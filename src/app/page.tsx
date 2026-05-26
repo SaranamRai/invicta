@@ -1,29 +1,54 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Trophy, 
   Users, 
   Activity, 
   Calendar,
-  ArrowUpRight,
-  Search,
-  Bell
+  ArrowUpRight
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { matches, standings, sports } from "@/lib/mock-data";
+import Link from "next/link";
+import { Card } from "@/components/ui/card";
+import { standings, sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-
-const stats = [
-  { label: "Active Teams", value: "0", icon: Users, color: "text-accent", bg: "bg-white/5" },
-  { label: "Live Matches", value: "0", icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  { label: "Upcoming Events", value: "0", icon: Calendar, color: "text-amber-500", bg: "bg-amber-500/10" },
-  { label: "Sports Disciplines", value: sports.length.toString(), icon: Trophy, color: "text-blue-500", bg: "bg-blue-500/10" },
-];
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot, query } from "firebase/firestore";
+import { MatchData } from "@/lib/types";
+import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 
 
 export default function Home() {
+  const [matchesData, setMatchesData] = useState<MatchData[]>([]);
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    const qMatches = query(collection(db, "matches"));
+    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
+      setMatchesData(data.sort((a, b) => b.lastUpdated - a.lastUpdated));
+    });
+
+    return () => unsubscribeMatches();
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const activeTeams = new Set(matchesData.flatMap(match => [match.teamA, match.teamB])).size;
+  const liveMatches = matchesData.filter(match => match.status === "Live").length;
+  const upcomingMatches = matchesData.filter(match => match.status === "Upcoming").length;
+
+  const stats = [
+    { label: "Active Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
+    { label: "Live Matches", value: liveMatches.toString(), icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Upcoming Events", value: upcomingMatches.toString(), icon: Calendar, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Sports Disciplines", value: sports.length.toString(), icon: Trophy, color: "text-blue-500", bg: "bg-blue-500/10" },
+  ];
+
   return (
     <div className="space-y-10">
       {/* Hero Section */}
@@ -46,10 +71,10 @@ export default function Home() {
           </div>
 
           <div className="mt-12 lg:mt-0">
-            <button className="group relative flex h-20 w-64 items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-accent/20">
+            <Link href="/matches" className="group relative flex h-20 w-64 items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-accent/20">
               <span className="relative z-10 text-xs font-black uppercase tracking-[0.3em] sport-heading">Enter The Arena</span>
               <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -62,7 +87,7 @@ export default function Home() {
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" /> WELCOME TO MSU INVICTA • THE INTER-DEPARTMENT ARENA IS NOW LIVE
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AWAITING TOURNAMENT SCHEDULE FROM ADMINISTRATION
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AWAITING MATCH UPDATES FROM VOLUNTEERS
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> OFFICIAL SPORTS MANAGEMENT PORTAL
@@ -111,13 +136,13 @@ export default function Home() {
               <div className="h-8 w-1.5 bg-accent rounded-full" />
               <h2 className="text-2xl font-black sport-heading">Live Scoreboard</h2>
             </div>
-            <button className="flex items-center text-xs font-black uppercase tracking-widest text-primary hover:text-accent transition-colors">
-              Broadcasting Center <ArrowUpRight size={16} className="ml-1" />
-            </button>
+            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary hover:text-accent transition-colors">
+              Match Center <ArrowUpRight size={16} className="ml-1" />
+            </Link>
           </div>
           
           <div className="grid gap-6">
-            {matches.length > 0 ? matches.map((match, i) => (
+            {matchesData.length > 0 ? matchesData.map((match, i) => (
               <motion.div
                 key={match.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -141,8 +166,8 @@ export default function Home() {
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent sport-heading">{match.type}</span>
                           {match.status === "Live" && (
-                            <span className="flex items-center gap-2 rounded-full bg-accent/20 px-3 py-1 text-[9px] font-black text-accent uppercase tracking-widest animate-pulse border border-accent/30">
-                              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> ON AIR {match.time}
+                          <span className="flex items-center gap-2 rounded-full bg-accent/20 px-3 py-1 text-[9px] font-black text-accent uppercase tracking-widest animate-pulse border border-accent/30">
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> ON AIR {getMatchClockText(match, now)}
                             </span>
                           )}
                         </div>
@@ -156,13 +181,26 @@ export default function Home() {
                     
                     <div className="flex items-center justify-center gap-4 bg-black/40 rounded-2xl p-5 min-w-[180px] border border-white/5 shadow-2xl">
                       <div className="text-center">
-                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{match.scoreA.toString().padStart(2, '0')}</span>
+                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{(match.scoreA ?? 0).toString().padStart(2, '0')}</span>
                       </div>
                       <div className="h-10 w-0.5 bg-white/20" />
                       <div className="text-center">
-                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{match.scoreB.toString().padStart(2, '0')}</span>
+                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{(match.scoreB ?? 0).toString().padStart(2, '0')}</span>
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300">
+                      {getMatchPeriod(match)}
+                    </span>
+                    <span className="rounded-full bg-white/10 px-3 py-1 font-mono text-xs font-black text-accent">
+                      {getMatchClockText(match, now)}
+                    </span>
+                    {match.scoreEvents?.[0] && (
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        Last point: {match.scoreEvents[0].teamName} at {match.scoreEvents[0].matchTime}
+                      </span>
+                    )}
                   </div>
                 </Card>
               </motion.div>
@@ -172,7 +210,7 @@ export default function Home() {
                   <Activity size={40} className="text-slate-600" />
                 </div>
                 <h3 className="text-2xl font-black sport-heading text-white">ARENA DATA PENDING</h3>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-2">The administrative board has not scheduled any live matches yet.</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-2">Volunteer updates will appear here once matches are published.</p>
               </div>
             )}
           </div>
@@ -227,5 +265,3 @@ export default function Home() {
     </div>
   );
 }
-
-

@@ -13,16 +13,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  // Volunteer routes have their own layout and auth guard
+  const isVolunteerPage = pathname.startsWith("/volunteer");
 
   useEffect(() => {
     if (!loading) {
-      if (!user && !isAuthPage) {
+      if (!user && !isAuthPage && !isVolunteerPage) {
         router.push("/login");
       } else if (user && isAuthPage) {
-        router.push("/");
+        // If volunteer is logged in and hits /login, send them to /volunteer
+        if (user.email?.toLowerCase() === "volunteer@gmail.com") {
+          router.push("/volunteer");
+        } else {
+          router.push("/");
+        }
       }
     }
-  }, [user, loading, isAuthPage, router]);
+  }, [user, loading, isAuthPage, isVolunteerPage, router]);
 
   if (loading) {
     return (
@@ -36,12 +43,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // On Login/Register pages, don't show sidebar/header
+  // Volunteer pages render their own full-page layout — no shared shell
+  if (isVolunteerPage) {
+    return <>{children}</>;
+  }
+
+  // Auth pages: no sidebar/header
   if (isAuthPage) {
     return <>{children}</>;
   }
 
-  // If not logged in and not on auth page, we're redirecting, so show nothing
+  // If not logged in and not on auth page, we're redirecting
   if (!user && !isAuthPage) {
     return null;
   }

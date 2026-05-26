@@ -22,10 +22,34 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
 
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/");
+      if (cleanEmail.toLowerCase() === "volunteer@gmail.com" && cleanPassword === "1234") {
+        // Special case for dummy volunteer: Firebase requires 6 chars, so we pad it behind the scenes
+        try {
+          await signInWithEmailAndPassword(auth, cleanEmail, "123456");
+        } catch (innerErr) {
+          const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
+            ? innerErr.code
+            : null;
+
+          if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
+            // Auto-create the dummy volunteer account
+            const { createUserWithEmailAndPassword } = await import("firebase/auth");
+            await createUserWithEmailAndPassword(auth, cleanEmail, "123456");
+          } else {
+            throw innerErr;
+          }
+        }
+        router.push("/volunteer");
+      } else {
+        await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+        router.push("/");
+      }
     } catch (err) {
+      console.error("Firebase Login Error:", err);
       setError(err instanceof Error ? err.message : "Invalid credentials. Please try again.");
     } finally {
       setIsLoading(false);
