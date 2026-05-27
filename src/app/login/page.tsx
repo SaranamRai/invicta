@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -26,44 +25,31 @@ export default function LoginPage() {
     const cleanPassword = password.trim();
 
     try {
-      if (cleanEmail.toLowerCase() === "volunteer@gmail.com" && cleanPassword === "1234") {
-        // Special case for dummy volunteer: Firebase requires 6 chars, so we pad it behind the scenes
-        try {
-          await signInWithEmailAndPassword(auth, cleanEmail, "123456");
-        } catch (innerErr) {
-          const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
-            ? innerErr.code
-            : null;
-
-          if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
-            // Auto-create the dummy volunteer account
-            const { createUserWithEmailAndPassword } = await import("firebase/auth");
-            await createUserWithEmailAndPassword(auth, cleanEmail, "123456");
-          } else {
-            throw innerErr;
-          }
-        }
-        router.push("/volunteer");
-      } else {
-        await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-        router.push("/");
+      if (cleanEmail.toLowerCase() !== "volunteer@gmail.com" || cleanPassword !== "1234") {
+        setError("Only the volunteer account can access this portal.");
+        return;
       }
+
+      // Special case for dummy volunteer: Firebase requires 6 chars, so we pad it behind the scenes.
+      try {
+        await signInWithEmailAndPassword(auth, cleanEmail, "123456");
+      } catch (innerErr) {
+        const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
+          ? innerErr.code
+          : null;
+
+        if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
+          const { createUserWithEmailAndPassword } = await import("firebase/auth");
+          await createUserWithEmailAndPassword(auth, cleanEmail, "123456");
+        } else {
+          throw innerErr;
+        }
+      }
+
+      router.push("/volunteer");
     } catch (err) {
       console.error("Firebase Login Error:", err);
       setError(err instanceof Error ? err.message : "Invalid credentials. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      await signInWithPopup(auth, googleProvider);
-      router.push("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to sign in with Google.");
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +79,7 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-2">Medhavi Skills University • Official Portal</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-2">Volunteer Access Terminal</p>
         </div>
 
         <div className="bg-white/75 backdrop-blur-2xl rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/40 relative overflow-hidden">
@@ -119,7 +105,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Official Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Volunteer Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
@@ -171,36 +157,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-100"></div>
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em] font-black text-slate-300">
-              <span className="bg-white px-6">Secure Override</span>
-            </div>
-          </div>
-
-          <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full h-16 bg-white border border-slate-200 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-4 group disabled:opacity-50 text-slate-700 shadow-sm"
-          >
-            <svg className="w-6 h-6" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 5.04c1.94 0 3.51.68 4.67 1.77L20.13 3.4C17.91 1.3 15.14 0 12 0 7.35 0 3.37 2.67 1.4 6.6l4.23 3.28C6.6 6.64 9.11 5.04 12 5.04z" />
-              <path fill="#4285F4" d="M23.49 12.27c0-.8-.07-1.56-.19-2.27H12v4.51h6.47c-.28 1.48-1.13 2.73-2.4 3.58l3.89 3.02c2.27-2.1 3.53-5.2 3.53-8.84z" />
-              <path fill="#34A853" d="M5.63 14.88c-.24-.72-.38-1.48-.38-2.28s.14-1.56.38-2.28L1.4 6.6C.51 8.38 0 10.36 0 12.4s.51 4.02 1.4 5.8l4.23-3.32z" />
-              <path fill="#FBBC05" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.89-3.02c-1.08.73-2.47 1.16-4.04 1.16-3.11 0-5.74-2.1-6.68-4.92l-4.23 3.32C3.37 21.33 7.35 24 12 24z" />
-            </svg>
-            Continue with Google
-          </button>
-
-          <div className="mt-8 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              New to the League?{" "}
-              <Link href="/register" className="text-accent hover:underline ml-2">
-                Create Account
-              </Link>
-            </p>
+          <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl bg-slate-50 p-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+            <ShieldCheck size={16} className="text-accent" />
+            Public users can browse without login
           </div>
         </div>
       </motion.div>

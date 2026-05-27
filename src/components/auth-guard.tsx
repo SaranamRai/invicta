@@ -12,26 +12,33 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isAuthPage = pathname === "/login";
+  const isRemovedUserAuthPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
   const isVolunteerPage = pathname.startsWith("/volunteer");
 
   useEffect(() => {
     if (!loading) {
-      if (!user && !isAuthPage && !isVolunteerPage) {
-        router.push("/login");
-      } else if (user && isAuthPage) {
-        // If volunteer is logged in and hits /login, send them to /volunteer
+      if (isRemovedUserAuthPage) {
+        router.replace("/");
+        return;
+      }
+
+      if (user && isAuthPage) {
         if (user.email?.toLowerCase() === "volunteer@gmail.com") {
           router.push("/volunteer");
         } else {
-          router.push("/");
+          auth.signOut();
         }
       }
     }
-  }, [user, loading, isAuthPage, isVolunteerPage, router]);
+  }, [user, loading, isAuthPage, isRemovedUserAuthPage, isVolunteerPage, router]);
 
-  if (loading) {
+  if (isVolunteerPage) {
+    return <>{children}</>;
+  }
+
+  if (loading && isAuthPage) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#020617]">
         <div className="relative h-20 w-20">
@@ -43,19 +50,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Volunteer pages render their own full-page layout — no shared shell
-  if (isVolunteerPage) {
-    return <>{children}</>;
+  if (isRemovedUserAuthPage) {
+    return null;
   }
 
   // Auth pages: no sidebar/header
   if (isAuthPage) {
     return <>{children}</>;
-  }
-
-  // If not logged in and not on auth page, we're redirecting
-  if (!user && !isAuthPage) {
-    return null;
   }
 
   return (

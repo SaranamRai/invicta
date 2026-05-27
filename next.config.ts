@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  devIndicators: false,
   allowedDevOrigins: ["192.168.56.1"],
 };
 
