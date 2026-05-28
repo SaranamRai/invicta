@@ -6,7 +6,8 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:teams:rtdb": "node src/lib/migrate-teams-to-rtdb.js"
   },
   "dependencies": {
     "clsx": "^2.1.1",

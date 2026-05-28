@@ -1,36 +1,46 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { 
-  Trophy, 
-  Users, 
-  Activity, 
-  Calendar,
-  ArrowUpRight
-} from "lucide-react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { standings, sports } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
-import { db } from "@/lib/firebase";
+import { motion } from "framer-motion";
+import {
+  Activity,
+  ArrowUpRight,
+  Calendar,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { collection, onSnapshot, query } from "firebase/firestore";
-import { MatchData } from "@/lib/types";
-import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 
+import { Card } from "@/components/ui/card";
+import { db } from "@/lib/firebase";
+import { Team } from "@/lib/fixture-generator";
+import { buildStandings, getAvailableSports } from "@/lib/live-data";
+import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
+import { MatchData } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
+  const [teamsData, setTeamsData] = useState<Team[]>([]);
   const [now, setNow] = useState(0);
 
   useEffect(() => {
     const qMatches = query(collection(db, "matches"));
     const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MatchData));
       setMatchesData(data.sort((a, b) => b.lastUpdated - a.lastUpdated));
     });
 
-    return () => unsubscribeMatches();
+    const qTeams = query(collection(db, "teams"));
+    const unsubscribeTeams = onSnapshot(qTeams, (snapshot) => {
+      setTeamsData(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)));
+    });
+
+    return () => {
+      unsubscribeMatches();
+      unsubscribeTeams();
+    };
   }, []);
 
   useEffect(() => {
@@ -38,9 +48,11 @@ export default function Home() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const activeTeams = new Set(matchesData.flatMap(match => [match.teamA, match.teamB])).size;
-  const liveMatches = matchesData.filter(match => match.status === "Live").length;
-  const upcomingMatches = matchesData.filter(match => match.status === "Upcoming").length;
+  const activeTeams = teamsData.length || new Set(matchesData.flatMap((match) => [match.teamA, match.teamB])).size;
+  const liveMatches = matchesData.filter((match) => match.status === "Live").length;
+  const upcomingMatches = matchesData.filter((match) => match.status === "Upcoming").length;
+  const sports = getAvailableSports(teamsData, matchesData);
+  const standings = buildStandings(matchesData, teamsData).slice(0, 5);
 
   const stats = [
     { label: "Active Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
@@ -51,55 +63,53 @@ export default function Home() {
 
   return (
     <div className="space-y-10">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-[2.5rem] bg-[#020617] text-white shadow-2xl">
+      <section className="relative overflow-hidden rounded-2xl bg-[#020617] text-white shadow-2xl sm:rounded-[2.5rem]">
         <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-transparent opacity-50" />
         <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-accent/10 blur-[100px]" />
-        
-        <div className="relative flex flex-col items-start p-12 lg:flex-row lg:items-center lg:justify-between lg:p-20">
+
+        <div className="relative flex flex-col items-start gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-between lg:p-20">
           <div className="max-w-2xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-accent border border-accent/30">
-              <span className="h-2 w-2 rounded-full bg-accent animate-pulse" /> Live Arena Updates
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-accent">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+              Guest Terminal
             </div>
-            <h1 className="text-6xl font-black tracking-tighter sport-heading lg:text-8xl text-white">
+            <h1 className="sport-heading text-4xl font-black tracking-tighter text-white sm:text-6xl lg:text-8xl">
               MSU <span className="text-accent italic">INVICTA.</span>
             </h1>
-            <p className="text-lg font-medium text-slate-400 max-w-md uppercase tracking-wider leading-relaxed">
+            <p className="max-w-md text-sm font-medium uppercase leading-relaxed tracking-wider text-slate-400 sm:text-lg">
               Official Inter-Department Sport Management Platform of Medhavi Skills University.
             </p>
-
           </div>
 
-          <div className="mt-12 lg:mt-0">
-            <Link href="/matches" className="group relative flex h-20 w-64 items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-accent/20">
-              <span className="relative z-10 text-xs font-black uppercase tracking-[0.3em] sport-heading">Enter The Arena</span>
+          <div className="w-full lg:mt-0 lg:w-auto">
+            <Link href="/register" className="group relative flex h-16 w-full items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground shadow-2xl shadow-accent/20 transition-all hover:scale-105 active:scale-95 sm:h-20 lg:w-72">
+              <span className="sport-heading relative z-10 text-xs font-black uppercase tracking-[0.3em]">Register Team</span>
               <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
             </Link>
           </div>
         </div>
 
-        {/* Live Ticker */}
         <div className="border-t border-white/10 bg-black/40 py-4 backdrop-blur-md">
           <div className="flex animate-marquee whitespace-nowrap gap-20">
             {[1, 2, 3].map((n) => (
               <div key={n} className="flex gap-20">
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" /> WELCOME TO MSU INVICTA • THE INTER-DEPARTMENT ARENA IS NOW LIVE
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                  Welcome to MSU Invicta - the inter-department arena is live
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> AWAITING MATCH UPDATES FROM VOLUNTEERS
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Awaiting match updates from volunteers
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> OFFICIAL SPORTS MANAGEMENT PORTAL
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  Official sports management portal
                 </span>
-
               </div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* Stats Row */}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
@@ -109,14 +119,14 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="group relative overflow-hidden border-2 hover:border-accent transition-all">
-              <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Card className="group relative overflow-hidden border-2 transition-all hover:border-accent">
+              <div className="absolute right-0 top-0 p-2 opacity-5 transition-opacity group-hover:opacity-10">
                 <stat.icon size={80} />
               </div>
-              <div className="flex items-center justify-between relative z-10">
+              <div className="relative z-10 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
-                  <h3 className="mt-1 text-4xl font-black sport-heading">{stat.value}</h3>
+                  <h3 className="sport-heading mt-1 text-4xl font-black">{stat.value}</h3>
                 </div>
                 <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", stat.bg)}>
                   <stat.icon className={stat.color} size={24} />
@@ -127,20 +137,18 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Main Grid */}
-      <div className="grid gap-10 lg:grid-cols-3">
-        {/* Live Matches */}
+      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
         <div className="space-y-8 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 bg-accent rounded-full" />
-              <h2 className="text-2xl font-black sport-heading">Live Scoreboard</h2>
+              <div className="h-8 w-1.5 rounded-full bg-accent" />
+              <h2 className="sport-heading text-2xl font-black">Live Scoreboard</h2>
             </div>
-            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary hover:text-accent transition-colors">
+            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary transition-colors hover:text-accent">
               Match Center <ArrowUpRight size={16} className="ml-1" />
             </Link>
           </div>
-          
+
           <div className="grid gap-6">
             {matchesData.length > 0 ? matchesData.map((match, i) => (
               <motion.div
@@ -149,44 +157,41 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + i * 0.1 }}
               >
-                <Card variant={match.status === "Live" ? "scoreboard" : "default"} className="relative overflow-hidden group border-2">
+                <Card variant={match.status === "Live" ? "scoreboard" : "default"} className="group relative overflow-hidden border-2">
                   {match.status === "Live" && (
-                    <div className="absolute top-0 left-0 h-full w-2 bg-accent shadow-[0_0_15px_rgba(252,191,77,0.5)]" />
+                    <div className="absolute left-0 top-0 h-full w-2 bg-accent shadow-[0_0_15px_rgba(252,191,77,0.5)]" />
                   )}
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 shadow-inner border border-white/10 group-hover:scale-110 transition-transform">
-                        <img 
-                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"} 
+                    <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-110">
+                        <img
+                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"}
                           alt={match.sport}
                           className="h-full w-full object-contain"
                         />
                       </div>
                       <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent sport-heading">{match.type}</span>
+                        <div className="mb-2 flex items-center gap-3">
+                          <span className="sport-heading text-[10px] font-black uppercase tracking-[0.2em] text-accent">{match.type}</span>
                           {match.status === "Live" && (
-                          <span className="flex items-center gap-2 rounded-full bg-accent/20 px-3 py-1 text-[9px] font-black text-accent uppercase tracking-widest animate-pulse border border-accent/30">
-                              <span className="h-1.5 w-1.5 rounded-full bg-accent" /> ON AIR {getMatchClockText(match, now)}
+                            <span className="flex animate-pulse items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                              On Air {getMatchClockText(match, now)}
                             </span>
                           )}
                         </div>
-                        <p className="text-2xl font-black sport-heading tracking-wide">
-                          <span className="opacity-80 group-hover:opacity-100 transition-opacity">{match.teamA}</span>
+                        <p className="sport-heading text-lg font-black tracking-wide sm:text-2xl">
+                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamA}</span>
                           <span className="mx-3 text-accent italic">VS</span>
-                          <span className="opacity-80 group-hover:opacity-100 transition-opacity">{match.teamB}</span>
+                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamB}</span>
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center justify-center gap-4 bg-black/40 rounded-2xl p-5 min-w-[180px] border border-white/5 shadow-2xl">
-                      <div className="text-center">
-                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{(match.scoreA ?? 0).toString().padStart(2, '0')}</span>
-                      </div>
+
+                    <div className="flex min-w-full items-center justify-center gap-4 rounded-2xl border border-white/5 bg-black/40 p-4 shadow-2xl sm:min-w-[180px] sm:p-5">
+                      <span className="scoreboard-number text-4xl font-black leading-none tracking-tighter sm:text-5xl">{(match.scoreA ?? 0).toString().padStart(2, "0")}</span>
                       <div className="h-10 w-0.5 bg-white/20" />
-                      <div className="text-center">
-                        <span className="text-5xl font-black scoreboard-number leading-none tracking-tighter">{(match.scoreB ?? 0).toString().padStart(2, '0')}</span>
-                      </div>
+                      <span className="scoreboard-number text-4xl font-black leading-none tracking-tighter sm:text-5xl">{(match.scoreB ?? 0).toString().padStart(2, "0")}</span>
                     </div>
                   </div>
                   <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
@@ -205,61 +210,55 @@ export default function Home() {
                 </Card>
               </motion.div>
             )) : (
-              <div className="flex flex-col items-center justify-center p-20 rounded-[2.5rem] bg-card/30 border-2 border-dashed border-white/10 text-center">
-                <div className="h-20 w-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center sm:rounded-[2.5rem] sm:p-20">
+                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white/5">
                   <Activity size={40} className="text-slate-600" />
                 </div>
-                <h3 className="text-2xl font-black sport-heading text-white">ARENA DATA PENDING</h3>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-2">Volunteer updates will appear here once matches are published.</p>
+                <h3 className="sport-heading text-2xl font-black text-white">ARENA DATA PENDING</h3>
+                <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-500">Volunteer updates will appear here once matches are published.</p>
               </div>
             )}
           </div>
-
         </div>
 
-        {/* Quick Standings */}
         <div className="space-y-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 bg-primary rounded-full" />
-              <h2 className="text-2xl font-black sport-heading">League Table</h2>
+              <div className="h-8 w-1.5 rounded-full bg-primary" />
+              <h2 className="sport-heading text-2xl font-black">League Table</h2>
             </div>
-            <button className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Stats</button>
+            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Stats</Link>
           </div>
-          
-          <Card className="p-0 overflow-hidden border-2">
+
+          <Card className="overflow-hidden border-2 p-0">
             {standings.length > 0 ? (
               <table className="w-full text-left text-sm">
                 <thead className="bg-secondary text-secondary-foreground">
                   <tr>
                     <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">POS</th>
                     <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">DEPARTMENT</th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-center">P</th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-right">PTS</th>
+                    <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest">P</th>
+                    <th className="px-5 py-4 text-right text-[10px] font-black uppercase tracking-widest">PTS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {standings.map((team) => (
-                    <tr key={team.team} className="transition-all hover:bg-secondary/50 group">
-                      <td className="px-5 py-5 font-black sport-heading text-lg">{team.rank}</td>
-                      <td className="px-5 py-5 font-bold text-sm tracking-wide group-hover:text-primary transition-colors">{team.team}</td>
-                      <td className="px-5 py-5 text-center text-muted-foreground font-bold">{team.played}</td>
-                      <td className="px-5 py-5 text-right font-black text-lg sport-heading text-primary">{team.pts}</td>
+                    <tr key={team.team} className="group transition-all hover:bg-secondary/50">
+                      <td className="sport-heading px-5 py-5 text-lg font-black">{team.rank}</td>
+                      <td className="px-5 py-5 text-sm font-bold tracking-wide transition-colors group-hover:text-primary">{team.team}</td>
+                      <td className="px-5 py-5 text-center font-bold text-muted-foreground">{team.played}</td>
+                      <td className="sport-heading px-5 py-5 text-right text-lg font-black text-primary">{team.pts}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
               <div className="p-10 text-center">
-                <Trophy size={48} className="mx-auto text-slate-700 opacity-20 mb-4" />
+                <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Standings await season start</p>
               </div>
             )}
           </Card>
-
-
-          {/* Ad/Promo Section */}
-
         </div>
       </div>
     </div>

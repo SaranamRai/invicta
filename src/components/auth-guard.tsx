@@ -2,39 +2,21 @@
 
 import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const [user, loading] = useAuthState(auth);
-  const router = useRouter();
+  const [, loading] = useAuthState(auth);
   const pathname = usePathname();
 
   const isAuthPage = pathname === "/login";
-  const isRemovedUserAuthPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
   const isVolunteerPage = pathname.startsWith("/volunteer");
+  // Admin routes have their own layout and auth guard
+  const isAdminPage = pathname.startsWith("/admin");
 
-  useEffect(() => {
-    if (!loading) {
-      if (isRemovedUserAuthPage) {
-        router.replace("/");
-        return;
-      }
-
-      if (user && isAuthPage) {
-        if (user.email?.toLowerCase() === "volunteer@gmail.com") {
-          router.push("/volunteer");
-        } else {
-          auth.signOut();
-        }
-      }
-    }
-  }, [user, loading, isAuthPage, isRemovedUserAuthPage, isVolunteerPage, router]);
-
-  if (isVolunteerPage) {
+  if (isVolunteerPage || isAdminPage) {
     return <>{children}</>;
   }
 
@@ -50,21 +32,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isRemovedUserAuthPage) {
-    return null;
-  }
-
   // Auth pages: no sidebar/header
   if (isAuthPage) {
     return <>{children}</>;
   }
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex min-h-screen w-full flex-col lg:flex-row">
       <Sidebar />
-      <div className="flex-1 ml-64 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
         <Header />
-        <main className="p-8 transition-all duration-300 w-full max-w-[1600px] mx-auto">
+        <main className="mx-auto w-full max-w-[1600px] p-4 transition-all duration-300 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

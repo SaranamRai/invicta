@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { setAdminAuth, setPortalRole } from "@/lib/admin-auth";
+import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from "firebase/auth";
 import { motion } from "framer-motion";
 import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
@@ -16,6 +17,25 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
+  const signInPortalAccount = async (accountEmail: string) => {
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailAndPassword(auth, accountEmail, "123456");
+    } catch (innerErr) {
+      const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
+        ? innerErr.code
+        : null;
+
+      if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
+        const { createUserWithEmailAndPassword } = await import("firebase/auth");
+        await setPersistence(auth, browserLocalPersistence);
+        await createUserWithEmailAndPassword(auth, accountEmail, "123456");
+      } else {
+        throw innerErr;
+      }
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -23,66 +43,63 @@ export default function LoginPage() {
 
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
+    const portalEmail = cleanEmail.toLowerCase();
 
     try {
-      if (cleanEmail.toLowerCase() !== "volunteer@gmail.com" || cleanPassword !== "1234") {
-        setError("Only the volunteer account can access this portal.");
+      if (portalEmail === "admin@gmail.com" && cleanPassword === "1234") {
+        await signInPortalAccount(cleanEmail);
+        setAdminAuth(true);
+        router.push("/admin");
         return;
       }
 
-      // Special case for dummy volunteer: Firebase requires 6 chars, so we pad it behind the scenes.
-      try {
-        await signInWithEmailAndPassword(auth, cleanEmail, "123456");
-      } catch (innerErr) {
-        const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
-          ? innerErr.code
-          : null;
-
-        if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
-          const { createUserWithEmailAndPassword } = await import("firebase/auth");
-          await createUserWithEmailAndPassword(auth, cleanEmail, "123456");
-        } else {
-          throw innerErr;
-        }
+      if (portalEmail !== "volunteer@gmail.com" || cleanPassword !== "1234") {
+        setAdminAuth(false);
+        setError("Only registered admin and volunteer credentials can access this portal.");
+        return;
       }
+
+      await signInPortalAccount(cleanEmail);
+      setPortalRole("volunteer");
+      setAdminAuth(false);
 
       router.push("/volunteer");
     } catch (err) {
       console.error("Firebase Login Error:", err);
       setError(err instanceof Error ? err.message : "Invalid credentials. Please try again.");
     } finally {
+      setPassword("");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden px-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-4 py-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-lg"
+        className="relative z-10 w-full max-w-3xl"
       >
-        <div className="text-center mb-10 flex flex-col items-center">
-          <div className="flex items-center justify-center gap-6 mb-2">
-            <div className="h-16 w-auto overflow-hidden flex items-center justify-center">
-              <img 
-                src="/msu-logo.png" 
-                alt="MSU Logo" 
-                className="h-full w-auto max-w-none ml-[-2px]" 
+        <div className="mb-8 sm:mb-10">
+          <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-7">
+            <div className="flex h-16 w-40 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-44">
+              <img
+                src="/msu-logo-transparent.png"
+                alt="Medhavi Skills University"
+                className="h-auto w-full object-contain"
               />
             </div>
-            <div className="flex flex-col items-center">
-              <div className="flex items-center gap-4">
-                <span className="h-[1.5px] w-14 bg-accent" />
-                <span className="text-[24px] font-bold tracking-[0.6em] text-slate-900 uppercase font-serif italic">Invicta</span>
-                <span className="h-[1.5px] w-14 bg-accent" />
-              </div>
+            <span className="hidden h-14 w-px shrink-0 bg-slate-300 sm:block" aria-hidden="true" />
+            <div className="flex w-full min-w-0 flex-1 items-center justify-center gap-3 sm:gap-5">
+              <span className="h-[1.5px] w-16 bg-accent sm:w-20" />
+              <span className="text-[22px] font-bold uppercase tracking-[0.42em] text-slate-900 font-serif italic sm:text-[28px] sm:tracking-[0.6em]">Invicta</span>
+              <span className="h-[1.5px] w-16 bg-accent sm:w-20" />
             </div>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-2">Volunteer Access Terminal</p>
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin & Volunteer Access Terminal</p>
         </div>
 
-        <div className="bg-white/75 backdrop-blur-2xl rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/40 relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/75 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl sm:rounded-[2.5rem] sm:p-10">
           {/* Subtle Form Watermark */}
           <div className="absolute -right-20 -bottom-20 w-80 h-80 opacity-[0.03] blur-[20px] pointer-events-none select-none rotate-12">
             <img 
@@ -103,13 +120,15 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Volunteer Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Admin or Volunteer Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
                   type="email" 
+                  name="portal-email"
+                  autoComplete="username email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -123,12 +142,16 @@ export default function LoginPage() {
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Secure Password</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  type={showPassword ? "text" : "password"} 
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="portal-password"
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password" 
+                  placeholder="Enter your password"
                   className="w-full h-14 bg-slate-50/50 border border-slate-200 rounded-2xl px-12 text-sm font-bold tracking-tight focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all text-slate-900 placeholder:text-slate-400"
                 />
                 {password && (

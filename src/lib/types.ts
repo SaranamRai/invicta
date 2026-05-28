@@ -24,6 +24,8 @@ export interface MatchData {
   scoreB: number;
   status: "Upcoming" | "Live" | "Finished";
   time?: string;
+  date?: string;
+  venue?: string;
   lastUpdated: number;
   startedAt?: number;
   endedAt?: number;

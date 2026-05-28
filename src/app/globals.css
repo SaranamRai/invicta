@@ -13,10 +13,26 @@
   --muted-foreground: #64748b;
   --card: #ffffff;
   --card-foreground: #020617;
-  --border: #e2e8f0;
+  --border: #cbd5e1;
   
   --font-heading: var(--font-outfit);
   --font-body: var(--font-inter);
+}
+
+:root[data-theme="dark"] {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --primary: #fcd34d;
+  --primary-foreground: #020617;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --accent: #fcd34d;
+  --accent-foreground: #020617;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --border: #1e293b;
 }
 
 @theme inline {
@@ -39,24 +55,6 @@
   
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-heading), sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #020617;
-    --foreground: #f8fafc;
-    --primary: #fcd34d;
-    --primary-foreground: #020617;
-    --secondary: #1e293b;
-    --secondary-foreground: #f8fafc;
-    --accent: #fcd34d;
-    --accent-foreground: #020617;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --card: #0f172a;
-    --card-foreground: #f8fafc;
-    --border: #1e293b;
-  }
 }
 
 body {
@@ -88,11 +86,85 @@ body {
   letter-spacing: -0.02em;
 }
 
+.input-light {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 0.875rem 1rem;
+  color: #020617;
+  font-size: 0.875rem;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.input-light::placeholder {
+  color: #94a3b8;
+}
+
+.input-light:focus {
+  border-color: #f59e0b;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
 
 .glass-card {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-surface [class*="bg-slate-900"],
+.dashboard-surface [class*="bg-slate-950"] {
+  background-color: color-mix(in oklab, var(--card) 88%, var(--secondary)) !important;
+}
+
+.dashboard-surface [class*="bg-slate-800"],
+.dashboard-surface [class*="bg-black/"],
+.dashboard-surface [class*="bg-white/5"],
+.dashboard-surface [class*="bg-white/10"] {
+  background-color: var(--secondary) !important;
+}
+
+.dashboard-surface [class*="border-white/"],
+.dashboard-surface [class*="border-slate-"] {
+  border-color: var(--border) !important;
+}
+
+.dashboard-surface [class*="text-white"],
+.dashboard-surface [class*="text-slate-200"],
+.dashboard-surface [class*="text-slate-300"] {
+  color: var(--foreground) !important;
+}
+
+.dashboard-surface [class*="text-slate-400"],
+.dashboard-surface [class*="text-slate-500"],
+.dashboard-surface [class*="text-slate-600"] {
+  color: var(--muted-foreground) !important;
+}
+
+.dashboard-surface .admin-hero-panel {
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+.dashboard-surface .admin-hero-panel h2,
+.dashboard-surface .admin-hero-panel p,
+.dashboard-surface .admin-hero-panel span,
+.dashboard-surface .admin-hero-panel svg {
+  color: inherit !important;
+}
+
+.dashboard-surface .admin-hero-panel .admin-hero-accent {
+  color: #facc15 !important;
+}
+
+.dashboard-surface .admin-primary-button {
+  background: #0f172a !important;
+  border-color: #0f172a !important;
+  color: #ffffff !important;
 }
 
 .sport-border {
@@ -116,5 +188,3 @@ body {
 .animate-logo-mark {
   animation: logo-mark 3s ease-in-out infinite;
 }
-
-

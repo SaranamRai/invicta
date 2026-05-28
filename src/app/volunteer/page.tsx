@@ -100,60 +100,60 @@ export default function VolunteerDashboard() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-4xl font-black tracking-tighter text-white uppercase sport-heading">Dashboard Overview</h1>
-        <p className="text-slate-400 font-medium mt-2 uppercase tracking-widest text-xs">
+        <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase sport-heading">Dashboard Overview</h1>
+        <p className="text-muted-foreground font-medium mt-2 uppercase tracking-widest text-xs">
           Manage live events and track updates
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-white/5 border-white/10 p-6 flex items-center gap-4">
+        <Card className="p-6 flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
             <Activity size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Matches</p>
-            <p className="text-3xl font-black text-white">{activeMatches.length}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Live Matches</p>
+            <p className="text-3xl font-black text-foreground">{activeMatches.length}</p>
           </div>
         </Card>
         
-        <Card className="bg-white/5 border-white/10 p-6 flex items-center gap-4">
+        <Card className="p-6 flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
             <Trophy size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Updates Today</p>
-            <p className="text-3xl font-black text-white">{recentLogs.length * 5}+</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Updates Today</p>
+            <p className="text-3xl font-black text-foreground">{recentLogs.length * 5}+</p>
           </div>
         </Card>
 
-        <Card className="bg-white/5 border-white/10 p-6 flex items-center gap-4">
+        <Card className="p-6 flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
             <Clock size={24} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Event</p>
-            <p className="text-xl font-black text-white mt-1">{nextMatch?.time || "TBD"}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Next Event</p>
+            <p className="text-xl font-black text-foreground mt-1">{nextMatch?.time || "TBD"}</p>
           </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         <div className="xl:col-span-2 space-y-6">
-          <div className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-black uppercase tracking-wider text-white">Sports Match Control</h2>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Select a sport, start the clock, then update points in the control panel.</p>
+              <h2 className="text-xl font-black uppercase tracking-wider text-foreground">Sports Match Control</h2>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Select a sport, start the clock, then update points in the control panel.</p>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-1">
+            <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-border bg-secondary/50 p-1">
               {sports.map(sport => (
                 <button
                   key={sport}
                   onClick={() => setSelectedSport(sport)}
                   className={cn(
                     "whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
-                    selectedSport === sport ? "bg-accent text-accent-foreground" : "text-slate-400 hover:bg-white/10 hover:text-white"
+                    selectedSport === sport ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground"
                   )}
                 >
                   {sport}
@@ -168,12 +168,12 @@ export default function VolunteerDashboard() {
               const isFinished = match.status === "Finished" || match.period === "Full Time";
 
               return (
-                <Card key={match.id} className="bg-white/5 border-white/10 p-6 relative overflow-hidden">
+                <Card key={match.id} className="p-6 relative overflow-hidden">
                   {isRunning && <div className="absolute left-0 top-0 h-full w-1 bg-accent" />}
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{match.sport} / {match.type}</span>
-                      <h3 className="mt-2 text-lg font-black uppercase tracking-wide text-white">{match.teamA} vs {match.teamB}</h3>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{match.sport} / {match.type}</span>
+                      <h3 className="mt-2 text-lg font-black uppercase tracking-wide text-foreground">{match.teamA} vs {match.teamB}</h3>
                     </div>
                     <span className={cn(
                       "rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest",
@@ -186,18 +186,18 @@ export default function VolunteerDashboard() {
                     </span>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-[1.2fr_1fr_1.2fr] items-center gap-4 rounded-2xl bg-black/30 p-4">
+                  <div className="mt-6 grid grid-cols-[1.2fr_1fr_1.2fr] items-center gap-4 rounded-2xl bg-secondary/60 p-4">
                     <div className="flex flex-col items-center">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">{match.teamA}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{match.teamA}</p>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => adjustScore(match, "A", -1)}
                           disabled={isFinished}
-                          className="h-7 w-7 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-xs font-black text-white transition-all disabled:opacity-20"
+                          className="h-7 w-7 rounded-lg bg-card border border-border hover:border-accent flex items-center justify-center text-xs font-black text-foreground transition-all disabled:opacity-20"
                         >
                           -
                         </button>
-                        <span className="text-2xl font-black text-white w-8 text-center">{match.scoreA}</span>
+                        <span className="text-2xl font-black text-foreground w-8 text-center">{match.scoreA}</span>
                         <button
                           onClick={() => adjustScore(match, "A", 1)}
                           disabled={isFinished}
@@ -209,19 +209,19 @@ export default function VolunteerDashboard() {
                     </div>
                     <div className="text-center">
                       <p className="font-mono text-xl font-black text-accent">{getMatchClockText(match, now)}</p>
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-500">{match.period || "First Half"}</p>
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{match.period || "First Half"}</p>
                     </div>
                     <div className="flex flex-col items-center">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">{match.teamB}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{match.teamB}</p>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => adjustScore(match, "B", -1)}
                           disabled={isFinished}
-                          className="h-7 w-7 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-xs font-black text-white transition-all disabled:opacity-20"
+                          className="h-7 w-7 rounded-lg bg-card border border-border hover:border-accent flex items-center justify-center text-xs font-black text-foreground transition-all disabled:opacity-20"
                         >
                           -
                         </button>
-                        <span className="text-2xl font-black text-white w-8 text-center">{match.scoreB}</span>
+                        <span className="text-2xl font-black text-foreground w-8 text-center">{match.scoreB}</span>
                         <button
                           onClick={() => adjustScore(match, "B", 1)}
                           disabled={isFinished}
@@ -246,7 +246,7 @@ export default function VolunteerDashboard() {
                     )}
                     <Link
                       href={`/volunteer/matches/${match.id}`}
-                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-white/10"
+                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
                     >
                       <ListChecks size={16} />
                       Control Panel
@@ -255,9 +255,9 @@ export default function VolunteerDashboard() {
                 </Card>
               );
             }) : (
-              <div className="col-span-full text-center p-10 border border-dashed border-white/10 rounded-2xl">
-                <AlertCircle size={32} className="mx-auto text-slate-500 mb-4" />
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No matches for this sport</p>
+              <div className="col-span-full text-center p-10 border border-dashed border-border rounded-2xl">
+                <AlertCircle size={32} className="mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No matches for this sport</p>
               </div>
             )}
           </div>
@@ -265,26 +265,26 @@ export default function VolunteerDashboard() {
 
         {/* Recent Activity */}
         <div className="space-y-6">
-          <h2 className="text-xl font-black uppercase tracking-wider text-white border-b border-white/10 pb-4">
+          <h2 className="text-xl font-black uppercase tracking-wider text-foreground border-b border-border pb-4">
             Recent Activity
           </h2>
           
           <div className="space-y-4">
             {recentLogs.length > 0 ? recentLogs.map(log => (
-              <Card key={log.id} className="bg-white/5 border-white/10 p-4 flex gap-4 items-start">
+              <Card key={log.id} className="p-4 flex gap-4 items-start">
                 <div className="mt-1 h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center text-accent">
                   <Activity size={14} />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-200">{log.action}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-1">
+                  <p className="text-sm text-foreground">{log.action}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
                     {formatDistanceToNow(log.timestamp, { addSuffix: true })} • {log.volunteerEmail}
                   </p>
                 </div>
               </Card>
             )) : (
-              <div className="text-center p-10 border border-dashed border-white/10 rounded-2xl">
-                <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No recent activity</p>
+              <div className="text-center p-10 border border-dashed border-border rounded-2xl">
+                <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No recent activity</p>
               </div>
             )}
           </div>
