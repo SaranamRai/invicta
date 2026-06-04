@@ -9,6 +9,7 @@ import { ArrowLeft, CheckCircle2, Loader2, Users } from "lucide-react";
 import { db, rtdb } from "@/lib/firebase";
 import { sports } from "@/lib/mock-data";
 import { Team } from "@/lib/fixture-generator";
+import { ProtectedRoute } from "@/components/protected-route";
 
 const DEPARTMENT_TEAM_LIMIT = 2;
 
@@ -23,7 +24,7 @@ const playerCountsBySport: Record<string, number> = {
 const normalizeDepartment = (value: string) => value.trim().replace(/\s+/g, " ").toUpperCase();
 const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const [captainName, setCaptainName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -138,7 +139,7 @@ export default function RegisterPage() {
       <div className="mx-auto max-w-4xl">
         <Link href="/" className="mb-8 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-950">
           <ArrowLeft size={16} />
-          Back to Guest Terminal
+          Back to Home
         </Link>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
@@ -149,7 +150,7 @@ export default function RegisterPage() {
               </div>
               <h1 className="sport-heading text-3xl font-black tracking-tight text-slate-950">Team Registration</h1>
               <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500">
-                Register your department team. Only the first two teams from each department are accepted.
+                Use this form to enter the department, sport, captain contact, and player names for MSU Invicta. Only the first two teams from each department are accepted.
               </p>
             </div>
             {teamName && (
@@ -213,8 +214,8 @@ export default function RegisterPage() {
             <div>
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Members Name</h2>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Fill exactly {requiredPlayers} player names for the selected sport.</p>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Player Names</h2>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Enter exactly {requiredPlayers} player names for the selected sport.</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
                   {requiredPlayers} slots
@@ -247,6 +248,14 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <ProtectedRoute allowedRole="coordinator">
+      <RegisterPageContent />
+    </ProtectedRoute>
   );
 }
 

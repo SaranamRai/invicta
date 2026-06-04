@@ -3,14 +3,19 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Trophy, Calendar, Target } from "lucide-react";
+import { BookOpen, Calendar, HelpCircle, Images, LayoutDashboard, Megaphone, Target, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-  { icon: Trophy, label: "League Tables", href: "/standings" },
-  { icon: Calendar, label: "Match Center", href: "/matches" },
+  { icon: LayoutDashboard, label: "Home", href: "/" },
+  { icon: Trophy, label: "Standings", href: "/standings" },
+  { icon: Calendar, label: "Matches", href: "/matches" },
   { icon: Target, label: "Sports", href: "/sports" },
+  { icon: Trophy, label: "Results", href: "/results" },
+  { icon: Megaphone, label: "News", href: "/announcements" },
+  { icon: BookOpen, label: "Rules", href: "/rules" },
+  { icon: Images, label: "Gallery", href: "/gallery" },
+  { icon: HelpCircle, label: "Help", href: "/contact" },
 ];
 
 
@@ -33,7 +38,7 @@ export function Sidebar() {
           </div>
 
           <div className="hidden h-[1px] w-full bg-gradient-to-r from-accent/50 to-transparent lg:mb-4 lg:block" />
-          <span className="block min-w-0 text-[10px] font-black uppercase tracking-[0.35em] text-accent/80 lg:px-1 lg:tracking-[0.5em]">INVICTA TERMINAL</span>
+          <span className="block min-w-0 text-[10px] font-black uppercase tracking-[0.22em] text-accent/80 lg:px-1">INVICTA SPORTS HUB</span>
 
         </div>
 

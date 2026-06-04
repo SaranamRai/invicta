@@ -295,9 +295,9 @@ export default function LiveMatchEditPanel() {
           <ChevronLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-3xl font-black tracking-tighter text-white uppercase sport-heading">Live Control Panel</h1>
-          <p className="text-slate-400 font-medium mt-1 uppercase tracking-widest text-[10px]">
-            {match.teamA} vs {match.teamB} / {match.sport}
+          <h1 className="text-3xl font-black tracking-tighter text-white uppercase sport-heading">Update This Match</h1>
+          <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-400">
+            {match.teamA} vs {match.teamB} / {match.sport}. Use the controls below to keep the public score and timeline accurate.
           </p>
         </div>
       </div>
@@ -317,7 +317,7 @@ export default function LiveMatchEditPanel() {
           <Card className="bg-white/5 border-white/10 p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Clock</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Clock Seen by Visitors</p>
                 <div className="mt-2 flex flex-wrap items-end gap-4">
                   <span className="font-mono text-6xl font-black text-accent">{getMatchClockText(match, now)}</span>
                   <span className="mb-2 rounded-full bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">
@@ -337,28 +337,28 @@ export default function LiveMatchEditPanel() {
                   disabled={saving || match.clockRunning || match.status === "Finished"}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-3 text-[10px] font-black uppercase tracking-widest text-accent-foreground disabled:opacity-50"
                 >
-                  <Play size={16} /> Start
+                  <Play size={16} /> Start Match
                 </button>
                 <button
                   onClick={handleHalfTime}
                   disabled={saving || match.status !== "Live" || !match.clockRunning}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50"
                 >
-                  <Pause size={16} /> Half
+                  <Pause size={16} /> Half Time
                 </button>
                 <button
                   onClick={handleSecondHalf}
                   disabled={saving || match.status !== "Live" || match.clockRunning}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50"
                 >
-                  <Flag size={16} /> Resume
+                  <Flag size={16} /> Start 2nd Half
                 </button>
                 <button
                   onClick={handleEndMatch}
                   disabled={saving || match.status === "Finished"}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-red-500/20 px-3 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500/30 disabled:opacity-50"
                 >
-                  <Square size={16} /> End
+                  <Square size={16} /> End Match
                 </button>
               </div>
             </div>
@@ -366,7 +366,7 @@ export default function LiveMatchEditPanel() {
 
           <Card className="bg-white/5 border-white/10 p-8">
             <h2 className="text-xl font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-6">
-              Match Status & Score
+              Score and Match Status
             </h2>
             
             <form onSubmit={handleSave} className="space-y-8">
@@ -436,7 +436,7 @@ export default function LiveMatchEditPanel() {
                   className="w-full h-14 bg-accent text-accent-foreground rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-accent/20 hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
                 >
                   {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  Save Changes (Live Sync)
+                  Save and Update Public Pages
                 </button>
               </div>
             </form>
@@ -447,7 +447,7 @@ export default function LiveMatchEditPanel() {
         <div className="space-y-8">
           <Card className="bg-white/5 border-white/10 p-6">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
-              Score Timeline
+              Scoring Timeline
             </h2>
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {match.scoreEvents && match.scoreEvents.length > 0 ? match.scoreEvents.map(event => (
@@ -468,13 +468,13 @@ export default function LiveMatchEditPanel() {
 
           <Card className="bg-white/5 border-white/10 p-6">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
-              Live Announcements
+              Match Announcements
             </h2>
             <div className="space-y-4">
               <textarea
                 value={announcement}
                 onChange={(e) => setAnnouncement(e.target.value)}
-                placeholder="Type a live update... (e.g. Goal by Player!)"
+                placeholder="Type a short update for visitors..."
                 className="w-full h-24 bg-black/40 border border-white/10 rounded-xl p-4 text-sm font-medium focus:outline-none focus:border-accent text-white resize-none"
               />
               <button 
@@ -482,7 +482,7 @@ export default function LiveMatchEditPanel() {
                 disabled={saving || !announcement.trim()}
                 className="w-full h-12 bg-white/10 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white/20 transition-all disabled:opacity-50"
               >
-                Push Announcement
+                Post Announcement
               </button>
             </div>
 

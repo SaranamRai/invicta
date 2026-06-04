@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
-import { signOut } from "firebase/auth";
-import { clearPortalAuth } from "@/lib/admin-auth";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { AdminOverview } from "@/components/admin/admin-overview";
 import { TeamManager } from "@/components/admin/team-manager";
 import { FixtureGenerator } from "@/components/admin/fixture-generator";
@@ -13,10 +11,12 @@ import { FixtureViewer } from "@/components/admin/fixture-viewer";
 import { TournamentManager } from "@/components/admin/tournament-manager";
 import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
+import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { MatchData } from "@/lib/types";
 import { LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { clearPortalSession } from "@/lib/role-auth";
 
 type AdminTab =
   | "dashboard"
@@ -25,6 +25,7 @@ type AdminTab =
   | "schedule"
   | "tournaments"
   | "leaderboard"
+  | "rules"
   | "users";
 
 const fixtureStatusToMatchStatus: Record<Fixture["status"], MatchData["status"]> = {
@@ -189,8 +190,7 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    clearPortalAuth();
-    signOut(auth);
+    clearPortalSession();
     router.replace("/login");
   };
 
@@ -221,8 +221,8 @@ export default function AdminDashboard() {
             </div>
             <div className="space-y-1">
               <h1 className="sport-heading text-2xl font-black sm:text-3xl">INVICTA ADMIN</h1>
-              <p className="text-sm text-muted-foreground uppercase tracking-wider">
-                Tournament Control & Analytics Portal
+              <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+                Set up teams, publish fixtures, review schedules, and monitor tournament results.
               </p>
             </div>
           </div>
@@ -235,7 +235,7 @@ export default function AdminDashboard() {
             >
               <LogOut size={18} />
               <span className="text-xs font-black uppercase tracking-[0.2em]">
-                Logout
+                Sign Out
               </span>
             </button>
           </div>
@@ -245,13 +245,14 @@ export default function AdminDashboard() {
         <div className="border-t border-border flex">
           <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
             {[
-              { id: "dashboard" as const, label: "Dashboard" },
-              { id: "tournaments" as const, label: "Tournaments" },
+              { id: "dashboard" as const, label: "Overview" },
+              { id: "tournaments" as const, label: "Sports Setup" },
               { id: "teams" as const, label: "Teams" },
-              { id: "fixtures" as const, label: "Generator" },
-              { id: "schedule" as const, label: "Schedule" },
-              { id: "leaderboard" as const, label: "Leaderboard" },
-              { id: "users" as const, label: "Users" },
+              { id: "fixtures" as const, label: "Create Fixtures" },
+              { id: "schedule" as const, label: "Match Schedule" },
+              { id: "leaderboard" as const, label: "Standings" },
+              { id: "rules" as const, label: "Rules" },
+              { id: "users" as const, label: "Registrations" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -316,6 +317,8 @@ export default function AdminDashboard() {
             onRecalculate={() => recalculateStandings()}
           />
         )}
+
+        {activeTab === "rules" && <RulesViewer />}
 
         {activeTab === "users" && <UsersViewer teams={teams} />}
       </div>

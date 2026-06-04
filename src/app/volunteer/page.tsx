@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { ActivityLog, MatchData } from "@/lib/types";
 import { Activity, Clock, Trophy, AlertCircle, Play, ListChecks } from "lucide-react";
@@ -14,6 +14,7 @@ import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/l
 
 export default function VolunteerDashboard() {
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
+  const [updatesToday, setUpdatesToday] = useState(0);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [selectedSport, setSelectedSport] = useState("All");
   const [startingId, setStartingId] = useState<string | null>(null);
@@ -27,6 +28,13 @@ export default function VolunteerDashboard() {
       setRecentLogs(logs);
     });
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const qTodayLogs = query(collection(db, "activityLogs"), where("timestamp", ">=", startOfToday.getTime()));
+    const unsubscribeTodayLogs = onSnapshot(qTodayLogs, (snapshot) => {
+      setUpdatesToday(snapshot.size);
+    });
+
     // Listen to live matches
     const qMatches = query(collection(db, "matches"));
     const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
@@ -36,6 +44,7 @@ export default function VolunteerDashboard() {
 
     return () => {
       unsubscribeLogs();
+      unsubscribeTodayLogs();
       unsubscribeMatches();
     };
   }, []);
@@ -100,9 +109,9 @@ export default function VolunteerDashboard() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase sport-heading">Dashboard Overview</h1>
-        <p className="text-muted-foreground font-medium mt-2 uppercase tracking-widest text-xs">
-          Manage live events and track updates
+        <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase sport-heading">Match Dashboard</h1>
+        <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+          Use this page during match duty. Start a match clock, update quick scores, or open the full control panel for detailed events and announcements.
         </p>
       </div>
 
@@ -124,7 +133,7 @@ export default function VolunteerDashboard() {
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Updates Today</p>
-            <p className="text-3xl font-black text-foreground">{recentLogs.length * 5}+</p>
+            <p className="text-3xl font-black text-foreground">{updatesToday}</p>
           </div>
         </Card>
 
@@ -143,8 +152,8 @@ export default function VolunteerDashboard() {
         <div className="xl:col-span-2 space-y-6">
           <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-black uppercase tracking-wider text-foreground">Sports Match Control</h2>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Select a sport, start the clock, then update points in the control panel.</p>
+              <h2 className="text-xl font-black uppercase tracking-wider text-foreground">Matches Assigned for Updates</h2>
+              <p className="mt-1 text-sm font-semibold leading-relaxed text-muted-foreground">Filter by sport, start the match clock, adjust scores, or open the full control panel.</p>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-border bg-secondary/50 p-1">
               {sports.map(sport => (
@@ -249,7 +258,7 @@ export default function VolunteerDashboard() {
                       className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
                     >
                       <ListChecks size={16} />
-                      Control Panel
+                      Full Match Controls
                     </Link>
                   </div>
                 </Card>

@@ -206,10 +206,10 @@ export function TeamManager({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black sport-heading text-white">
-            Team Management Portal
+            Teams and Players
           </h2>
           <p className="text-sm text-slate-400">
-            Manage registered teams, update squads, upload logos, and review team details.
+            Add new department teams, edit captain contact details, and review player lists before fixtures are created.
           </p>
         </div>
         {!showForm && (
@@ -222,7 +222,7 @@ export function TeamManager({
           >
             <Plus size={18} />
             <span className="text-xs font-black uppercase tracking-[0.2em]">
-              Register Team
+              Add Team
             </span>
             <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
           </button>
@@ -236,7 +236,7 @@ export function TeamManager({
           <CardHeader>
             <CardTitle className="text-lg text-white flex items-center gap-2">
               {editingTeamId ? <Edit className="text-accent" size={20} /> : <Plus className="text-accent" size={20} />}
-              {editingTeamId ? `Edit Details: ${name}` : "Register New Tournament Team"}
+              {editingTeamId ? `Edit Team: ${name}` : "Add a New Team"}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2">

@@ -35,9 +35,9 @@ export default function MatchesSelectionPage() {
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter text-white uppercase sport-heading">Manage Matches</h1>
-          <p className="text-slate-400 font-medium mt-2 uppercase tracking-widest text-xs">
-            Select a match to update scores and details
+          <h1 className="text-4xl font-black tracking-tighter text-white uppercase sport-heading">All Matches</h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
+            Find the match you are responsible for, then open it to update the clock, score, announcements, and match events.
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export default function MatchesSelectionPage() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         <input 
           type="text" 
-          placeholder="Search teams..." 
+          placeholder="Search by team name..." 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-12 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white placeholder:text-slate-500 transition-colors"
@@ -103,7 +103,7 @@ export default function MatchesSelectionPage() {
 
               <div className="mt-6 pt-4 border-t border-white/10 text-center">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-accent transition-colors">
-                  Open Control Panel &rarr;
+                  Open Match Controls &rarr;
                 </span>
               </div>
             </Card>

@@ -3,14 +3,16 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { collection, onSnapshot } from "firebase/firestore";
 import {
   Activity,
   ArrowUpRight,
   Calendar,
+  ClipboardList,
+  Radio,
   Trophy,
   Users,
 } from "lucide-react";
-import { collection, onSnapshot, query } from "firebase/firestore";
 
 import { Card } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
@@ -26,15 +28,17 @@ export default function Home() {
   const [now, setNow] = useState(0);
 
   useEffect(() => {
-    const qMatches = query(collection(db, "matches"));
-    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MatchData));
-      setMatchesData(data.sort((a, b) => b.lastUpdated - a.lastUpdated));
+    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
+      const nextMatches = snapshot.docs
+        .map((matchDoc) => ({ id: matchDoc.id, ...matchDoc.data() } as MatchData))
+        .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+
+      setMatchesData(nextMatches);
     });
 
-    const qTeams = query(collection(db, "teams"));
-    const unsubscribeTeams = onSnapshot(qTeams, (snapshot) => {
-      setTeamsData(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)));
+    const unsubscribeTeams = onSnapshot(collection(db, "teams"), (snapshot) => {
+      const nextTeams = snapshot.docs.map((teamDoc) => ({ id: teamDoc.id, ...teamDoc.data() } as Team));
+      setTeamsData(nextTeams);
     });
 
     return () => {
@@ -55,36 +59,43 @@ export default function Home() {
   const standings = buildStandings(matchesData, teamsData).slice(0, 5);
 
   const stats = [
-    { label: "Active Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
+    { label: "Registered Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
     { label: "Live Matches", value: liveMatches.toString(), icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Upcoming Events", value: upcomingMatches.toString(), icon: Calendar, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Sports Disciplines", value: sports.length.toString(), icon: Trophy, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Matches Scheduled", value: upcomingMatches.toString(), icon: Calendar, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Sports Available", value: sports.length.toString(), icon: Trophy, color: "text-blue-500", bg: "bg-blue-500/10" },
+  ];
+
+  const visitorActions = [
+    { label: "View Sports", text: "See which sports are part of MSU Invicta and browse registered teams.", href: "/sports", icon: ClipboardList },
+    { label: "Follow Matches", text: "Students and visitors can see schedules, live scores, and match updates.", href: "/matches", icon: Radio },
+    { label: "Check Standings", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
   ];
 
   return (
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-2xl bg-[#020617] text-white shadow-2xl sm:rounded-[2.5rem]">
-        <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-transparent opacity-50" />
-        <div className="absolute -right-20 -top-20 h-96 w-96 rounded-full bg-accent/10 blur-[100px]" />
-
+        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url('/msu-logo-flat.png')] bg-[length:auto,620px_auto] bg-[position:center,right_2rem_center] bg-no-repeat" />
         <div className="relative flex flex-col items-start gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-between lg:p-20">
           <div className="max-w-2xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.3em] text-accent">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-accent">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-              Guest Terminal
+              Official MSU Sports Event Hub
             </div>
             <h1 className="sport-heading text-4xl font-black tracking-tighter text-white sm:text-6xl lg:text-8xl">
               MSU <span className="text-accent italic">INVICTA.</span>
             </h1>
-            <p className="max-w-md text-sm font-medium uppercase leading-relaxed tracking-wider text-slate-400 sm:text-lg">
-              Official Inter-Department Sport Management Platform of Medhavi Skills University.
+            <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
+              A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
             </p>
           </div>
 
-          <div className="w-full lg:mt-0 lg:w-auto">
-            <Link href="/register" className="group relative flex h-16 w-full items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground shadow-2xl shadow-accent/20 transition-all hover:scale-105 active:scale-95 sm:h-20 lg:w-72">
-              <span className="sport-heading relative z-10 text-xs font-black uppercase tracking-[0.3em]">Register Team</span>
+          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-80 lg:grid-cols-1">
+            <Link href="/sports" className="group relative flex h-14 w-full items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground shadow-2xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95 sm:h-16">
+              <span className="sport-heading relative z-10 text-xs font-black uppercase tracking-[0.2em]">View Sports</span>
               <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
+            </Link>
+            <Link href="/matches" className="flex h-14 w-full items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-16">
+              View Live Matches
             </Link>
           </div>
         </div>
@@ -95,15 +106,15 @@ export default function Home() {
               <div key={n} className="flex gap-20">
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                  Welcome to MSU Invicta - the inter-department arena is live
+                  View MSU Invicta sports and department teams
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Awaiting match updates from volunteers
+                  Track live scores as volunteers update them
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  Official sports management portal
+                  Standings are calculated from completed matches
                 </span>
               </div>
             ))}
@@ -137,15 +148,33 @@ export default function Home() {
         ))}
       </div>
 
+      <div className="grid gap-4 md:grid-cols-3">
+        {visitorActions.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group flex items-start gap-4 rounded-2xl border-2 border-border bg-card p-5 transition-all hover:border-accent hover:shadow-lg"
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
+              <item.icon size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wide text-foreground">{item.label}</h2>
+              <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{item.text}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
       <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
         <div className="space-y-8 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-accent" />
-              <h2 className="sport-heading text-2xl font-black">Live Scoreboard</h2>
+              <h2 className="sport-heading text-2xl font-black">Live Scores</h2>
             </div>
             <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary transition-colors hover:text-accent">
-              Match Center <ArrowUpRight size={16} className="ml-1" />
+              All Matches <ArrowUpRight size={16} className="ml-1" />
             </Link>
           </div>
 
@@ -214,8 +243,8 @@ export default function Home() {
                 <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white/5">
                   <Activity size={40} className="text-slate-600" />
                 </div>
-                <h3 className="sport-heading text-2xl font-black text-white">ARENA DATA PENDING</h3>
-                <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-500">Volunteer updates will appear here once matches are published.</p>
+                <h3 className="sport-heading text-2xl font-black text-white">No Matches Published Yet</h3>
+                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">When the organizing team publishes fixtures, match cards and live scores will appear here.</p>
               </div>
             )}
           </div>
@@ -225,9 +254,9 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-primary" />
-              <h2 className="sport-heading text-2xl font-black">League Table</h2>
+              <h2 className="sport-heading text-2xl font-black">Team Standings</h2>
             </div>
-            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Stats</Link>
+            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
 
           <Card className="overflow-hidden border-2 p-0">
@@ -235,15 +264,15 @@ export default function Home() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-secondary text-secondary-foreground">
                   <tr>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">POS</th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">Rank</th>
                     <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">DEPARTMENT</th>
-                    <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest">P</th>
-                    <th className="px-5 py-4 text-right text-[10px] font-black uppercase tracking-widest">PTS</th>
+                    <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest">Played</th>
+                    <th className="px-5 py-4 text-right text-[10px] font-black uppercase tracking-widest">Points</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {standings.map((team) => (
-                    <tr key={team.team} className="group transition-all hover:bg-secondary/50">
+                    <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
                       <td className="sport-heading px-5 py-5 text-lg font-black">{team.rank}</td>
                       <td className="px-5 py-5 text-sm font-bold tracking-wide transition-colors group-hover:text-primary">{team.team}</td>
                       <td className="px-5 py-5 text-center font-bold text-muted-foreground">{team.played}</td>
@@ -255,7 +284,7 @@ export default function Home() {
             ) : (
               <div className="p-10 text-center">
                 <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Standings await season start</p>
+                <p className="text-sm font-semibold text-slate-500">Standings will appear after teams are registered and matches are completed.</p>
               </div>
             )}
           </Card>

@@ -15,7 +15,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "INVICTA | Medhavi Skills University",
-  description: "Official Inter-Department Sport Management Platform of MSU",
+  description: "Register teams, follow fixtures and live scores, and view inter-department sports standings for MSU Invicta.",
 };
 
 
@@ -34,7 +34,6 @@ export default function RootLayout({
     </html>
   );
 }
-
 
 
 

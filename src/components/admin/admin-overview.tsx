@@ -96,7 +96,7 @@ export function AdminOverview({
         timestamp: "Tournament Setup"
       });
     } else {
-      notifList.push("No fixtures have been generated yet. Head to Generator.");
+      notifList.push("No fixtures have been published yet. Open Create Fixtures to build the match schedule.");
     }
 
     // Check completed matches
@@ -168,11 +168,11 @@ export function AdminOverview({
         <div>
           <div className="admin-hero-accent flex items-center gap-2">
             <Sparkles size={18} />
-            <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">Tournament Live Center</span>
+            <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">Admin Overview</span>
           </div>
-          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">Ready to manage matches?</h2>
+          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">Start here to run the event</h2>
           <p className="text-sm text-slate-300 max-w-xl mt-1">
-            Review registered teams, generate smart schedules, and record match results in real time.
+            First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -186,7 +186,7 @@ export function AdminOverview({
             onClick={() => setActiveTab("fixtures")}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-white border border-white/20 text-slate-950 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
-            Generate Fixtures <ArrowRight size={14} />
+            Create Fixtures <ArrowRight size={14} />
           </button>
         </div>
       </div>
@@ -227,7 +227,7 @@ export function AdminOverview({
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
             </span>
             <h3 className="text-lg font-black uppercase tracking-widest text-foreground sport-heading">
-              Live Right Now
+              Matches Live Now
             </h3>
             <span className={cn(
               "text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border",
@@ -242,7 +242,7 @@ export function AdminOverview({
             onClick={() => setActiveTab("schedule" as any)}
             className="text-xs font-black uppercase tracking-widest text-slate-700 hover:text-accent transition-colors flex items-center gap-1 cursor-pointer"
           >
-            Manage All <ArrowRight size={13} />
+            Open Schedule <ArrowRight size={13} />
           </button>
         </div>
 
@@ -344,13 +344,13 @@ export function AdminOverview({
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-white">
               <BarChart2 size={18} className="text-accent" />
-              Tournament Match Distribution
+              Matches by Sport
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {fixtures.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-slate-500 text-sm">
-                No fixture data to display in chart
+                Create fixtures to see how matches are distributed across sports.
               </div>
             ) : (
               <div className="space-y-4">
@@ -378,7 +378,7 @@ export function AdminOverview({
             {/* Overall Progress bar */}
             <div className="pt-4 border-t border-white/5">
               <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider mb-2">
-                <span className="text-slate-400">Total Completion Progress</span>
+                <span className="text-slate-400">Tournament Completion</span>
                 <span className="text-green-400">{completionRate}% ({completedMatches.length}/{totalMatches})</span>
               </div>
               <div className="w-full bg-slate-950 h-4 rounded-full overflow-hidden p-0.5 border border-white/10">
@@ -400,7 +400,7 @@ export function AdminOverview({
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-white">
               <Bell size={18} className="text-accent" />
-              Notifications & Action Needed
+              Setup Checklist
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -426,7 +426,7 @@ export function AdminOverview({
 
             {/* Activities List */}
             <div className="pt-4 border-t border-white/5 space-y-3">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Recent logs</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Recent activity</h4>
               {activities.length === 0 ? (
                 <p className="text-xs text-slate-500">No activities recorded yet.</p>
               ) : (
@@ -451,7 +451,7 @@ export function AdminOverview({
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-white">
               <Calendar size={18} className="text-accent" />
-              Tournament Schedule Calendar
+              Match Calendar
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

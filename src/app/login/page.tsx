@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { auth } from "@/lib/firebase";
-import { setAdminAuth, setPortalRole } from "@/lib/admin-auth";
-import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword } from "firebase/auth";
 import { motion } from "framer-motion";
 import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 import { useRouter } from "next/navigation";
+import { loginRoleAccount } from "@/lib/api";
+import { roleHomePath, storePortalSession } from "@/lib/role-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,25 +15,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-
-  const signInPortalAccount = async (accountEmail: string) => {
-    try {
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithEmailAndPassword(auth, accountEmail, "123456");
-    } catch (innerErr) {
-      const errorCode = typeof innerErr === "object" && innerErr !== null && "code" in innerErr
-        ? innerErr.code
-        : null;
-
-      if (errorCode === "auth/user-not-found" || errorCode === "auth/invalid-credential") {
-        const { createUserWithEmailAndPassword } = await import("firebase/auth");
-        await setPersistence(auth, browserLocalPersistence);
-        await createUserWithEmailAndPassword(auth, accountEmail, "123456");
-      } else {
-        throw innerErr;
-      }
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,26 +26,15 @@ export default function LoginPage() {
     const portalEmail = cleanEmail.toLowerCase();
 
     try {
-      if (portalEmail === "admin@gmail.com" && cleanPassword === "1234") {
-        await signInPortalAccount(cleanEmail);
-        setAdminAuth(true);
-        router.push("/admin");
+      if (!cleanEmail || !cleanPassword) {
+        setError("Please enter your email and password.");
         return;
       }
 
-      if (portalEmail !== "volunteer@gmail.com" || cleanPassword !== "1234") {
-        setAdminAuth(false);
-        setError("Only registered admin and volunteer credentials can access this portal.");
-        return;
-      }
-
-      await signInPortalAccount(cleanEmail);
-      setPortalRole("volunteer");
-      setAdminAuth(false);
-
-      router.push("/volunteer");
+      const session = await loginRoleAccount(portalEmail, cleanPassword);
+      storePortalSession(session);
+      router.push(roleHomePath[session.role]);
     } catch (err) {
-      console.error("Firebase Login Error:", err);
       setError(err instanceof Error ? err.message : "Invalid credentials. Please try again.");
     } finally {
       setPassword("");
@@ -96,7 +65,7 @@ export default function LoginPage() {
               <span className="h-[1.5px] w-16 bg-accent sm:w-20" />
             </div>
           </div>
-          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin & Volunteer Access Terminal</p>
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin, Volunteer & Coordinator Login</p>
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/75 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl sm:rounded-[2.5rem] sm:p-10">
@@ -122,7 +91,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Admin or Volunteer Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Admin, Volunteer, or Coordinator Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
@@ -174,7 +143,7 @@ export default function LoginPage() {
               {isLoading ? <Loader2 className="animate-spin" size={20} /> : (
                 <>
                   <ArrowRight size={18} className="text-accent" />
-                  Access Terminal
+                  Sign In
                 </>
               )}
             </button>

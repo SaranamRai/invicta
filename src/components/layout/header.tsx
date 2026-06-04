@@ -1,12 +1,9 @@
 "use client";
 
-import { Bell, LogOut } from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { auth } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { signOut } from "firebase/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -17,10 +14,8 @@ interface GuestNotification extends NotificationData {
 }
 
 export function Header() {
-  const [user] = useAuthState(auth);
   const [notifications, setNotifications] = useState<GuestNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const isVolunteer = user?.email?.toLowerCase() === "volunteer@gmail.com";
 
   useEffect(() => {
     const notificationsQuery = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(5));
@@ -40,7 +35,7 @@ export function Header() {
         <h2 className="sport-heading text-xl font-black tracking-tighter text-primary sm:text-2xl">INVICTA</h2>
         <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
         <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:tracking-[0.2em]">
-          {isVolunteer ? `Terminal Active: ${user.displayName || user.email}` : "Guest Terminal"}
+          Public sports updates for visitors
         </span>
       </div>
 
@@ -52,15 +47,6 @@ export function Header() {
         <ThemeToggle />
 
         <div className="flex items-center gap-3 border-l border-border pl-3 sm:gap-4 sm:pl-6">
-          {isVolunteer && (
-            <button 
-              onClick={() => signOut(auth)}
-              className="hidden sm:flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
-            >
-              <LogOut size={14} /> Exit Terminal
-            </button>
-          )}
-          
           <div className="relative">
             <button
               type="button"
@@ -75,7 +61,7 @@ export function Header() {
             {isOpen && (
               <div className="absolute right-0 top-12 z-50 w-[calc(100vw-2rem)] max-w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
                 <div className="border-b border-border px-5 py-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Guest Notifications</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Event Notifications</p>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {notifications.length > 0 ? notifications.map((notification) => (

@@ -71,8 +71,10 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             <ArrowLeft size={24} />
           </Link>
           <div>
-            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sport.name} ARENA</h1>
-            <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-xs">Squad rosters & department rankings</p>
+            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sport.name}</h1>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+              View registered teams, player names, and fixtures for {sport.name}.
+            </p>
           </div>
         </div>
 
@@ -99,7 +101,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
               <Trophy size={20} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active Teams</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Registered Teams</p>
               <p className="text-2xl font-black sport-heading">{teams.length}</p>
             </div>
           </div>
@@ -191,7 +193,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
                   href="/matches"
                   className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-secondary px-5 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
                 >
-                  Match Center
+                  View All Matches
                 </Link>
               </div>
             </Card>
@@ -210,8 +212,8 @@ function EmptyState({ activeTab, sportName }: { activeTab: string; sportName: st
       <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center mb-8">
         {activeTab === "Teams" ? <Users size={48} className="text-slate-500" /> : <User size={48} className="text-slate-500" />}
       </div>
-      <h3 className="text-3xl font-black sport-heading text-foreground uppercase">NO {activeTab.toUpperCase()} REGISTERED</h3>
-      <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mt-2 max-w-md">
+      <h3 className="text-3xl font-black sport-heading text-foreground uppercase">No {activeTab} Registered</h3>
+      <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
         Registered {sportName} {activeTab.toLowerCase()} will appear here automatically.
       </p>
     </div>

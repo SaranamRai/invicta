@@ -141,9 +141,9 @@ export function LeaderboardViewer({ teams, fixtures, onRecalculate }: Leaderboar
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black sport-heading text-white">Leaderboards & Tables</h2>
+          <h2 className="text-2xl font-black sport-heading text-white">Team Standings</h2>
           <p className="text-sm text-slate-400">
-            Standings are calculated automatically from completed match scores.
+            Check the ranking table that comes from completed match scores. Use recalculate after editing old results.
           </p>
         </div>
         <div className="flex gap-2 self-start sm:self-auto">
@@ -151,7 +151,7 @@ export function LeaderboardViewer({ teams, fixtures, onRecalculate }: Leaderboar
             onClick={onRecalculate}
             className="flex items-center gap-2 rounded-xl bg-slate-800 border border-white/10 hover:bg-slate-700 text-xs font-bold px-4 py-3 transition-all cursor-pointer"
           >
-            <RefreshCw size={14} /> Recalculate
+            <RefreshCw size={14} /> Recalculate Standings
           </button>
           <button
             onClick={handleExportCSV}

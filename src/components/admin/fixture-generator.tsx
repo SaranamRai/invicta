@@ -78,8 +78,11 @@ export function FixtureGenerator({
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-black sport-heading text-white">
-        Fixture Generator
+        Create Match Fixtures
       </h2>
+      <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
+        Choose the first match date, pick the sports to include, set time slots, and publish the schedule for visitors and volunteers.
+      </p>
 
       {/* Configuration Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -89,7 +92,7 @@ export function FixtureGenerator({
             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-3">
               <div className="flex items-center gap-2">
                 <Calendar size={16} />
-                Tournament Start Date
+                First Match Date
               </div>
             </label>
             <input
@@ -107,7 +110,7 @@ export function FixtureGenerator({
             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-3">
               <div className="flex items-center gap-2">
                 <Zap size={16} />
-                Select Sport
+                Sports to Schedule
               </div>
             </label>
             <select
@@ -129,7 +132,7 @@ export function FixtureGenerator({
         <Card className="bg-slate-900/60 border-white/5 text-white md:col-span-2">
           <CardContent className="pt-6">
             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-3">
-              Teams by Sport
+              Teams Available for Scheduling
             </label>
             <div className="space-y-2">
               {sports.map((sport) => (
@@ -150,7 +153,7 @@ export function FixtureGenerator({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Clock size={20} />
-            Match Timeslots
+            Match Time Slots
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -195,11 +198,10 @@ export function FixtureGenerator({
             <div className="flex items-start gap-3">
               <Zap className="text-accent mt-1" size={18} />
               <div>
-                <p className="font-bold text-white">Smart Scheduling</p>
+                <p className="font-bold text-white">What happens when you publish fixtures</p>
                 <p className="text-sm text-slate-400">
-                  Fixtures are automatically scheduled to prevent timing collisions.
-                  A department cannot be assigned to multiple sports at the same
-                  date and time.
+                  The app creates match pairings and avoids assigning the same department to two matches at the same date and time.
+                  The public Matches page and volunteer dashboard update after publishing.
                 </p>
               </div>
             </div>
@@ -214,7 +216,7 @@ export function FixtureGenerator({
         className="group relative w-full flex h-16 items-center justify-center overflow-hidden rounded-xl bg-accent text-accent-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-accent/10 disabled:opacity-50"
       >
         <span className="relative z-10 text-sm font-black uppercase tracking-[0.2em] sport-heading">
-          {generating ? "Generating Fixtures..." : "Generate Tournament Fixtures"}
+          {generating ? "Creating Fixtures..." : "Create and Publish Fixtures"}
         </span>
         <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
       </button>

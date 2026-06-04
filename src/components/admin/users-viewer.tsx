@@ -16,13 +16,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
 import { sports } from "@/lib/mock-data";
+import { ROLE_COLLECTION } from "@/lib/role-auth";
 
 interface AppUser {
   id: string;
   fullName: string;
   email: string;
   deptName: string;
-  role: string;
+  role: "admin" | "volunteer" | "coordinator" | string;
   createdAt?: unknown;
 }
 
@@ -33,23 +34,6 @@ interface PlayerUser {
   department: string;
   sport: string;
   registeredAt?: number;
-}
-
-const VOLUNTEER_EMAIL = "volunteer@gmail.com";
-
-const fallbackVolunteer: AppUser = {
-  id: "default-volunteer",
-  fullName: "Volunteer",
-  email: VOLUNTEER_EMAIL,
-  deptName: "Tournament Operations",
-  role: "volunteer",
-  createdAt: "2026-01-01T00:00:00.000Z",
-};
-
-function isVolunteer(user: AppUser) {
-  const email = user.email.toLowerCase();
-  const role = user.role.toLowerCase();
-  return role === "volunteer" || email === VOLUNTEER_EMAIL;
 }
 
 function formatCreatedAt(value: unknown) {
@@ -83,21 +67,21 @@ function sortByName<T extends { fullName: string }>(users: T[]) {
 
 export function UsersViewer({ teams }: { teams: Team[] }) {
   const [activeSection, setActiveSection] = useState<"volunteers" | "players">("volunteers");
-  const [volunteers, setVolunteers] = useState<AppUser[]>([]);
+  const [roleAccounts, setRoleAccounts] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchVolunteers() {
+    async function fetchRoleAccounts() {
       try {
-        const querySnapshot = await getDocs(collection(db, "users"));
+        const querySnapshot = await getDocs(collection(db, ROLE_COLLECTION));
         const fetchedUsers: AppUser[] = [];
 
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
           fetchedUsers.push({
             id: docSnap.id,
-            fullName: data.fullName || data.displayName || "Unknown",
+            fullName: data.name || data.fullName || data.displayName || "Unknown",
             email: data.email || "No email",
             deptName: data.deptName || data.department || "Not assigned",
             role: data.role || "",
@@ -105,17 +89,16 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
           });
         });
 
-        const fetchedVolunteers = fetchedUsers.filter(isVolunteer);
-        setVolunteers(fetchedVolunteers.length > 0 ? fetchedVolunteers : [fallbackVolunteer]);
+        setRoleAccounts(fetchedUsers);
       } catch (error) {
-        console.error("Firestore users fetch error", error);
-        setVolunteers([fallbackVolunteer]);
+        console.error("Firestore role accounts fetch error", error);
+        setRoleAccounts([]);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchVolunteers();
+    fetchRoleAccounts();
   }, []);
 
   const players = useMemo<PlayerUser[]>(
@@ -139,7 +122,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
 
   const query = searchQuery.trim().toLowerCase();
   const filteredVolunteers = sortByName(
-    volunteers.filter((volunteer) =>
+    roleAccounts.filter((volunteer) =>
       [volunteer.fullName, volunteer.email, volunteer.deptName, volunteer.role]
         .join(" ")
         .toLowerCase()
@@ -159,14 +142,14 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-black sport-heading text-white">Users Directory</h2>
+          <h2 className="text-2xl font-black sport-heading text-white">Role Accounts and Players</h2>
           <p className="text-sm text-slate-400">
-            Admin can review volunteers with portal access and players registered under teams.
+            Review Admin, Volunteer, and Coordinator login accounts from Firestore, plus players registered under teams.
           </p>
         </div>
 
         <div className="grid w-full grid-cols-2 gap-3 sm:w-auto">
-          <CountCard label="Volunteers" value={volunteers.length} />
+          <CountCard label="Role Accounts" value={roleAccounts.length} />
           <CountCard label="Players" value={players.length} />
         </div>
       </div>
@@ -176,7 +159,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-slate-950/60 p-1 lg:w-[320px]">
               {[
-                { id: "volunteers" as const, label: "Volunteers", icon: ShieldCheck },
+                { id: "volunteers" as const, label: "Role Accounts", icon: ShieldCheck },
                 { id: "players" as const, label: "Players", icon: UsersRound },
               ].map((section) => {
                 const isActive = activeSection === section.id;
@@ -202,7 +185,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${activeSection} by name, email, team, or department...`}
+                placeholder={`Search ${activeSection === "volunteers" ? "role accounts" : "players"} by name, email, team, or department...`}
                 className="w-full rounded-xl bg-slate-950/60 border border-white/10 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-accent transition-all"
               />
             </div>
@@ -233,19 +216,19 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
     <Card className="bg-slate-900/60 border-white/5 text-white">
       <CardContent className="p-0 overflow-hidden">
         {loading ? (
-          <EmptyState label="Loading volunteers..." spinning />
+          <EmptyState label="Loading role accounts..." spinning />
         ) : volunteers.length === 0 ? (
-          <EmptyState label="No Volunteers Match Search" detail="Try searching by volunteer name, email, or department." />
+          <EmptyState label="No Role Accounts Found" detail="Create roleAccounts documents using Firebase Auth UID as the document ID." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
-                  <th className="px-6 py-4">Volunteer Name</th>
+                  <th className="px-6 py-4">Name</th>
                   <th className="px-6 py-4">Email Address</th>
                   <th className="px-6 py-4">Department / Group</th>
                   <th className="px-6 py-4">Joined Date</th>
-                  <th className="px-6 py-4 text-right">Access</th>
+                  <th className="px-6 py-4 text-right">Role</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -273,7 +256,7 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
                       </div>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <RolePill icon={ShieldCheck} label="Volunteer" />
+                      <RolePill icon={ShieldCheck} label={volunteer.role || "No role"} />
                     </td>
                   </tr>
                 ))}

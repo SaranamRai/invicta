@@ -1,3 +1,5 @@
+import { clearPortalSession, PortalRole } from "@/lib/role-auth";
+
 // Admin credentials - hardcoded for demonstration
 // In production, this should be properly hashed and stored in a database
 export const ADMIN_CREDENTIALS = {
@@ -12,8 +14,6 @@ export function validateAdminCredentials(email: string, password: string): boole
 export const ADMIN_AUTH_KEY = "adminAuth";
 const ADMIN_AUTH_EVENT = "admin-auth-change";
 export const PORTAL_ROLE_KEY = "portalRole";
-
-export type PortalRole = "admin" | "volunteer";
 
 function setCookie(key: string, value: string) {
   document.cookie = `${key}=${value}; path=/; max-age=2592000; SameSite=Lax`;
@@ -85,13 +85,14 @@ export function getPortalRole(): PortalRole | null {
   }
 
   const role = getStoredValue(PORTAL_ROLE_KEY);
-  return role === "admin" || role === "volunteer" ? role : null;
+  return role === "admin" || role === "volunteer" || role === "coordinator" ? role : null;
 }
 
 export function clearPortalAuth() {
   if (typeof window !== "undefined") {
     removeStoredValue(ADMIN_AUTH_KEY);
     removeStoredValue(PORTAL_ROLE_KEY);
+    clearPortalSession();
     window.dispatchEvent(new Event(ADMIN_AUTH_EVENT));
   }
 }

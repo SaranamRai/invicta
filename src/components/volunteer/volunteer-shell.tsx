@@ -3,16 +3,15 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
-import { clearPortalAuth } from "@/lib/admin-auth";
+import { clearPortalSession } from "@/lib/role-auth";
 import { Calendar, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const navigation = [
-  { name: "Overview", href: "/volunteer", icon: LayoutDashboard },
-  { name: "Matches", href: "/volunteer/matches", icon: Calendar },
-  { name: "Teams", href: "/volunteer/teams", icon: UsersRound },
+  { name: "Match Dashboard", href: "/volunteer", icon: LayoutDashboard },
+  { name: "All Matches", href: "/volunteer/matches", icon: Calendar },
+  { name: "Teams & Players", href: "/volunteer/teams", icon: UsersRound },
 ];
 
 export function VolunteerShell({ children }: { children: React.ReactNode }) {
@@ -33,7 +32,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
             </div>
             <span className="block text-[18px] font-bold uppercase tracking-[0.32em] text-foreground font-serif italic sm:text-[20px] sm:tracking-[0.4em]">Invicta</span>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mt-2">Volunteer Portal</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mt-2">Volunteer Match Tools</p>
         </div>
 
         <nav className="flex gap-2 overflow-x-auto p-4 md:flex-1 md:flex-col md:space-y-2 md:overflow-visible">
@@ -60,14 +59,13 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-border p-4">
           <button
             onClick={() => {
-              clearPortalAuth();
-              auth.signOut();
+              clearPortalSession();
               router.replace("/login");
             }}
             className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-wider text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-all"
           >
             <LogOut size={18} />
-            Logout
+            Sign Out
           </button>
         </div>
       </div>
@@ -75,8 +73,8 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
       <div className="relative flex-1 overflow-auto">
         <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-4 backdrop-blur-xl sm:px-8 md:px-12 md:py-5">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volunteer Dashboard</p>
-            <h2 className="text-xl font-black uppercase tracking-tight sport-heading">Match Operations</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volunteer Area</p>
+            <h2 className="text-xl font-black uppercase tracking-tight sport-heading">Update Scores and Match Status</h2>
           </div>
           <ThemeToggle />
         </header>

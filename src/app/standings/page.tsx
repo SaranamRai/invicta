@@ -37,13 +37,11 @@ export default function StandingsPage() {
 
   const sports = useMemo(() => getAvailableSports(teams, matches), [teams, matches]);
 
-  useEffect(() => {
-    if (!activeSport && sports[0]) setActiveSport(sports[0].id);
-  }, [activeSport, sports]);
+  const activeSportId = activeSport || sports[0]?.id || "";
 
   const standings = useMemo(
-    () => buildStandings(matches, teams, activeSport),
-    [matches, teams, activeSport]
+    () => buildStandings(matches, teams, activeSportId),
+    [matches, teams, activeSportId]
   );
 
   const handleExport = () => {
@@ -63,9 +61,9 @@ export default function StandingsPage() {
     <div className="space-y-10">
       <header className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">INVICTA Tables</h1>
-          <p className="mt-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Real-time standings from admin-created fixtures
+          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Team Standings</h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+            Compare departments by sport. Wins, losses, draws, and points update after match results are recorded.
           </p>
         </div>
         <button
@@ -85,7 +83,7 @@ export default function StandingsPage() {
               onClick={() => setActiveSport(sport.id)}
               className={cn(
                 "flex items-center gap-3 rounded-xl border-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all",
-                activeSport === sport.id
+                activeSportId === sport.id
                   ? "bg-primary border-primary text-primary-foreground shadow-xl"
                   : "bg-card border-border text-muted-foreground hover:border-accent hover:text-accent"
               )}
@@ -114,7 +112,7 @@ export default function StandingsPage() {
       </div>
 
       <motion.div
-        key={`${activeSport}-${activeCategory}`}
+        key={`${activeSportId}-${activeCategory}`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -124,12 +122,12 @@ export default function StandingsPage() {
             <table className="w-full text-left">
               <thead className="bg-secondary text-[10px] font-black uppercase tracking-[0.2em] text-secondary-foreground">
                 <tr>
-                  <th className="px-8 py-5">POS</th>
-                  <th className="px-8 py-5">TEAM / COLLEGE</th>
-                  <th className="px-8 py-5 text-center">P</th>
-                  <th className="px-8 py-5 text-center text-emerald-500">W</th>
-                  <th className="px-8 py-5 text-center text-rose-500">L</th>
-                  <th className="px-8 py-5 text-center">D</th>
+                  <th className="px-8 py-5">Rank</th>
+                  <th className="px-8 py-5">Department / Team</th>
+                  <th className="px-8 py-5 text-center">Played</th>
+                  <th className="px-8 py-5 text-center text-emerald-500">Won</th>
+                  <th className="px-8 py-5 text-center text-rose-500">Lost</th>
+                  <th className="px-8 py-5 text-center">Drawn</th>
                   <th className="px-8 py-5 text-right">POINTS</th>
                 </tr>
               </thead>
@@ -166,7 +164,7 @@ export default function StandingsPage() {
                     <td colSpan={7} className="py-20 text-center">
                       <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                        No standings yet. Admin-created teams and completed matches will appear here.
+                        No standings yet. Registered teams and completed matches will appear here automatically.
                       </p>
                     </td>
                   </tr>

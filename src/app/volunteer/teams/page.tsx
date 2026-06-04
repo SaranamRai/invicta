@@ -96,8 +96,8 @@ export default function VolunteerTeamsPage() {
           <h1 className="text-4xl font-black uppercase tracking-tighter text-foreground sport-heading">
             Teams & Members
           </h1>
-          <p className="mt-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Registered squads available for volunteer match operations
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+            Look up registered teams, captains, contact numbers, and player names before or during a match.
           </p>
         </div>
 
@@ -148,7 +148,7 @@ export default function VolunteerTeamsPage() {
               <UsersRound size={22} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtered View</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Currently Showing</p>
               <p className="text-3xl font-black text-foreground">{activeTab === "Teams" ? filteredTeams.length : members.length}</p>
             </div>
           </div>

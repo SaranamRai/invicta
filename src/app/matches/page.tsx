@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar as CalendarIcon, MapPin, Clock, ChevronLeft, ChevronRight, Radio } from "lucide-react";
+import { collection, onSnapshot } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { MatchData, LiveFeedPost } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
+import { db } from "@/lib/firebase";
 
 const tabs = ["All Matches", "Live", "Upcoming", "Finished"];
 
@@ -23,18 +23,20 @@ export default function MatchesPage() {
   const [now, setNow] = useState(0);
 
   React.useEffect(() => {
-    // Real-time listener for matches
-    const qMatches = query(collection(db, "matches"));
-    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
-      setMatchesData(data.sort((a, b) => b.lastUpdated - a.lastUpdated));
+    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
+      const nextMatches = snapshot.docs
+        .map((matchDoc) => ({ id: matchDoc.id, ...matchDoc.data() } as MatchData))
+        .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+
+      setMatchesData(nextMatches);
     });
 
-    // Real-time listener for Live Feeds (ordered by newest first)
-    const qFeeds = query(collection(db, "liveFeeds"), orderBy("timestamp", "desc"));
-    const unsubscribeFeeds = onSnapshot(qFeeds, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LiveFeedPost));
-      setLiveFeeds(data);
+    const unsubscribeFeeds = onSnapshot(collection(db, "liveFeeds"), (snapshot) => {
+      const nextFeeds = snapshot.docs
+        .map((feedDoc) => ({ id: feedDoc.id, ...feedDoc.data() } as LiveFeedPost))
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+      setLiveFeeds(nextFeeds);
     });
 
     return () => {
@@ -80,9 +82,9 @@ export default function MatchesPage() {
       {/* Header */}
       <header className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-8">
         <div>
-          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Match Center</h1>
-          <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-[10px]">
-            {formatFullDate(selectedDate)}
+          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Matches & Live Scores</h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+            See every published fixture, follow live scores during a match, and read updates posted by volunteers. Selected date: {formatFullDate(selectedDate)}.
           </p>
         </div>
 
@@ -219,10 +221,10 @@ export default function MatchesPage() {
                   {match.status === "Live" && (
                     <div className="absolute left-0 top-0 h-full w-2 bg-accent" />
                   )}
-                  <div className="flex flex-col md:flex-row md:items-stretch">
+                  <div className="grid grid-cols-1 xl:grid-cols-[180px_minmax(0,1fr)_132px]">
                     {/* Status & Info */}
                     <div className={cn(
-                      "p-8 md:w-72 flex flex-col justify-center border-b md:border-b-0 md:border-r",
+                      "flex flex-col justify-center border-b p-5 sm:p-6 xl:border-b-0 xl:border-r",
                       match.status === "Live" ? "bg-white/5 border-white/10" : "bg-secondary/30 border-border"
                     )}>
                       <div className="space-y-4">
@@ -242,7 +244,7 @@ export default function MatchesPage() {
                           </div>
                           <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest opacity-60">
                             <MapPin size={14} className="text-accent" />
-                            Arena A-04
+                            {match.venue || "Venue TBD"}
                           </div>
                         </div>
                       </div>
@@ -255,30 +257,30 @@ export default function MatchesPage() {
                     </div>
 
                     {/* Teams & Score */}
-                    <div className="flex-1 p-8 flex flex-col justify-center">
-                      <div className="flex items-center justify-between gap-8 md:px-8">
+                    <div className="min-w-0 p-5 sm:p-6 xl:p-7">
+                      <div className="grid min-w-0 grid-cols-1 items-center gap-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
                         {/* Team A */}
-                        <div className="flex flex-1 flex-col items-center gap-4 text-center md:flex-row md:text-left group/team">
-                          <div className="h-16 w-16 rounded-2xl bg-white/5 border border-white/10 shadow-inner flex items-center justify-center text-3xl group-hover/team:scale-110 transition-transform">
+                        <div className="group/team flex min-w-0 items-center justify-center gap-4 text-center sm:justify-start sm:text-left">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
                             🏆
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <span className="block text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-1">Home</span>
-                            <span className="text-2xl font-black sport-heading tracking-wide uppercase">{match.teamA}</span>
+                            <span className="sport-heading block truncate text-xl font-black uppercase tracking-wide text-white">{match.teamA}</span>
                           </div>
                         </div>
 
                         {/* Score */}
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex shrink-0 flex-col items-center gap-2">
                           <div className={cn(
-                            "flex items-center gap-6 rounded-2xl px-10 py-5 border-2 transition-all shadow-2xl",
+                            "flex items-center gap-4 rounded-2xl border-2 px-6 py-4 shadow-2xl transition-all",
                             match.status === "Live" ? "bg-black/60 border-accent/40" : "bg-secondary border-border"
                           )}>
-                            <span className={cn("text-6xl font-black scoreboard-number leading-none tracking-tighter", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
+                            <span className={cn("scoreboard-number text-4xl font-black leading-none sm:text-5xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
                               {match.status === "Upcoming" ? "00" : (match.scoreA ?? 0).toString().padStart(2, "0")}
                             </span>
-                            <span className="text-accent font-black text-4xl opacity-50 italic">:</span>
-                            <span className={cn("text-6xl font-black scoreboard-number leading-none tracking-tighter", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
+                            <span className="text-3xl font-black italic text-accent opacity-50">:</span>
+                            <span className={cn("scoreboard-number text-4xl font-black leading-none sm:text-5xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
                               {match.status === "Upcoming" ? "00" : (match.scoreB ?? 0).toString().padStart(2, "0")}
                             </span>
                           </div>
@@ -287,12 +289,12 @@ export default function MatchesPage() {
                         </div>
 
                         {/* Team B */}
-                        <div className="flex flex-1 flex-col-reverse items-center gap-4 text-center md:flex-row md:justify-end md:text-right group/team">
-                          <div>
+                        <div className="group/team flex min-w-0 items-center justify-center gap-4 text-center sm:justify-end sm:text-right">
+                          <div className="min-w-0">
                             <span className="block text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-1">Away</span>
-                            <span className="text-2xl font-black sport-heading tracking-wide uppercase">{match.teamB}</span>
+                            <span className="sport-heading block truncate text-xl font-black uppercase tracking-wide text-white">{match.teamB}</span>
                           </div>
-                          <div className="h-16 w-16 rounded-2xl bg-white/5 border border-white/10 shadow-inner flex items-center justify-center text-3xl group-hover/team:scale-110 transition-transform">
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
                             🥈
                           </div>
                         </div>
@@ -300,9 +302,9 @@ export default function MatchesPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-center p-6 bg-white/5 md:w-48 md:border-l border-white/10">
-                      <button className="w-full rounded-xl bg-accent px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-accent-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-accent/20">
-                        DETAILS
+                    <div className="flex items-center justify-center border-t border-white/10 bg-white/5 p-5 xl:border-l xl:border-t-0">
+                      <button className="w-full rounded-xl bg-accent px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95">
+                        View Match
                       </button>
                     </div>
                   </div>
@@ -317,9 +319,9 @@ export default function MatchesPage() {
                 <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center mb-8">
                   <CalendarIcon size={48} className="text-slate-600" />
                 </div>
-                <h3 className="text-3xl font-black sport-heading text-white uppercase">No Scheduled Events</h3>
-                <p className="text-sm font-bold uppercase tracking-widest text-slate-500 mt-2 max-w-md">
-                  The arena is currently silent. Stay tuned for administrative updates.
+                <h3 className="text-3xl font-black sport-heading text-white uppercase">No Matches Published</h3>
+                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">
+                  Once the organizing team adds fixtures, they will appear here with date, time, venue, teams, and scores.
                 </p>
               </motion.div>
             )}
@@ -334,7 +336,7 @@ export default function MatchesPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-accent" />
               </span>
-              <h2 className="text-xl font-black tracking-wider uppercase sport-heading">Live Feed</h2>
+              <h2 className="text-xl font-black tracking-wider uppercase sport-heading">Volunteer Updates</h2>
             </div>
 
             <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
@@ -371,9 +373,9 @@ export default function MatchesPage() {
                   <div className="text-center py-16 border border-dashed border-border rounded-2xl">
                     <Radio size={32} className="mx-auto text-slate-600 mb-4" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                      No live updates yet
+                      No updates posted yet
                     </p>
-                    <p className="text-[10px] text-slate-600 mt-1">Updates from volunteers will appear here</p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">Short match notes and photos from volunteers will appear here.</p>
                   </div>
                 )}
               </AnimatePresence>

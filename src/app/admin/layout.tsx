@@ -1,20 +1,9 @@
-import { ADMIN_AUTH_KEY, PORTAL_ROLE_KEY } from "@/lib/admin-auth";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { ProtectedRoute } from "@/components/protected-route";
 
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const isAdmin =
-    cookieStore.get(ADMIN_AUTH_KEY)?.value === "true" ||
-    cookieStore.get(PORTAL_ROLE_KEY)?.value === "admin";
-
-  if (!isAdmin) {
-    redirect("/login");
-  }
-
-  return <>{children}</>;
+  return <ProtectedRoute allowedRole="admin">{children}</ProtectedRoute>;
 }

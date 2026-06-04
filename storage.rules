@@ -6,9 +6,22 @@ service firebase.storage {
       return request.auth != null && request.auth.token.email == "volunteer@gmail.com";
     }
 
+    function isCoordinator() {
+      return request.auth != null && request.auth.token.email == "coordinator@gmail.com";
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "admin@gmail.com";
+    }
+
     match /matches/{matchId}/{fileName} {
       allow read: if true;
       allow write: if isVolunteer();
+    }
+
+    match /rules/{sportId}/{fileName} {
+      allow read: if true;
+      allow write: if isCoordinator() || isAdmin();
     }
 
     match /profiles/{userId}/{fileName} {

@@ -12,8 +12,10 @@ export default function SportsPage() {
   return (
     <div className="space-y-10">
       <header className="border-b border-border pb-8">
-        <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Sports Disciplines</h1>
-        <p className="text-muted-foreground font-medium mt-1 uppercase tracking-widest text-xs">Browse all sports disciplines and their respective leagues.</p>
+        <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Sports</h1>
+        <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+          Choose a sport to see registered departments, player lists, and fixtures for that event.
+        </p>
       </header>
 
       <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -35,7 +37,7 @@ export default function SportsPage() {
                   </div>
                   <div className="text-center px-6">
                     <h3 className="text-3xl font-black sport-heading tracking-wide uppercase">{sport.name}</h3>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mt-2">Awaiting Tournament Configuration</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Teams, players, and fixtures</p>
                   </div>
                 </div>
 
@@ -51,7 +53,7 @@ export default function SportsPage() {
         )) : (
           <div className="col-span-full py-20 text-center border-2 border-dashed border-border rounded-3xl">
             <Trophy className="mx-auto text-muted-foreground opacity-20 mb-4" size={64} />
-            <h3 className="text-xl font-black sport-heading opacity-50">NO DISCIPLINES CONFIGURED</h3>
+            <h3 className="text-xl font-black sport-heading opacity-50">No sports configured yet</h3>
           </div>
         )}
       </div>
@@ -59,4 +61,3 @@ export default function SportsPage() {
     </div>
   );
 }
-

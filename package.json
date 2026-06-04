@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 127.0.0.1",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "next dev -H 127.0.0.1",
+    "dev:api": "npm --prefix backend run dev",
+    "start:api": "npm --prefix backend run start",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
