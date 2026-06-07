@@ -9,14 +9,13 @@ import {
   ShieldCheck,
   UserRoundCheck,
   UsersRound,
+  UserPlus,
 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { createAdminCoordinator, createAdminVolunteer, getAdminRoleAccounts } from "@/lib/api";
 import { Team } from "@/lib/fixture-generator";
 import { sports } from "@/lib/mock-data";
-import { ROLE_COLLECTION } from "@/lib/role-auth";
 
 interface AppUser {
   id: string;
@@ -24,6 +23,8 @@ interface AppUser {
   email: string;
   deptName: string;
   role: "admin" | "volunteer" | "coordinator" | string;
+  assignedSport?: string;
+  createdByRole?: string;
   createdAt?: unknown;
 }
 
@@ -65,41 +66,69 @@ function sortByName<T extends { fullName: string }>(users: T[]) {
   return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 }
 
-export function UsersViewer({ teams }: { teams: Team[] }) {
+export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[]; canManageAccounts?: boolean }) {
   const [activeSection, setActiveSection] = useState<"volunteers" | "players">("volunteers");
   const [roleAccounts, setRoleAccounts] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [accountRole, setAccountRole] = useState<"coordinator" | "volunteer">("coordinator");
+  const [accountSport, setAccountSport] = useState("football");
+  const [accountName, setAccountName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("1234");
+  const [accountError, setAccountError] = useState("");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
-  useEffect(() => {
-    async function fetchRoleAccounts() {
+  const fetchRoleAccounts = React.useCallback(async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, ROLE_COLLECTION));
-        const fetchedUsers: AppUser[] = [];
-
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          fetchedUsers.push({
-            id: docSnap.id,
-            fullName: data.name || data.fullName || data.displayName || "Unknown",
-            email: data.email || "No email",
-            deptName: data.deptName || data.department || "Not assigned",
-            role: data.role || "",
-            createdAt: data.createdAt,
-          });
-        });
-
-        setRoleAccounts(fetchedUsers);
+        setRoleAccounts(await getAdminRoleAccounts());
       } catch (error) {
-        console.error("Firestore role accounts fetch error", error);
+        console.error("Mongo role accounts fetch error", error);
         setRoleAccounts([]);
       } finally {
         setLoading(false);
       }
+  }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchRoleAccounts);
+  }, [fetchRoleAccounts]);
+
+  const handleCreateAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAccountError("");
+
+    const payload = {
+      name: accountName.trim(),
+      email: accountEmail.trim().toLowerCase(),
+      password: accountPassword.trim(),
+      assignedSport: accountSport,
+    };
+
+    if (!payload.name || !payload.email || !payload.password || !payload.assignedSport) {
+      setAccountError("Name, email, password, and sport are required.");
+      return;
     }
 
-    fetchRoleAccounts();
-  }, []);
+    setIsCreatingAccount(true);
+
+    try {
+      if (accountRole === "coordinator") {
+        await createAdminCoordinator(payload);
+      } else {
+        await createAdminVolunteer(payload);
+      }
+
+      setAccountName("");
+      setAccountEmail("");
+      setAccountPassword("1234");
+      await fetchRoleAccounts();
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : "Could not create account.");
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
 
   const players = useMemo<PlayerUser[]>(
     () =>
@@ -144,7 +173,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
         <div>
           <h2 className="text-2xl font-black sport-heading text-white">Role Accounts and Players</h2>
           <p className="text-sm text-slate-400">
-            Review Admin, Volunteer, and Coordinator login accounts from Firestore, plus players registered under teams.
+            Review admin, supercoordinator, coordinator, and volunteer accounts from MongoDB, plus players registered under teams.
           </p>
         </div>
 
@@ -153,6 +182,77 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
           <CountCard label="Players" value={players.length} />
         </div>
       </div>
+
+      {canManageAccounts && (
+        <Card className="bg-slate-900/60 border-white/5">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <UserPlus size={19} />
+              </div>
+              <div>
+                <h3 className="sport-heading text-lg font-black text-white">Add Sport Role Account</h3>
+                <p className="text-xs font-semibold text-slate-400">Supercoordinator can add one coordinator per sport and volunteers under that sport.</p>
+              </div>
+            </div>
+
+            {accountError && (
+              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-300">
+                {accountError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAccount} className="grid gap-3 lg:grid-cols-[160px_160px_1fr_1fr_130px_auto]">
+              <select
+                value={accountRole}
+                onChange={(event) => setAccountRole(event.target.value as "coordinator" | "volunteer")}
+                className="h-12 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+              >
+                <option value="coordinator">Coordinator</option>
+                <option value="volunteer">Volunteer</option>
+              </select>
+              <select
+                value={accountSport}
+                onChange={(event) => setAccountSport(event.target.value)}
+                className="h-12 rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+              >
+                {sports.map((sport) => (
+                  <option key={sport.id} value={sport.id}>{sport.name}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={accountName}
+                onChange={(event) => setAccountName(event.target.value)}
+                placeholder="Full name"
+                className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+              />
+              <input
+                type="email"
+                value={accountEmail}
+                onChange={(event) => setAccountEmail(event.target.value)}
+                placeholder={`${accountRole}${accountSport}@gmail.com`}
+                className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+              />
+              <input
+                type="text"
+                value={accountPassword}
+                onChange={(event) => setAccountPassword(event.target.value)}
+                placeholder="1234"
+                className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={isCreatingAccount}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50"
+              >
+                <UserPlus size={15} />
+                {isCreatingAccount ? "Adding" : "Add"}
+              </button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-slate-900/60 border-white/5">
         <CardContent className="p-4">
@@ -218,7 +318,7 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
         {loading ? (
           <EmptyState label="Loading role accounts..." spinning />
         ) : volunteers.length === 0 ? (
-          <EmptyState label="No Role Accounts Found" detail="Create roleAccounts documents using Firebase Auth UID as the document ID." />
+          <EmptyState label="No Role Accounts Found" detail="Create role accounts from the admin dashboard." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -246,7 +346,7 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
                     <td className="px-6 py-5 text-slate-300 font-bold">
                       <div className="flex items-center gap-1.5 text-xs">
                         <GraduationCap size={14} className="text-slate-500" />
-                        <span className="uppercase">{volunteer.deptName}</span>
+                        <span className="uppercase">{volunteer.assignedSport ? getSportName(volunteer.assignedSport) : volunteer.deptName}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-slate-400 text-xs">

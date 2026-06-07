@@ -4,11 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Calendar, Camera, CheckCircle2, Clock3, Mail, Shield, Upload, User, XCircle } from "lucide-react";
 import { updateProfile } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { Card } from "@/components/ui/card";
-import { auth, db, storage } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 type UserProfile = {
@@ -53,17 +51,15 @@ export default function ProfilePage() {
       setIsLoading(true);
       setError("");
 
-      try {
-        const snapshot = await getDoc(doc(db, "users", user.uid));
-        if (!isMounted) return;
-
-        setProfile(snapshot.exists() ? (snapshot.data() as UserProfile) : null);
-      } catch (err) {
-        if (!isMounted) return;
-        setError(err instanceof Error ? err.message : "Unable to load profile details.");
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+      if (!isMounted) return;
+      setProfile({
+        fullName: user.displayName,
+        email: user.email,
+        role: "user",
+        createdAt: user.metadata.creationTime,
+        photoURL: user.photoURL,
+      });
+      setIsLoading(false);
     };
 
     loadProfile();
@@ -107,23 +103,14 @@ export default function ProfilePage() {
     setIsUploading(true);
 
     try {
-      const fileExtension = file.name.split(".").pop() || "jpg";
-      const imageRef = ref(storage, `profiles/${user.uid}/avatar.${fileExtension}`);
-      await uploadBytes(imageRef, file);
-      const imageUrl = await getDownloadURL(imageRef);
+      const imageUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
 
       await updateProfile(user, { photoURL: imageUrl });
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          fullName: displayName,
-          email,
-          role,
-          photoURL: imageUrl,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
 
       setProfile((current) => ({ ...current, photoURL: imageUrl }));
       setUploadMessage("Profile image updated.");

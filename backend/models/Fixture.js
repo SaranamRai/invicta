@@ -3,12 +3,19 @@ import mongoose from "mongoose";
 const fixtureSchema = new mongoose.Schema(
   {
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport", required: true },
+    sport: { type: String, required: true, trim: true, lowercase: true },
+    sportName: { type: String, trim: true },
     matchTitle: { type: String, required: true, trim: true },
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     teamB: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
+    teamAName: { type: String, trim: true },
+    teamBName: { type: String, trim: true },
     venue: { type: String, trim: true },
     date: { type: String, trim: true },
     time: { type: String, trim: true },
+    scoreA: { type: Number, default: 0 },
+    scoreB: { type: Number, default: 0 },
+    endedAt: { type: String },
     round: { type: String, trim: true },
     status: {
       type: String,

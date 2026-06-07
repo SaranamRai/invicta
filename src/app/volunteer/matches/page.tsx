@@ -1,28 +1,38 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { collection, query, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { MatchData } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getAllMatches } from "@/lib/services/mongo-service";
+import { getRoleAccount } from "@/lib/role-auth";
 
 export default function MatchesSelectionPage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"All" | "Live" | "Upcoming" | "Finished">("All");
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
-    const qMatches = query(collection(db, "matches"));
-    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const matchesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
-      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
-    });
+    let isMounted = true;
 
-    return () => unsubscribeMatches();
-  }, []);
+    async function loadMatches() {
+      const matchesData = await getAllMatches();
+      if (!isMounted) return;
+      const visibleMatches = assignedSport ? matchesData.filter((match) => match.sport === assignedSport) : matchesData;
+      setMatches(visibleMatches.sort((a, b) => b.lastUpdated - a.lastUpdated));
+    }
+
+    void loadMatches();
+    const interval = window.setInterval(loadMatches, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [assignedSport]);
 
   const filteredMatches = matches.filter(match => {
     const matchesSearch = match.teamA.toLowerCase().includes(search.toLowerCase()) || 

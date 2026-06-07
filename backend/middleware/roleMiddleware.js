@@ -4,7 +4,7 @@ export function allowRoles(...roles) {
       return res.status(401).json({ message: "Login required" });
     }
 
-    if (req.user.role === "admin" || roles.includes(req.user.role)) {
+    if (roles.includes(req.user.role)) {
       return next();
     }
 

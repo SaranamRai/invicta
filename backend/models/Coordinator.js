@@ -7,7 +7,9 @@ const coordinatorSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: { type: String, enum: ["coordinator"], default: "coordinator" },
     department: { type: String, trim: true },
-    assignedSport: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
+    assignedSport: { type: String, trim: true, lowercase: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId },
+    createdByRole: { type: String, trim: true },
     phone: { type: String, trim: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

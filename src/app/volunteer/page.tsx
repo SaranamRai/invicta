@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, onSnapshot, where } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { ActivityLog, MatchData } from "@/lib/types";
 import { Activity, Clock, Trophy, AlertCircle, Play, ListChecks } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { updateMatchDetails, logActivity } from "@/lib/services/firebase-service";
+import { getAllMatches, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
+import { getPublicLiveFeeds } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/lib/match-clock";
+import { getRoleAccount } from "@/lib/role-auth";
 
 export default function VolunteerDashboard() {
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
@@ -19,43 +20,47 @@ export default function VolunteerDashboard() {
   const [selectedSport, setSelectedSport] = useState("All");
   const [startingId, setStartingId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
-    // Listen to recent activity
-    const qLogs = query(collection(db, "activityLogs"), orderBy("timestamp", "desc"), limit(5));
-    const unsubscribeLogs = onSnapshot(qLogs, (snapshot) => {
-      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog));
-      setRecentLogs(logs);
-    });
+    let isMounted = true;
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const qTodayLogs = query(collection(db, "activityLogs"), where("timestamp", ">=", startOfToday.getTime()));
-    const unsubscribeTodayLogs = onSnapshot(qTodayLogs, (snapshot) => {
-      setUpdatesToday(snapshot.size);
-    });
+    async function loadDashboardData() {
+      const [matchesData, feeds] = await Promise.all([getAllMatches(), getPublicLiveFeeds()]);
+      if (!isMounted) return;
 
-    // Listen to live matches
-    const qMatches = query(collection(db, "matches"));
-    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const matchesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
-      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
-    });
+      const visibleMatches = assignedSport ? matchesData.filter((match) => match.sport === assignedSport) : matchesData;
+      setMatches(visibleMatches.sort((a, b) => b.lastUpdated - a.lastUpdated));
+      const logs = feeds.map((feed) => ({
+        id: feed._id,
+        matchId: typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "",
+        action: feed.message,
+        timestamp: feed.createdAt ? Date.parse(feed.createdAt) : Date.now(),
+        volunteerEmail: feed.volunteerEmail || "volunteer",
+      } as ActivityLog)).sort((a, b) => b.timestamp - a.timestamp);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      setRecentLogs(logs.slice(0, 5));
+      setUpdatesToday(logs.filter((log) => log.timestamp >= startOfToday.getTime()).length);
+    }
+
+    void loadDashboardData();
+    const interval = window.setInterval(loadDashboardData, 5000);
 
     return () => {
-      unsubscribeLogs();
-      unsubscribeTodayLogs();
-      unsubscribeMatches();
+      isMounted = false;
+      window.clearInterval(interval);
     };
-  }, []);
+  }, [assignedSport]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, []);
 
-  const sports = ["All", ...Array.from(new Set(matches.map(match => match.sport)))];
-  const filteredMatches = matches.filter(match => selectedSport === "All" || match.sport === selectedSport);
+  const sports = assignedSport ? [assignedSport] : ["All", ...Array.from(new Set(matches.map(match => match.sport)))];
+  const filteredMatches = matches.filter(match => Boolean(assignedSport) || selectedSport === "All" || match.sport === selectedSport);
   const activeMatches = matches.filter(match => match.status === "Live");
   const nextMatch = matches.find(match => match.status === "Upcoming");
 

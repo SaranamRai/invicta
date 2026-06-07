@@ -5,10 +5,9 @@ import { sports } from "@/lib/mock-data";
 import { Card } from "@/components/ui/card";
 import { Users, User, ArrowLeft, Trophy } from "lucide-react";
 import Link from "next/link";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
 import { MatchData } from "@/lib/types";
+import { getPublicFixtures, getPublicLiveScores, getPublicTeams, mapMongoFixture, mapMongoTeam } from "@/lib/api";
 
 
 export default function SportDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
@@ -20,34 +19,51 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
 
   useEffect(() => {
     if (!sport) return;
+    const sportId = sport.id;
+    let isMounted = true;
 
-    const teamsQuery = query(collection(db, "teams"), where("sport", "==", sport.id));
-    const unsubscribe = onSnapshot(teamsQuery, (snapshot) => {
-      const nextTeams = snapshot.docs.map((teamDoc) => ({
-        id: teamDoc.id,
-        ...teamDoc.data(),
-      } as Team));
+    async function loadTeams() {
+      const publicTeams = await getPublicTeams();
+      if (!isMounted) return;
+      const nextTeams = publicTeams
+        .map((team) => mapMongoTeam(team) as Team)
+        .filter((team) => team.sport === sportId);
 
       setTeams(nextTeams.sort((a, b) => a.name.localeCompare(b.name)));
-    });
+    }
 
-    return () => unsubscribe();
+    void loadTeams();
+    const interval = window.setInterval(loadTeams, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, [sport]);
 
   useEffect(() => {
     if (!sport) return;
+    const sportId = sport.id;
+    let isMounted = true;
 
-    const fixturesQuery = query(collection(db, "matches"), where("sport", "==", sport.id));
-    const unsubscribe = onSnapshot(fixturesQuery, (snapshot) => {
-      const nextFixtures = snapshot.docs.map((matchDoc) => ({
-        id: matchDoc.id,
-        ...matchDoc.data(),
-      } as MatchData));
+    async function loadFixtures() {
+      const [publicFixtures, liveScores] = await Promise.all([getPublicFixtures(), getPublicLiveScores()]);
+      if (!isMounted) return;
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      const nextFixtures = publicFixtures
+        .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+        .filter((fixture) => fixture.sport === sportId);
 
       setFixtures(nextFixtures.sort((a, b) => `${a.date || ""}${a.time || ""}`.localeCompare(`${b.date || ""}${b.time || ""}`)));
-    });
+    }
 
-    return () => unsubscribe();
+    void loadFixtures();
+    const interval = window.setInterval(loadFixtures, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, [sport]);
 
 

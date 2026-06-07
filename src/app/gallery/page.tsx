@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Images } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { getPublicGallery } from "@/lib/api";
 
 interface GalleryImage {
   id: string;
@@ -19,11 +18,27 @@ export default function GalleryPage() {
   const [images, setImages] = useState<GalleryImage[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(query(collection(db, "gallery"), orderBy("timestamp", "desc")), (snapshot) => {
-      setImages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as GalleryImage)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadGallery() {
+      const gallery = await getPublicGallery();
+      if (!isMounted) return;
+      setImages(gallery.map((image) => ({
+        id: image._id,
+        title: image.title,
+        imageUrl: image.imageUrl,
+        caption: image.caption,
+        timestamp: image.createdAt ? Date.parse(image.createdAt) : undefined,
+      })));
+    }
+
+    void loadGallery();
+    const interval = window.setInterval(loadGallery, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (

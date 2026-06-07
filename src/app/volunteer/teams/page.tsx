@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
 import { Calendar, ChevronDown, Search, Trophy, User, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
+import { getPublicTeams, mapMongoTeam } from "@/lib/api";
 import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { getRoleAccount } from "@/lib/role-auth";
 
 const allSportsLabel = "All Sports";
 
@@ -33,24 +33,35 @@ export default function VolunteerTeamsPage() {
   const [selectedSport, setSelectedSport] = useState(allSportsLabel);
   const [activeTab, setActiveTab] = useState<"Teams" | "Members">("Teams");
   const [searchQuery, setSearchQuery] = useState("");
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "teams"), (snapshot) => {
-      const nextTeams = snapshot.docs.map((teamDoc) => ({
-        id: teamDoc.id,
-        ...teamDoc.data(),
-      } as Team));
+    let isMounted = true;
 
-      setTeams(nextTeams.sort((a, b) => `${a.sport}${a.name}`.localeCompare(`${b.sport}${b.name}`)));
-    });
+    async function loadTeams() {
+      const publicTeams = await getPublicTeams();
+      if (!isMounted) return;
+      setTeams(
+        publicTeams
+          .map((team) => mapMongoTeam(team) as Team)
+          .filter((team) => !assignedSport || team.sport === assignedSport)
+          .sort((a, b) => `${a.sport}${a.name}`.localeCompare(`${b.sport}${b.name}`))
+      );
+    }
 
-    return () => unsubscribe();
-  }, []);
+    void loadTeams();
+    const interval = window.setInterval(loadTeams, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [assignedSport]);
 
   const sportOptions = useMemo(() => {
-    const registeredSports = sports.map((sport) => sport.id);
+    const registeredSports = assignedSport ? [assignedSport] : sports.map((sport) => sport.id);
     return [allSportsLabel, ...registeredSports];
-  }, []);
+  }, [assignedSport]);
 
   const teamCountBySport = useMemo(() => {
     return teams.reduce((counts, team) => {

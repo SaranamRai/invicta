@@ -1,17 +1,34 @@
 import { spawn } from "node:child_process";
+import net from "node:net";
 
 const useShell = process.platform === "win32";
 
-const processes = [
-  spawn("npm", ["--prefix", "backend", "run", "dev"], {
+function isPortOpen(port, host = "127.0.0.1") {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+  });
+}
+
+const processes = [];
+
+if (await isPortOpen(5000)) {
+  console.log("Backend already running on 127.0.0.1:5000; starting web app only.");
+} else {
+  processes.push(spawn("npm", ["--prefix", "backend", "run", "dev"], {
     stdio: "inherit",
     shell: useShell,
-  }),
-  spawn("npx", ["next", "dev", "-H", "127.0.0.1"], {
-    stdio: "inherit",
-    shell: useShell,
-  }),
-];
+  }));
+}
+
+processes.push(spawn("npx", ["next", "dev", "-H", "127.0.0.1"], {
+  stdio: "inherit",
+  shell: useShell,
+}));
 
 let isShuttingDown = false;
 

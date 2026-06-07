@@ -7,6 +7,9 @@ const announcementSchema = new mongoose.Schema(
     postedBy: { type: mongoose.Schema.Types.ObjectId },
     postedByRole: { type: String, enum: ["admin", "volunteer", "coordinator"], required: true },
     visibleToPublic: { type: Boolean, default: true },
+    attachmentName: { type: String, trim: true },
+    attachmentType: { type: String, trim: true },
+    attachmentHtml: { type: String },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

@@ -1,15 +1,20 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ref, set } from "firebase/database";
-import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { ArrowLeft, CheckCircle2, Loader2, Users } from "lucide-react";
 
-import { db, rtdb } from "@/lib/firebase";
 import { sports } from "@/lib/mock-data";
 import { Team } from "@/lib/fixture-generator";
 import { ProtectedRoute } from "@/components/protected-route";
+import {
+  createAdminTeam,
+  createCoordinatorTeam,
+  getPublicTeams,
+  getPublicTournaments,
+  getStoredSession,
+  TournamentPayload,
+} from "@/lib/api";
 
 const DEPARTMENT_TEAM_LIMIT = 2;
 
@@ -33,9 +38,62 @@ function RegisterPageContent() {
   const [members, setMembers] = useState<string[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [openTournament, setOpenTournament] = useState<TournamentPayload | null>(null);
+  const [nextTournament, setNextTournament] = useState<TournamentPayload | null>(null);
 
   const requiredPlayers = playerCountsBySport[sport] || 1;
   const teamName = useMemo(() => normalizeDepartment(department), [department]);
+
+  const updateRegistrationWindow = (tournaments: TournamentPayload[]) => {
+    const nowTime = Date.now();
+    const normalized = tournaments
+      .map((tournament) => ({
+        ...tournament,
+        startTime: new Date(tournament.startDate).setHours(0, 0, 0, 0),
+        endTime: new Date(tournament.endDate).setHours(23, 59, 59, 999),
+      }))
+      .filter((tournament) =>
+        tournament.registrationOpen &&
+        !Number.isNaN(tournament.startTime) &&
+        !Number.isNaN(tournament.endTime)
+      );
+
+    const activeTournament = normalized.find(
+      (tournament) => nowTime >= tournament.startTime && nowTime <= tournament.endTime
+    ) || null;
+
+    const upcomingTournament = normalized
+      .filter((tournament) => tournament.startTime > nowTime)
+      .sort((a, b) => a.startTime - b.startTime)[0] || null;
+
+    setRegistrationOpen(Boolean(activeTournament));
+    setOpenTournament(activeTournament);
+    setNextTournament(upcomingTournament);
+  };
+
+  const formatDate = (value: string) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTournamentSettings() {
+      const tournaments = await getPublicTournaments();
+      if (!isMounted) return;
+      updateRegistrationWindow(tournaments);
+    }
+
+    void loadTournamentSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const updateMember = (index: number, value: string) => {
     const nextMembers = Array.from({ length: requiredPlayers }, (_, i) => members[i] || "");
@@ -71,13 +129,12 @@ function RegisterPageContent() {
     }
 
     try {
-      const departmentTeamsQuery = query(
-        collection(db, "teams"),
-        where("department", "==", cleanDepartment)
-      );
-      const departmentTeamsSnapshot = await getDocs(departmentTeamsQuery);
+      const existingTeams = await getPublicTeams();
+      const departmentTeamsCount = existingTeams.filter((team) => {
+        return normalizeDepartment(team.department || team.teamName || "") === cleanDepartment;
+      }).length;
 
-      if (departmentTeamsSnapshot.size >= DEPARTMENT_TEAM_LIMIT) {
+      if (departmentTeamsCount >= DEPARTMENT_TEAM_LIMIT) {
         setStatus("error");
         setMessage(`${cleanDepartment} team quota is full. Only the first ${DEPARTMENT_TEAM_LIMIT} registered teams from each department are allowed.`);
         return;
@@ -112,16 +169,19 @@ function RegisterPageContent() {
         source: "public-registration",
       };
 
-      const teamRef = doc(collection(db, "teams"));
-      await Promise.all([
-        setDoc(teamRef, teamData),
-        set(ref(rtdb, `teams/${teamRef.id}`), {
-          id: teamRef.id,
-          ...teamData,
-        }),
-      ]);
+      const session = getStoredSession();
+      if (!session) {
+        setStatus("error");
+        setMessage("Please login again before registering a team.");
+        return;
+      }
+
+      const savedTeam = session.role === "admin"
+        ? await createAdminTeam(teamData)
+        : await createCoordinatorTeam(teamData);
+
       setStatus("success");
-      setMessage(`${cleanDepartment} has been registered successfully.`);
+      setMessage(`${savedTeam.name || cleanDepartment} has been saved to MongoDB.`);
       setCaptainName("");
       setEmail("");
       setPhone("");
@@ -130,7 +190,7 @@ function RegisterPageContent() {
     } catch (error) {
       console.error("Team registration failed:", error);
       setStatus("error");
-      setMessage("Registration failed. Please try again.");
+      setMessage(error instanceof Error ? error.message : "Registration failed. Please try again.");
     }
   };
 
@@ -174,77 +234,99 @@ function RegisterPageContent() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="grid gap-5 md:grid-cols-2">
-              <Field label="Name *">
-                <input value={captainName} onChange={(event) => setCaptainName(event.target.value)} required className="input-light" placeholder="Captain or representative name" />
-              </Field>
-              <Field label="Email *">
-                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input-light" placeholder="name@university.edu" />
-              </Field>
-              <Field label="Phone *">
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="\d{10}"
-                  maxLength={10}
-                  value={phone}
-                  onChange={(event) => setPhone(normalizePhone(event.target.value))}
-                  required
-                  className="input-light"
-                  placeholder="10 digit phone number"
-                />
-              </Field>
-              <Field label="Department *">
-                <input value={department} onChange={(event) => setDepartment(event.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
-              </Field>
-              <Field label="Sport *">
-                <select value={sport} onChange={(event) => { setSport(event.target.value); setMembers([]); }} className="input-light">
-                  {sports.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
-                  ))}
-                </select>
-              </Field>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Required</p>
-                <p className="mt-1 text-2xl font-black text-slate-950">{requiredPlayers}</p>
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Player Names</h2>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Enter exactly {requiredPlayers} player names for the selected sport.</p>
-                </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                  {requiredPlayers} slots
-                </span>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                {Array.from({ length: requiredPlayers }).map((_, index) => (
+          {registrationOpen ? (
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Name *">
+                  <input value={captainName} onChange={(event) => setCaptainName(event.target.value)} required className="input-light" placeholder="Captain or representative name" />
+                </Field>
+                <Field label="Email *">
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input-light" placeholder="name@university.edu" />
+                </Field>
+                <Field label="Phone *">
                   <input
-                    key={`${sport}-${index}`}
-                    value={members[index] || ""}
-                    onChange={(event) => updateMember(index, event.target.value)}
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="\d{10}"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(event) => setPhone(normalizePhone(event.target.value))}
                     required
                     className="input-light"
-                    placeholder={`Player ${index + 1} name`}
+                    placeholder="10 digit phone number"
                   />
-                ))}
+                </Field>
+                <Field label="Department *">
+                  <input value={department} onChange={(event) => setDepartment(event.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
+                </Field>
+                <Field label="Sport *">
+                  <select value={sport} onChange={(event) => { setSport(event.target.value); setMembers([]); }} className="input-light">
+                    {sports.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Required</p>
+                  <p className="mt-1 text-2xl font-black text-slate-950">{requiredPlayers}</p>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={status === "submitting"}
-              className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-slate-950 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {status === "submitting" && <Loader2 className="animate-spin" size={18} />}
-              Register Team
-            </button>
-          </form>
+              <div>
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Player Names</h2>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Enter exactly {requiredPlayers} player names for the selected sport.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                    {requiredPlayers} slots
+                  </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {Array.from({ length: requiredPlayers }).map((_, index) => (
+                    <input
+                      key={`${sport}-${index}`}
+                      value={members[index] || ""}
+                      onChange={(event) => updateMember(index, event.target.value)}
+                      required
+                      className="input-light"
+                      placeholder={`Player ${index + 1} name`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={status === "submitting"}
+                className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-slate-950 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {status === "submitting" && <Loader2 className="animate-spin" size={18} />}
+                Register Team
+              </button>
+            </form>
+          ) : (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-slate-700">
+              <h2 className="text-2xl font-black text-slate-900">Registration Closed</h2>
+              <p className="mt-4 text-sm leading-relaxed text-slate-600">
+                The registration portal is currently disabled or outside the configured tournament window. Admins must enable the registration portal and ensure the current date falls between the tournament start and end dates.
+              </p>
+              {nextTournament ? (
+                <p className="mt-4 text-sm text-slate-600">
+                  Next registration window: {formatDate(nextTournament.startDate)} to {formatDate(nextTournament.endDate)}.
+                </p>
+              ) : (
+                <p className="mt-4 text-sm text-slate-600">No upcoming registration window has been configured yet.</p>
+              )}
+              <Link
+                href="/"
+                className="mt-6 inline-flex h-14 w-full items-center justify-center rounded-xl bg-slate-950 text-sm font-black uppercase tracking-[0.2em] text-white"
+              >
+                Back to Home
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

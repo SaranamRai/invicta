@@ -1,13 +1,16 @@
 import { Router } from "express";
 import {
   coordinatorFixtures,
+  coordinatorVolunteers,
   createCoordinatorIssue,
+  createCoordinatorVolunteer,
   createPlayer,
-  createTeam,
   myDepartment,
+  publishRule,
   updatePlayer,
   updateTeam,
 } from "../controllers/coordinatorController.js";
+import { createTeam } from "../controllers/adminDataController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
 
@@ -21,6 +24,9 @@ router.put("/teams/:id", updateTeam);
 router.post("/players", createPlayer);
 router.put("/players/:id", updatePlayer);
 router.get("/fixtures", coordinatorFixtures);
+router.get("/volunteers", coordinatorVolunteers);
 router.post("/issues", createCoordinatorIssue);
+router.post("/rules", publishRule);
+router.post("/create-volunteer", createCoordinatorVolunteer);
 
 export default router;

@@ -1,22 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Trophy } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { getPublicFixtures, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
 import { MatchData } from "@/lib/types";
 
 export default function ResultsPage() {
   const [results, setResults] = useState<MatchData[]>([]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(query(collection(db, "matches"), where("status", "==", "Finished")), (snapshot) => {
-      setResults(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MatchData)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadResults() {
+      const [fixtures, liveScores] = await Promise.all([getPublicFixtures(), getPublicLiveScores()]);
+      if (!isMounted) return;
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setResults(fixtures
+        .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+        .filter((match) => match.status === "Finished"));
+    }
+
+    void loadResults();
+    const interval = window.setInterval(loadResults, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (

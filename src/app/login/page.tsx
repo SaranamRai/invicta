@@ -65,7 +65,7 @@ export default function LoginPage() {
               <span className="h-[1.5px] w-16 bg-accent sm:w-20" />
             </div>
           </div>
-          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin, Volunteer & Coordinator Login</p>
+          <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin, Supercoordinator, Volunteer & Coordinator Login</p>
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-white/40 bg-white/75 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl sm:rounded-[2.5rem] sm:p-10">
@@ -91,7 +91,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Admin, Volunteer, or Coordinator Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Role Account Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 

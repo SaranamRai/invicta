@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getPublicAnnouncements, mapMongoAnnouncement } from "@/lib/api";
 import { NotificationData } from "@/lib/types";
 
 interface GuestNotification extends NotificationData {
@@ -18,15 +17,21 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const notificationsQuery = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(5));
-    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
-      setNotifications(snapshot.docs.map((notificationDoc) => ({
-        id: notificationDoc.id,
-        ...notificationDoc.data(),
-      } as GuestNotification)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadNotifications() {
+      const announcements = await getPublicAnnouncements();
+      if (!isMounted) return;
+      setNotifications(announcements.map(mapMongoAnnouncement).slice(0, 5));
+    }
+
+    void loadNotifications();
+    const interval = window.setInterval(loadNotifications, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (

@@ -2,10 +2,9 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { MatchData, MatchPeriod, ScoreEvent } from "@/lib/types";
-import { updateMatchDetails, logActivity } from "@/lib/services/firebase-service";
+import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Flag, Loader2, Pause, Play, Save, Square } from "lucide-react";
 import Link from "next/link";
@@ -19,6 +18,7 @@ import {
   getMatchPeriod,
   parseMatchClock,
 } from "@/lib/match-clock";
+import { getRoleAccount } from "@/lib/role-auth";
 
 export default function LiveMatchEditPanel() {
   const params = useParams();
@@ -38,6 +38,7 @@ export default function LiveMatchEditPanel() {
   const [timer, setTimer] = useState("");
   const [fullMatchTimer, setFullMatchTimer] = useState("90:00");
   const [announcement, setAnnouncement] = useState("");
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -46,26 +47,36 @@ export default function LiveMatchEditPanel() {
 
   useEffect(() => {
     if (!matchId) return;
-    const unsubscribe = onSnapshot(doc(db, "matches", matchId), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = { id: docSnap.id, ...docSnap.data() } as MatchData;
-        setMatch(data);
-        // Only initialize form state once
-        if (loading) {
-          setScoreA(data.scoreA || 0);
-          setScoreB(data.scoreB || 0);
-          setStatus(data.status || "Upcoming");
-          setTimer(data.timer || "");
-          setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(data)));
-          setLoading(false);
-        }
-      } else {
-        router.push("/volunteer/matches");
-      }
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
-  }, [matchId, loading, router]);
+    async function loadMatch() {
+      const data = await getMatchById(matchId);
+      if (!isMounted) return;
+
+      if (!data || (assignedSport && data.sport !== assignedSport)) {
+        router.push("/volunteer/matches");
+        return;
+      }
+
+      setMatch(data);
+      if (loading) {
+        setScoreA(data.scoreA || 0);
+        setScoreB(data.scoreB || 0);
+        setStatus(data.status || "Upcoming");
+        setTimer(data.timer || "");
+        setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(data)));
+        setLoading(false);
+      }
+    }
+
+    void loadMatch();
+    const interval = window.setInterval(loadMatch, 5000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [assignedSport, matchId, loading, router]);
 
   const showMessage = (text: string, type: "success" | "error") => {
     setMessage({ text, type });

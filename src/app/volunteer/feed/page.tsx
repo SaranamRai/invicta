@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { collection, query, onSnapshot } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { MatchData } from "@/lib/types";
-import { createLiveFeedPost, uploadFeedImage } from "@/lib/services/firebase-service";
+import { createLiveFeedPost, getAllMatches, uploadFeedImage } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
 import { Loader2, Send, Image as ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,14 +19,21 @@ export default function VolunteerLiveFeedPage() {
   const [message, setMessage] = useState({ text: "", type: "" });
 
   useEffect(() => {
-    // Only fetch Live matches for the feed dropdown
-    const qMatches = query(collection(db, "matches"));
-    const unsubscribeMatches = onSnapshot(qMatches, (snapshot) => {
-      const matchesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MatchData));
-      setMatches(matchesData.filter(m => m.status === "Live" || m.status === "Upcoming"));
-    });
+    let isMounted = true;
 
-    return () => unsubscribeMatches();
+    async function loadMatches() {
+      const matchesData = await getAllMatches();
+      if (!isMounted) return;
+      setMatches(matchesData.filter(m => m.status === "Live" || m.status === "Upcoming"));
+    }
+
+    void loadMatches();
+    const interval = window.setInterval(loadMatches, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const showMessage = (text: string, type: "success" | "error") => {

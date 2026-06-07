@@ -16,8 +16,9 @@ import { cn } from "@/lib/utils";
 interface AdminOverviewProps {
   teams: Team[];
   fixtures: Fixture[];
-  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule") => void;
+  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule" | "users") => void;
   onUpdateTeam: (team: Team) => void;
+  canManageSetup?: boolean;
 }
 
 interface ActivityItem {
@@ -50,6 +51,7 @@ export function AdminOverview({
   fixtures,
   setActiveTab,
   onUpdateTeam,
+  canManageSetup = true,
 }: AdminOverviewProps) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -168,22 +170,38 @@ export function AdminOverview({
         <div>
           <div className="admin-hero-accent flex items-center gap-2">
             <Sparkles size={18} />
-            <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">Admin Overview</span>
-          </div>
-          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">Start here to run the event</h2>
+          <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">
+            {canManageSetup ? "Supercoordinator Overview" : "Admin Overview"}
+          </span>
+        </div>
+          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">
+            {canManageSetup ? "Start here to run the event" : "System visibility and permissions"}
+          </h2>
           <p className="text-sm text-slate-300 max-w-xl mt-1">
-            First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress.
+            {canManageSetup
+              ? "First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress."
+              : "Review supercoordinators, coordinators, volunteers, registered teams, and match activity without changing tournament setup."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveTab("teams")}
-            className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
-          >
-            <Plus size={14} /> Add Team
-          </button>
+          {canManageSetup ? (
+            <button
+              onClick={() => setActiveTab("teams")}
+              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
+            >
+              <Plus size={14} /> Add Team
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab("users")}
+              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
+            >
+              <Users size={14} /> View Users
+            </button>
+          )}
           <button
             onClick={() => setActiveTab("fixtures")}
+            disabled={!canManageSetup}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-white border border-white/20 text-slate-950 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
             Create Fixtures <ArrowRight size={14} />

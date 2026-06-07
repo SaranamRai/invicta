@@ -3,12 +3,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Download, Trophy } from "lucide-react";
-import { collection, onSnapshot, query } from "firebase/firestore";
 
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
 import { MatchData } from "@/lib/types";
+import { getPublicFixtures, getPublicLiveScores, getPublicTeams, mapMongoFixture, mapMongoTeam } from "@/lib/api";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { cn } from "@/lib/utils";
 
@@ -21,17 +20,28 @@ export default function StandingsPage() {
   const [activeCategory, setActiveCategory] = useState(categories[0] || "");
 
   useEffect(() => {
-    const unsubscribeMatches = onSnapshot(query(collection(db, "matches")), (snapshot) => {
-      setMatches(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as MatchData)));
-    });
+    let isMounted = true;
 
-    const unsubscribeTeams = onSnapshot(query(collection(db, "teams")), (snapshot) => {
-      setTeams(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Team)));
-    });
+    async function loadStandingsData() {
+      const [fixtures, liveScores, publicTeams] = await Promise.all([
+        getPublicFixtures(),
+        getPublicLiveScores(),
+        getPublicTeams(),
+      ]);
+
+      if (!isMounted) return;
+
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setMatches(fixtures.map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData));
+      setTeams(publicTeams.map((team) => mapMongoTeam(team) as Team));
+    };
+
+    void loadStandingsData();
+    const interval = window.setInterval(loadStandingsData, 15000);
 
     return () => {
-      unsubscribeMatches();
-      unsubscribeTeams();
+      isMounted = false;
+      window.clearInterval(interval);
     };
   }, []);
 
@@ -52,7 +62,7 @@ export default function StandingsPage() {
     const blob = new Blob([headers + rows], { type: "text/csv" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "invicta-standings.csv";
+    link.download = "invicta-league-tables.csv";
     link.click();
     URL.revokeObjectURL(link.href);
   };
@@ -61,7 +71,7 @@ export default function StandingsPage() {
     <div className="space-y-10">
       <header className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Team Standings</h1>
+          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">League Tables</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
             Compare departments by sport. Wins, losses, draws, and points update after match results are recorded.
           </p>
@@ -164,7 +174,7 @@ export default function StandingsPage() {
                     <td colSpan={7} className="py-20 text-center">
                       <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                        No standings yet. Registered teams and completed matches will appear here automatically.
+                        No league table data yet. Registered teams and completed matches will appear here automatically.
                       </p>
                     </td>
                   </tr>

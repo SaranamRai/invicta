@@ -4,12 +4,18 @@ import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
 import Volunteer from "../models/Volunteer.js";
 import Coordinator from "../models/Coordinator.js";
+import SuperCoordinator from "../models/SuperCoordinator.js";
 
 const roleModels = [
   { role: "admin", model: Admin },
+  { role: "supercoordinator", model: SuperCoordinator },
   { role: "volunteer", model: Volunteer },
   { role: "coordinator", model: Coordinator },
 ];
+
+function normalizeSport(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
 
 function signToken(account, role) {
   return jwt.sign(
@@ -75,12 +81,16 @@ export async function createRoleAccount(model, role, req, res) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
+  const assignedSport = normalizeSport(rest.assignedSport || rest.sport);
   const account = await model.create({
     ...rest,
+    ...(assignedSport ? { assignedSport } : {}),
     name,
     email: normalizedEmail,
     password: hashedPassword,
     role,
+    createdBy: req.user?.id,
+    createdByRole: req.user?.role,
   });
 
   return res.status(201).json({
@@ -88,5 +98,8 @@ export async function createRoleAccount(model, role, req, res) {
     name: account.name,
     email: account.email,
     role,
+    assignedSport: account.assignedSport || "",
+    registrationNumber: account.registrationNumber || "",
+    phone: account.phone || "",
   });
 }

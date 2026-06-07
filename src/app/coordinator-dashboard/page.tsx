@@ -3,34 +3,65 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, onSnapshot } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { BookOpen, Calendar, ClipboardList, FileUp, LogOut, Send, ShieldCheck, Trophy, UsersRound } from "lucide-react";
+import { BookOpen, ClipboardList, FileUp, LogOut, Send, ShieldCheck, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
-import { db, storage } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
+import { CoordinatorVolunteerPayload, createCoordinatorRule, createCoordinatorVolunteer, getCoordinatorVolunteers, getPublicTeams, mapMongoTeam } from "@/lib/api";
 import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 function CoordinatorDashboardContent() {
   const router = useRouter();
   const [account] = useState<RoleAccount | null>(() => getRoleAccount());
+  const assignedSport = account?.assignedSport?.trim().toLowerCase() || "";
   const [teams, setTeams] = useState<Team[]>([]);
-  const [ruleSport, setRuleSport] = useState("football");
+  const [ruleSport, setRuleSport] = useState(assignedSport || "football");
   const [ruleTitle, setRuleTitle] = useState("");
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleAttachment, setRuleAttachment] = useState<File | null>(null);
   const [isPublishingRule, setIsPublishingRule] = useState(false);
+  const [volunteers, setVolunteers] = useState<CoordinatorVolunteerPayload[]>([]);
+  const [volunteerName, setVolunteerName] = useState("");
+  const [volunteerEmail, setVolunteerEmail] = useState("");
+  const [volunteerPassword, setVolunteerPassword] = useState("1234");
+  const [volunteerRegistrationNumber, setVolunteerRegistrationNumber] = useState("");
+  const [volunteerPhone, setVolunteerPhone] = useState("");
+  const [volunteerMessage, setVolunteerMessage] = useState("");
+  const [isCreatingVolunteer, setIsCreatingVolunteer] = useState(false);
+  const availableRuleSports = assignedSport ? sports.filter((sport) => sport.id === assignedSport) : sports;
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "teams"), (snapshot) => {
-      setTeams(snapshot.docs.map((teamDoc) => ({ id: teamDoc.id, ...teamDoc.data() } as Team)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadDashboardData() {
+      const [publicTeams, coordinatorVolunteers] = await Promise.all([
+        getPublicTeams(),
+        getCoordinatorVolunteers().catch(() => []),
+      ]);
+      if (!isMounted) return;
+      setTeams(publicTeams.map((team) => mapMongoTeam(team) as Team));
+      setVolunteers(coordinatorVolunteers);
+    }
+
+    void loadDashboardData();
+    const interval = window.setInterval(loadDashboardData, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const assignedTeams = useMemo(() => {
@@ -56,7 +87,7 @@ function CoordinatorDashboardContent() {
 
     const title = ruleTitle.trim();
     const description = ruleDescription.trim();
-    const selectedSport = sports.find((sport) => sport.id === ruleSport);
+    const selectedSport = availableRuleSports.find((sport) => sport.id === ruleSport);
 
     if (!title || !description || !selectedSport) {
       return;
@@ -65,10 +96,9 @@ function CoordinatorDashboardContent() {
     setIsPublishingRule(true);
 
     try {
-      const timestamp = Date.now();
       let attachment:
         | {
-            attachmentUrl: string;
+            attachmentData: string;
             attachmentName: string;
             attachmentType: string;
             attachmentKind: "document" | "image";
@@ -76,36 +106,20 @@ function CoordinatorDashboardContent() {
         | Record<string, never> = {};
 
       if (ruleAttachment) {
-        const extension = ruleAttachment.name.split(".").pop() || "file";
-        const storageRef = ref(storage, `rules/${selectedSport.id}/${timestamp}.${extension}`);
-        const snapshot = await uploadBytes(storageRef, ruleAttachment);
-        const attachmentUrl = await getDownloadURL(snapshot.ref);
-
         attachment = {
-          attachmentUrl,
+          attachmentData: await readFileAsDataUrl(ruleAttachment),
           attachmentName: ruleAttachment.name,
           attachmentType: ruleAttachment.type || "application/octet-stream",
           attachmentKind: ruleAttachment.type.startsWith("image/") ? "image" : "document",
         };
       }
 
-      await addDoc(collection(db, "rules"), {
+      await createCoordinatorRule({
         title,
         description,
         sport: selectedSport.id,
         sportName: selectedSport.name,
-        createdAt: timestamp,
-        createdBy: account?.name || "Coordinator",
-        createdByEmail: account?.email || "",
         ...attachment,
-      });
-
-      await addDoc(collection(db, "notifications"), {
-        title: `${selectedSport.name} Rules Published`,
-        message: `${account?.name || "Coordinator"} added rules for ${selectedSport.name}.`,
-        timestamp,
-        type: "info",
-        href: "/rules",
       });
 
       setRuleTitle("");
@@ -114,6 +128,46 @@ function CoordinatorDashboardContent() {
       event.currentTarget.reset();
     } finally {
       setIsPublishingRule(false);
+    }
+  };
+
+  const handleCreateVolunteer = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setVolunteerMessage("");
+
+    const name = volunteerName.trim();
+    const email = volunteerEmail.trim().toLowerCase();
+    const password = volunteerPassword.trim();
+    const registrationNumber = volunteerRegistrationNumber.trim();
+    const phone = volunteerPhone.trim();
+
+    if (!name || !email || !password || !registrationNumber || !phone) {
+      setVolunteerMessage("Name, email, password, registration number, and mobile number are required.");
+      return;
+    }
+
+    setIsCreatingVolunteer(true);
+
+    try {
+      await createCoordinatorVolunteer({
+        name,
+        email,
+        password,
+        assignedSport,
+        registrationNumber,
+        phone,
+      });
+      setVolunteerName("");
+      setVolunteerEmail("");
+      setVolunteerPassword("1234");
+      setVolunteerRegistrationNumber("");
+      setVolunteerPhone("");
+      setVolunteers(await getCoordinatorVolunteers().catch(() => []));
+      setVolunteerMessage("Volunteer added for your sport.");
+    } catch (error) {
+      setVolunteerMessage(error instanceof Error ? error.message : "Could not add volunteer.");
+    } finally {
+      setIsCreatingVolunteer(false);
     }
   };
 
@@ -173,7 +227,7 @@ function CoordinatorDashboardContent() {
         <section className="grid gap-4 md:grid-cols-3">
           <StatCard icon={Trophy} label="Assigned Teams" value={assignedTeams.length} />
           <StatCard icon={UsersRound} label="Players Listed" value={totalPlayers} />
-          <StatCard icon={Calendar} label="Sports Available" value={sports.length} />
+          <StatCard icon={UsersRound} label="Sport Volunteers" value={volunteers.length} />
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -235,7 +289,7 @@ function CoordinatorDashboardContent() {
                 onChange={(event) => setRuleSport(event.target.value)}
                 className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent"
               >
-                {sports.map((sport) => (
+                {availableRuleSports.map((sport) => (
                   <option key={sport.id} value={sport.id}>{sport.name}</option>
                 ))}
               </select>
@@ -300,6 +354,110 @@ function CoordinatorDashboardContent() {
               </button>
             </div>
           </form>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent">
+              <UserPlus size={21} />
+            </div>
+            <div>
+              <h2 className="sport-heading text-xl font-black">Add Sport Volunteers</h2>
+              <p className="text-sm font-medium text-muted-foreground">
+                Volunteers created here inherit your sport access only.
+              </p>
+            </div>
+          </div>
+
+          {volunteerMessage && (
+            <div className="mb-4 rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+              {volunteerMessage}
+            </div>
+          )}
+
+          <form onSubmit={handleCreateVolunteer} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_170px_170px_130px_auto]">
+            <input
+              type="text"
+              value={volunteerName}
+              onChange={(event) => setVolunteerName(event.target.value)}
+              placeholder="Volunteer name"
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+            />
+            <input
+              type="email"
+              value={volunteerEmail}
+              onChange={(event) => setVolunteerEmail(event.target.value)}
+              placeholder={assignedSport ? `volunteer${assignedSport}@gmail.com` : "volunteer@gmail.com"}
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+            />
+            <input
+              type="text"
+              value={volunteerRegistrationNumber}
+              onChange={(event) => setVolunteerRegistrationNumber(event.target.value)}
+              placeholder="Registration no"
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+            />
+            <input
+              type="tel"
+              value={volunteerPhone}
+              onChange={(event) => setVolunteerPhone(event.target.value)}
+              placeholder="Mobile no"
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+            />
+            <input
+              type="text"
+              value={volunteerPassword}
+              onChange={(event) => setVolunteerPassword(event.target.value)}
+              placeholder="1234"
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={isCreatingVolunteer || !assignedSport}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <UserPlus size={16} />
+              {isCreatingVolunteer ? "Adding..." : "Add Volunteer"}
+            </button>
+          </form>
+
+          <div className="mt-6 overflow-hidden rounded-2xl border border-border">
+            <div className="border-b border-border bg-secondary px-4 py-3">
+              <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Volunteers Under This Sport</h3>
+            </div>
+            {volunteers.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-background text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Registration No</th>
+                      <th className="px-4 py-3">Mobile No</th>
+                      <th className="px-4 py-3">Sport</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {volunteers.map((volunteer) => (
+                      <tr key={volunteer.id}>
+                        <td className="px-4 py-4 font-black uppercase tracking-wide text-foreground">{volunteer.name}</td>
+                        <td className="px-4 py-4 font-mono text-xs font-semibold text-muted-foreground">{volunteer.email}</td>
+                        <td className="px-4 py-4 text-xs font-bold uppercase tracking-wider text-foreground">{volunteer.registrationNumber || "Not added"}</td>
+                        <td className="px-4 py-4 text-xs font-bold text-foreground">{volunteer.phone || "Not added"}</td>
+                        <td className="px-4 py-4 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                          {sports.find((sport) => sport.id === volunteer.assignedSport)?.name || volunteer.assignedSport || "Assigned sport"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-sm font-semibold text-muted-foreground">
+                No volunteers have been added for this sport yet.
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>

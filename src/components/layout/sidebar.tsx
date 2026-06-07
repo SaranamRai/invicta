@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Home", href: "/" },
-  { icon: Trophy, label: "Standings", href: "/standings" },
+  { icon: Trophy, label: "League Tables", href: "/standings" },
   { icon: Calendar, label: "Matches", href: "/matches" },
   { icon: Target, label: "Sports", href: "/sports" },
   { icon: Trophy, label: "Results", href: "/results" },
@@ -27,7 +27,7 @@ export function Sidebar() {
       {/* Background Accent */}
       <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-accent/10 blur-[100px]" />
       
-      <div className="relative flex h-full flex-col overflow-y-auto px-4 py-4 lg:py-5">
+      <div className="no-scrollbar relative flex h-full flex-col overflow-y-auto px-4 py-4 lg:py-5">
         <div className="mb-4 flex shrink-0 items-center gap-4 px-2 lg:mb-8 lg:flex-col lg:items-stretch">
           <div className="flex aspect-[425/159] w-40 items-center justify-center self-center sm:w-48 lg:mb-5 lg:w-full">
             <img 

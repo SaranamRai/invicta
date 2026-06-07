@@ -3,13 +3,12 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar as CalendarIcon, MapPin, Clock, ChevronLeft, ChevronRight, Radio } from "lucide-react";
-import { collection, onSnapshot } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { MatchData, LiveFeedPost } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
-import { db } from "@/lib/firebase";
+import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
 
 const tabs = ["All Matches", "Live", "Upcoming", "Finished"];
 
@@ -20,28 +19,47 @@ export default function MatchesPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
 
   React.useEffect(() => {
-    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
-      const nextMatches = snapshot.docs
-        .map((matchDoc) => ({ id: matchDoc.id, ...matchDoc.data() } as MatchData))
-        .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+    let isMounted = true;
 
-      setMatchesData(nextMatches);
-    });
+    async function loadMatches() {
+      const [fixtures, liveScores, feeds] = await Promise.all([
+        getPublicFixtures(),
+        getPublicLiveScores(),
+        getPublicLiveFeeds(),
+      ]);
 
-    const unsubscribeFeeds = onSnapshot(collection(db, "liveFeeds"), (snapshot) => {
-      const nextFeeds = snapshot.docs
-        .map((feedDoc) => ({ id: feedDoc.id, ...feedDoc.data() } as LiveFeedPost))
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (!isMounted) return;
 
-      setLiveFeeds(nextFeeds);
-    });
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setMatchesData(
+        fixtures
+          .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+          .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
+      );
+      setLiveFeeds(
+        feeds
+          .map((feed) => ({
+            id: feed._id,
+            matchId: typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "",
+            matchTitle: typeof feed.fixtureId === "string" ? "Match Update" : feed.fixtureId?.name || feed.fixtureId?.teamName || "Match Update",
+            content: feed.message,
+            timestamp: feed.createdAt ? Date.parse(feed.createdAt) : Date.now(),
+            volunteerEmail: "Volunteer",
+          }) as LiveFeedPost)
+          .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      );
+    }
+
+    void loadMatches();
+    const interval = window.setInterval(loadMatches, 15000);
 
     return () => {
-      unsubscribeMatches();
-      unsubscribeFeeds();
+      isMounted = false;
+      window.clearInterval(interval);
     };
   }, []);
 
@@ -258,20 +276,19 @@ export default function MatchesPage() {
 
                     {/* Teams & Score */}
                     <div className="min-w-0 p-5 sm:p-6 xl:p-7">
-                      <div className="grid min-w-0 grid-cols-1 items-center gap-6 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                      <div className="flex min-w-0 flex-wrap items-center justify-center gap-5">
                         {/* Team A */}
-                        <div className="group/team flex min-w-0 items-center justify-center gap-4 text-center sm:justify-start sm:text-left">
+                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-start gap-4 text-left">
                           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
                             🏆
                           </div>
                           <div className="min-w-0">
-                            <span className="block text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-1">Home</span>
-                            <span className="sport-heading block truncate text-xl font-black uppercase tracking-wide text-white">{match.teamA}</span>
+                            <span className="sport-heading block truncate text-2xl font-black uppercase tracking-wide text-white lg:text-3xl">{match.teamA}</span>
                           </div>
                         </div>
 
                         {/* Score */}
-                        <div className="flex shrink-0 flex-col items-center gap-2">
+                        <div className="order-2 flex w-full shrink-0 flex-col items-center gap-2">
                           <div className={cn(
                             "flex items-center gap-4 rounded-2xl border-2 px-6 py-4 shadow-2xl transition-all",
                             match.status === "Live" ? "bg-black/60 border-accent/40" : "bg-secondary border-border"
@@ -289,10 +306,9 @@ export default function MatchesPage() {
                         </div>
 
                         {/* Team B */}
-                        <div className="group/team flex min-w-0 items-center justify-center gap-4 text-center sm:justify-end sm:text-right">
+                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-end gap-4 text-right">
                           <div className="min-w-0">
-                            <span className="block text-[10px] font-black text-accent uppercase tracking-[0.2em] mb-1">Away</span>
-                            <span className="sport-heading block truncate text-xl font-black uppercase tracking-wide text-white">{match.teamB}</span>
+                            <span className="sport-heading block truncate text-2xl font-black uppercase tracking-wide text-white lg:text-3xl">{match.teamB}</span>
                           </div>
                           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
                             🥈
@@ -303,12 +319,44 @@ export default function MatchesPage() {
 
                     {/* Actions */}
                     <div className="flex items-center justify-center border-t border-white/10 bg-white/5 p-5 xl:border-l xl:border-t-0">
-                      <button className="w-full rounded-xl bg-accent px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95">
-                        View Match
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMatchId((current) => current === match.id ? null : match.id)}
+                        className="w-full rounded-xl bg-accent px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95"
+                      >
+                        {selectedMatchId === match.id ? "Hide Match" : "View Match"}
                       </button>
                     </div>
                   </div>
                 </Card>
+                {selectedMatchId === match.id && (
+                  <Card className="mt-4 border-2 p-5">
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <DetailItem label="Date" value={match.date || "TBD"} />
+                      <DetailItem label="Time" value={match.time || "TBD"} />
+                      <DetailItem label="Venue" value={match.venue || "Venue TBD"} />
+                      <DetailItem label="Status" value={match.status} />
+                    </div>
+                    <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">
+                      <p className="sport-heading text-lg font-black uppercase text-foreground">
+                        {match.teamA} {match.scoreA ?? 0} - {match.scoreB ?? 0} {match.teamB}
+                      </p>
+                      <p className="mt-1 text-xs font-black uppercase tracking-widest text-accent">
+                        {match.sport} / {getMatchPeriod(match)}
+                      </p>
+                    </div>
+                    {match.announcements && match.announcements.length > 0 && (
+                      <div className="mt-5 space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Match Updates</p>
+                        {match.announcements.map((announcement, index) => (
+                          <p key={`${match.id}-announcement-${index}`} className="rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground">
+                            {announcement}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                )}
               </motion.div>
             )) : (
               <motion.div
@@ -384,6 +432,15 @@ export default function MatchesPage() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3">
+      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-black uppercase text-foreground">{value}</p>
     </div>
   );
 }

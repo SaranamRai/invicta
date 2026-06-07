@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { BookOpen, ExternalLink, FileText, Mail } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { getPublicRules, mapMongoRule } from "@/lib/api";
 import { sports } from "@/lib/mock-data";
 
 interface PublishedRule {
@@ -43,12 +42,21 @@ export function RulesViewer() {
   const [rules, setRules] = useState<PublishedRule[]>([]);
 
   useEffect(() => {
-    const rulesQuery = query(collection(db, "rules"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(rulesQuery, (snapshot) => {
-      setRules(snapshot.docs.map((ruleDoc) => ({ id: ruleDoc.id, ...ruleDoc.data() } as PublishedRule)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadRules() {
+      const publicRules = await getPublicRules();
+      if (!isMounted) return;
+      setRules(publicRules.map(mapMongoRule));
+    }
+
+    void loadRules();
+    const interval = window.setInterval(loadRules, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (

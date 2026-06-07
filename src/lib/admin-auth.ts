@@ -85,7 +85,7 @@ export function getPortalRole(): PortalRole | null {
   }
 
   const role = getStoredValue(PORTAL_ROLE_KEY);
-  return role === "admin" || role === "volunteer" || role === "coordinator" ? role : null;
+  return role === "admin" || role === "supercoordinator" || role === "volunteer" || role === "coordinator" ? role : null;
 }
 
 export function clearPortalAuth() {

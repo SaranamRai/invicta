@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { collection, onSnapshot } from "firebase/firestore";
 import {
   Activity,
   ArrowUpRight,
@@ -15,8 +14,16 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
 import { Team } from "@/lib/fixture-generator";
+import {
+  getPublicFixtures,
+  getPublicLiveScores,
+  getPublicTeams,
+  getPublicTournaments,
+  mapMongoFixture,
+  mapMongoTeam,
+  TournamentPayload,
+} from "@/lib/api";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 import { MatchData } from "@/lib/types";
@@ -26,24 +33,80 @@ export default function Home() {
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
   const [teamsData, setTeamsData] = useState<Team[]>([]);
   const [now, setNow] = useState(0);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [openTournament, setOpenTournament] = useState<TournamentPayload | null>(null);
+  const [nextTournament, setNextTournament] = useState<TournamentPayload | null>(null);
+
+  const updateRegistrationWindow = (nextTournaments: TournamentPayload[]) => {
+    const nowTime = Date.now();
+    const normalized = nextTournaments
+      .map((tournament) => ({
+        ...tournament,
+        startTime: new Date(tournament.startDate).setHours(0, 0, 0, 0),
+        endTime: new Date(tournament.endDate).setHours(23, 59, 59, 999),
+      }))
+      .filter((tournament) =>
+        tournament.registrationOpen &&
+        !Number.isNaN(tournament.startTime) &&
+        !Number.isNaN(tournament.endTime)
+      );
+
+    const activeTournament = normalized.find(
+      (tournament) => nowTime >= tournament.startTime && nowTime <= tournament.endTime
+    ) || null;
+
+    const upcomingTournament = normalized
+      .filter((tournament) => tournament.startTime > nowTime)
+      .sort((a, b) => a.startTime - b.startTime)[0] || null;
+
+    setRegistrationOpen(Boolean(activeTournament));
+    setOpenTournament(activeTournament);
+    setNextTournament(upcomingTournament);
+  };
+
+  const formatDate = (value: string) => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  };
 
   useEffect(() => {
-    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
-      const nextMatches = snapshot.docs
-        .map((matchDoc) => ({ id: matchDoc.id, ...matchDoc.data() } as MatchData))
-        .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+    if (tournaments.length > 0) {
+      updateRegistrationWindow(tournaments);
+    }
+  }, [tournaments, now]);
 
-      setMatchesData(nextMatches);
-    });
+  useEffect(() => {
+    let isMounted = true;
 
-    const unsubscribeTeams = onSnapshot(collection(db, "teams"), (snapshot) => {
-      const nextTeams = snapshot.docs.map((teamDoc) => ({ id: teamDoc.id, ...teamDoc.data() } as Team));
-      setTeamsData(nextTeams);
-    });
+    async function loadPublicData() {
+      const [fixtures, liveScores, teams, tournaments] = await Promise.all([
+        getPublicFixtures(),
+        getPublicLiveScores(),
+        getPublicTeams(),
+        getPublicTournaments(),
+      ]);
+
+      if (!isMounted) return;
+
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setMatchesData(
+        fixtures
+          .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+          .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
+      );
+      setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
+      setTournaments(tournaments);
+    };
+
+    void loadPublicData();
+    const interval = window.setInterval(loadPublicData, 15000);
 
     return () => {
-      unsubscribeMatches();
-      unsubscribeTeams();
+      isMounted = false;
+      window.clearInterval(interval);
     };
   }, []);
 
@@ -68,7 +131,7 @@ export default function Home() {
   const visitorActions = [
     { label: "View Sports", text: "See which sports are part of MSU Invicta and browse registered teams.", href: "/sports", icon: ClipboardList },
     { label: "Follow Matches", text: "Students and visitors can see schedules, live scores, and match updates.", href: "/matches", icon: Radio },
-    { label: "Check Standings", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
+    { label: "Check League Tables", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
   ];
 
   return (
@@ -114,7 +177,7 @@ export default function Home() {
                 </span>
                 <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  Standings are calculated from completed matches
+                  League tables are calculated from completed matches
                 </span>
               </div>
             ))}
@@ -165,6 +228,56 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      <section className="rounded-2xl border-2 border-border bg-card p-6 shadow-sm md:p-10">
+        <div className="mb-8 flex flex-col gap-3 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/20 text-accent">
+              <Users size={24} />
+            </div>
+            <h2 className="sport-heading text-2xl font-black tracking-tight text-foreground">Public Team Registration</h2>
+            <p className="mt-2 max-w-2xl text-sm font-medium text-muted-foreground">
+              Registration opens only when the admin enables the registration portal and the current date falls within an active tournament window.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {registrationOpen && openTournament ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Registration is open from {formatDate(openTournament.startDate)} to {formatDate(openTournament.endDate)}.
+              </p>
+              <Link
+                href="/register"
+                className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-accent text-sm font-black uppercase tracking-[0.2em] text-accent-foreground transition-all hover:bg-accent/90"
+              >
+                Open Registration
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-red-200 bg-red-500/10 p-4 text-sm font-medium text-red-700">
+                Registration is currently closed. You can only register while the admin portal is enabled and the date is within the tournament window.
+              </div>
+              {nextTournament ? (
+                <p className="text-sm text-muted-foreground">
+                  Next registration window: {formatDate(nextTournament.startDate)} to {formatDate(nextTournament.endDate)}.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">No upcoming registration window is configured yet.</p>
+              )}
+              <button
+                type="button"
+                disabled
+                className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-slate-400 text-sm font-black uppercase tracking-[0.2em] text-white opacity-70"
+              >
+                Registration Closed
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
         <div className="space-y-8 lg:col-span-2">
@@ -254,7 +367,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-primary" />
-              <h2 className="sport-heading text-2xl font-black">Team Standings</h2>
+              <h2 className="sport-heading text-2xl font-black">League Tables</h2>
             </div>
             <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
@@ -284,7 +397,7 @@ export default function Home() {
             ) : (
               <div className="p-10 text-center">
                 <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
-                <p className="text-sm font-semibold text-slate-500">Standings will appear after teams are registered and matches are completed.</p>
+                <p className="text-sm font-semibold text-slate-500">League tables will appear after teams are registered and matches are completed.</p>
               </div>
             )}
           </Card>

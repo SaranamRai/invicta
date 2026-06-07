@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { AdminOverview } from "@/components/admin/admin-overview";
 import { TeamManager } from "@/components/admin/team-manager";
 import { FixtureGenerator } from "@/components/admin/fixture-generator";
@@ -13,10 +11,21 @@ import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
-import { MatchData } from "@/lib/types";
 import { LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { clearPortalSession } from "@/lib/role-auth";
+import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
+import { sports } from "@/lib/mock-data";
+import {
+  createAdminAnnouncement,
+  createAdminTeam,
+  deleteAdminFixture,
+  deleteAdminTeam,
+  getAdminFixtures,
+  getAdminTeams,
+  replaceAdminFixtures,
+  updateAdminFixture,
+  updateAdminTeam,
+} from "@/lib/api";
 
 type AdminTab =
   | "dashboard"
@@ -28,97 +37,140 @@ type AdminTab =
   | "rules"
   | "users";
 
-const fixtureStatusToMatchStatus: Record<Fixture["status"], MatchData["status"]> = {
-  scheduled: "Upcoming",
-  live: "Live",
-  completed: "Finished",
-};
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-const matchStatusToFixtureStatus: Record<MatchData["status"], Fixture["status"]> = {
-  Upcoming: "scheduled",
-  Live: "live",
-  Finished: "completed",
-};
+function getSportName(sportId: string) {
+  return sports.find((sport) => sport.id === sportId)?.name || sportId;
+}
 
-const fixtureToMatch = (fixture: Fixture, teams: Team[]): MatchData => {
-  const teamA = teams.find((team) => team.id === fixture.teamA);
-  const teamB = teams.find((team) => team.id === fixture.teamB);
+function getTeamName(teamId: string, teams: Team[]) {
+  return teams.find((team) => team.id === teamId)?.name || teamId;
+}
 
-  const match: MatchData = {
-    id: fixture.id,
-    teamA: teamA?.name || fixture.teamA,
-    teamB: teamB?.name || fixture.teamB,
-    sport: fixture.sport,
-    type: "Inter-Department",
-    scoreA: fixture.scoreA ?? 0,
-    scoreB: fixture.scoreB ?? 0,
-    status: fixtureStatusToMatchStatus[fixture.status],
-    time: fixture.time,
-    date: fixture.date,
-    venue: fixture.venue,
-    lastUpdated: Date.now(),
-  };
+function buildFixtureFlowchartDoc(fixtures: Fixture[], teams: Team[]) {
+  const groupedFixtures = [...fixtures].sort((a, b) => `${a.date}${a.time}${a.sport}`.localeCompare(`${b.date}${b.time}${b.sport}`));
+  const rows = groupedFixtures.map((fixture, index) => {
+    const teamA = escapeHtml(getTeamName(fixture.teamA, teams));
+    const teamB = escapeHtml(getTeamName(fixture.teamB, teams));
+    const sport = escapeHtml(getSportName(fixture.sport));
+    const venue = escapeHtml(fixture.venue);
+    const date = escapeHtml(fixture.date);
+    const time = escapeHtml(fixture.time);
 
-  if (fixture.endedAt) {
-    match.endedAt = new Date(fixture.endedAt).getTime();
-  }
+    return `
+      <tr>
+        <td class="step">${index + 1}</td>
+        <td>
+          <div class="match-card">
+            <div class="meta">${date} at ${time} | ${venue}</div>
+            <div class="title">${teamA} vs ${teamB}</div>
+            <div class="sport">${sport}</div>
+          </div>
+          ${index < groupedFixtures.length - 1 ? '<div class="connector">then</div>' : ""}
+        </td>
+      </tr>
+    `;
+  }).join("");
 
-  return match;
-};
-
-const matchToFixture = (match: MatchData): Fixture => ({
-  id: match.id,
-  teamA: match.teamA,
-  teamB: match.teamB,
-  sport: match.sport,
-  date: match.date || new Date(match.lastUpdated || Date.now()).toISOString().split("T")[0],
-  time: match.time || "09:00",
-  venue: match.venue || "Arena",
-  status: matchStatusToFixtureStatus[match.status],
-  scoreA: match.scoreA,
-  scoreB: match.scoreB,
-  endedAt: match.endedAt ? new Date(match.endedAt).toISOString() : undefined,
-});
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: Arial, sans-serif; color: #111827; }
+          h1 { color: #0f172a; margin-bottom: 4px; }
+          .subtitle { color: #64748b; margin-bottom: 24px; }
+          table { width: 100%; border-collapse: collapse; }
+          td { vertical-align: top; padding: 8px; }
+          .step {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #facc15;
+            color: #0f172a;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+          }
+          .match-card {
+            border: 2px solid #e2e8f0;
+            border-left: 8px solid #facc15;
+            border-radius: 10px;
+            padding: 14px 16px;
+            background: #f8fafc;
+          }
+          .meta { font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; }
+          .title { margin-top: 6px; font-size: 18px; font-weight: bold; color: #020617; }
+          .sport { margin-top: 4px; font-size: 12px; font-weight: bold; color: #b45309; text-transform: uppercase; }
+          .connector { margin: 8px 0 0 18px; color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        </style>
+      </head>
+      <body>
+        <h1>Invicta Fixture Flowchart</h1>
+        <div class="subtitle">Generated schedule. Teams from the same department are not scheduled at the same date and time.</div>
+        <table>${rows}</table>
+      </body>
+    </html>
+  `;
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const account = getRoleAccount();
+  const canManageSetup = account?.role === "supercoordinator";
   const [teams, setTeams] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AdminTab>(canManageSetup ? "dashboard" : "users");
 
   useEffect(() => {
-    const unsubscribeTeams = onSnapshot(collection(db, "teams"), (snapshot) => {
-      setTeams(snapshot.docs.map((teamDoc) => ({ id: teamDoc.id, ...teamDoc.data() } as Team)));
-    });
+    let isMounted = true;
 
-    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
-      const nextFixtures = snapshot.docs.map((matchDoc) => {
-        const match = { id: matchDoc.id, ...matchDoc.data() } as MatchData;
-        return matchToFixture(match);
-      });
+    async function loadAdminData() {
+      try {
+        const [nextTeams, nextFixtures] = await Promise.all([
+          getAdminTeams(),
+          getAdminFixtures(),
+        ]);
 
-      setFixtures(nextFixtures.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
-    });
+        if (!isMounted) return;
+
+        setTeams(nextTeams as Team[]);
+        setFixtures(nextFixtures as Fixture[]);
+      } catch (error) {
+        console.error("Failed to load Mongo admin data:", error);
+      }
+    }
+
+    void loadAdminData();
 
     return () => {
-      unsubscribeTeams();
-      unsubscribeMatches();
+      isMounted = false;
     };
   }, []);
 
   // Add team handler
   const handleAddTeam = async (team: Team) => {
-    await setDoc(doc(db, "teams", team.id), team);
+    const savedTeam = await createAdminTeam(team);
+    setTeams((currentTeams) => [savedTeam as Team, ...currentTeams]);
   };
 
   // Remove team handler
   const handleRemoveTeam = async (teamId: string) => {
-    await deleteDoc(doc(db, "teams", teamId));
+    await deleteAdminTeam(teamId);
+    setTeams((currentTeams) => currentTeams.filter((team) => team.id !== teamId));
+    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.teamA !== teamId && fixture.teamB !== teamId));
   };
 
   // Update team handler
   const handleUpdateTeam = async (updatedTeam: Team) => {
-    await setDoc(doc(db, "teams", updatedTeam.id), updatedTeam, { merge: true });
+    const savedTeam = await updateAdminTeam(updatedTeam);
+    setTeams((currentTeams) => currentTeams.map((team) => team.id === savedTeam.id ? savedTeam as Team : team));
   };
 
   // Recalculate team standings (wins/losses) based on completed fixtures
@@ -154,23 +206,26 @@ export default function AdminDashboard() {
     });
 
     updatedTeams.forEach((team) => {
-      setDoc(doc(db, "teams", team.id), team, { merge: true });
+      void updateAdminTeam(team).catch((error) => console.error("Mongo standings update failed:", error));
     });
+    setTeams(updatedTeams);
   };
 
   // Save fixtures to Firestore so user and volunteer dashboards update in real time.
   const handleGenerateFixtures = async (newFixtures: Fixture[]) => {
-    await Promise.all(fixtures.map((fixture) => deleteDoc(doc(db, "matches", fixture.id))));
-    await Promise.all(
-      newFixtures.map((fixture) => setDoc(doc(db, "matches", fixture.id), fixtureToMatch(fixture, teams)))
-    );
+    const savedFixtures = await replaceAdminFixtures(newFixtures);
+    setFixtures(savedFixtures as Fixture[]);
+
     if (newFixtures.length > 0) {
-      await addDoc(collection(db, "notifications"), {
+      const scheduleDocumentHtml = buildFixtureFlowchartDoc(newFixtures, teams);
+
+      await createAdminAnnouncement({
         title: "Fixtures Published",
-        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published to the Match Center.`,
-        timestamp: Date.now(),
-        type: "info",
-        href: "/matches",
+        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published. Download the flowchart schedule from Announcements.`,
+        visibleToPublic: true,
+        attachmentName: "invicta-fixture-flowchart.doc",
+        attachmentType: "application/msword",
+        attachmentHtml: scheduleDocumentHtml,
       });
     }
     // Reset standings count
@@ -179,14 +234,17 @@ export default function AdminDashboard() {
 
   // Delete single fixture
   const handleDeleteFixture = async (fixtureId: string) => {
-    await deleteDoc(doc(db, "matches", fixtureId));
+    await deleteAdminFixture(fixtureId);
+    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.id !== fixtureId));
     recalculateStandings(fixtures.filter((fixture) => fixture.id !== fixtureId));
   };
 
   // Update fixture handler
   const handleUpdateFixture = async (updatedFixture: Fixture) => {
-    await setDoc(doc(db, "matches", updatedFixture.id), fixtureToMatch(updatedFixture, teams), { merge: true });
-    recalculateStandings(fixtures.map((fixture) => fixture.id === updatedFixture.id ? updatedFixture : fixture));
+    const savedFixture = await updateAdminFixture(updatedFixture);
+    const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
+    setFixtures(nextFixtures);
+    recalculateStandings(nextFixtures);
   };
 
   const handleLogout = () => {
@@ -220,9 +278,13 @@ export default function AdminDashboard() {
               />
             </div>
             <div className="space-y-1">
-              <h1 className="sport-heading text-2xl font-black sm:text-3xl">INVICTA ADMIN</h1>
+              <h1 className="sport-heading text-2xl font-black sm:text-3xl">
+                {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}
+              </h1>
               <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
-                Set up teams, publish fixtures, review schedules, and monitor tournament results.
+                {canManageSetup
+                  ? "Set up tournaments, add sport teams, publish fixtures, and manage sport-level coordinators and volunteers."
+                  : "View system role accounts, coordinator hierarchy, volunteers, teams, fixtures, and tournament permissions."}
               </p>
             </div>
           </div>
@@ -244,16 +306,24 @@ export default function AdminDashboard() {
         {/* Navigation Tabs */}
         <div className="border-t border-border flex">
           <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
-            {[
-              { id: "dashboard" as const, label: "Overview" },
-              { id: "tournaments" as const, label: "Sports Setup" },
-              { id: "teams" as const, label: "Teams" },
-              { id: "fixtures" as const, label: "Create Fixtures" },
-              { id: "schedule" as const, label: "Match Schedule" },
-              { id: "leaderboard" as const, label: "Standings" },
-              { id: "rules" as const, label: "Rules" },
-              { id: "users" as const, label: "Registrations" },
-            ].map((tab) => (
+            {(canManageSetup
+              ? [
+                  { id: "dashboard" as const, label: "Overview" },
+                  { id: "tournaments" as const, label: "Sports Setup" },
+                  { id: "teams" as const, label: "Teams" },
+                  { id: "fixtures" as const, label: "Create Fixtures" },
+                  { id: "schedule" as const, label: "Match Schedule" },
+                  { id: "leaderboard" as const, label: "League Tables" },
+                  { id: "rules" as const, label: "Rules" },
+                  { id: "users" as const, label: "System Users" },
+                ]
+              : [
+                  { id: "dashboard" as const, label: "Overview" },
+                  { id: "schedule" as const, label: "Match Schedule" },
+                  { id: "leaderboard" as const, label: "League Tables" },
+                  { id: "rules" as const, label: "Rules" },
+                  { id: "users" as const, label: "System Users" },
+                ]).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -278,14 +348,15 @@ export default function AdminDashboard() {
             fixtures={fixtures}
             setActiveTab={setActiveTab}
             onUpdateTeam={handleUpdateTeam}
+            canManageSetup={canManageSetup}
           />
         )}
 
-        {activeTab === "tournaments" && (
+        {activeTab === "tournaments" && canManageSetup && (
           <TournamentManager teamsCountBySport={teamsCountBySport} />
         )}
 
-        {activeTab === "teams" && (
+        {activeTab === "teams" && canManageSetup && (
           <TeamManager
             teams={teams}
             onAddTeam={handleAddTeam}
@@ -294,7 +365,7 @@ export default function AdminDashboard() {
           />
         )}
 
-        {activeTab === "fixtures" && (
+        {activeTab === "fixtures" && canManageSetup && (
           <FixtureGenerator
             teams={teams}
             onGenerateFixtures={handleGenerateFixtures}
@@ -320,7 +391,7 @@ export default function AdminDashboard() {
 
         {activeTab === "rules" && <RulesViewer />}
 
-        {activeTab === "users" && <UsersViewer teams={teams} />}
+        {activeTab === "users" && <UsersViewer teams={teams} canManageAccounts={canManageSetup} />}
       </div>
     </div>
   );

@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trophy, Calendar, AlignLeft, RefreshCw, Eye, Tag } from "lucide-react";
+import { Plus, Trophy, Calendar, AlignLeft } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
-import { db } from "@/lib/firebase";
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { createAdminTournament, deleteAdminTournament, getAdminTournaments, toggleAdminTournamentRegistration, updateAdminTournament, getStoredSession } from "@/lib/api";
 
 export interface Tournament {
   id: string;
@@ -14,6 +13,7 @@ export interface Tournament {
   sport: string;
   startDate: string;
   endDate: string;
+  registrationOpen?: boolean;
   type: "round-robin" | "knockout";
   status: "upcoming" | "ongoing" | "completed";
   teamsCount: number;
@@ -30,51 +30,111 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
   const [sport, setSport] = useState("football");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [type, setType] = useState<"round-robin" | "knockout">("round-robin");
   const [status, setStatus] = useState<"upcoming" | "ongoing" | "completed">("upcoming");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const sportOptions = [{ id: "all", name: "All Sports" }, ...sports];
+  const getSportName = (sportId: string) => {
+    return sportOptions.find((item) => item.id === sportId)?.name || sportId;
+  };
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "tournaments"), (snapshot) => {
-      setTournaments(snapshot.docs.map((tournamentDoc) => ({ id: tournamentDoc.id, ...tournamentDoc.data() } as Tournament)));
-    });
+    let isMounted = true;
 
-    return () => unsubscribe();
+    async function loadTournaments() {
+      const nextTournaments = await getAdminTournaments();
+      if (!isMounted) return;
+      setTournaments(nextTournaments.map((tournament) => ({
+        ...tournament,
+        id: String(tournament.id || tournament._id || ""),
+      })));
+    }
+
+    void loadTournaments();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert("Tournament Name is required");
+      setErrorMessage("Tournament Name is required");
       return;
     }
 
-    const newTour: Tournament = {
-      id: `tour-${Date.now()}`,
+    const newTour = {
       name: name.trim(),
       sport,
       startDate,
       endDate,
+      registrationOpen,
       type,
       status,
       teamsCount: teamsCountBySport[sport] || 0
     };
 
-    setDoc(doc(db, "tournaments", newTour.id), newTour);
+    const savedTournament = await createAdminTournament(newTour);
+    setTournaments((current) => [{ ...savedTournament, id: String(savedTournament.id || savedTournament._id || "") }, ...current]);
 
     setName("");
     setSport("football");
     setShowForm(false);
-    alert(`Tournament "${newTour.name}" created successfully!`);
+    setSuccessMessage(`Tournament "${newTour.name}" created successfully!`);
+    setTimeout(() => setSuccessMessage(null), 4000);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to remove this tournament?")) {
-      deleteDoc(doc(db, "tournaments", id));
+      await deleteAdminTournament(id);
+      setTournaments((current) => current.filter((tournament) => tournament.id !== id));
+    }
+  };
+
+  const toggleRegistrationOpen = async (tournament: Tournament) => {
+    try {
+      if (!tournament.id) {
+        setErrorMessage("Tournament identifier missing — cannot open portal.");
+        setTimeout(() => setErrorMessage(null), 4000);
+        return;
+      }
+      const session = getStoredSession();
+      if (!session?.token) {
+        setErrorMessage("Admin login required to change registration portal state.");
+        setTimeout(() => setErrorMessage(null), 4000);
+        return;
+      }
+      const updated = await toggleAdminTournamentRegistration(tournament.id, !tournament.registrationOpen);
+      setTournaments((current) => current.map((item) => {
+        if (item.id !== tournament.id) return item;
+        return {
+          ...item,
+          registrationOpen: updated.registrationOpen,
+        };
+      }));
+    } catch (error) {
+      console.error("Failed to toggle registration portal:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Could not update registration status.");
+      setTimeout(() => setErrorMessage(null), 4000);
     }
   };
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {errorMessage && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {errorMessage}
+        </div>
+      )}
+      {successMessage && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          {successMessage}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black sport-heading text-white">Tournaments Manager</h2>
@@ -127,8 +187,10 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                     onChange={(e) => setSport(e.target.value)}
                     className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-3 text-white focus:outline-none focus:border-accent cursor-pointer"
                   >
-                    {sports.map(s => (
-                      <option key={s.id} value={s.id} className="bg-slate-950 text-white">{s.name}</option>
+                    {sportOptions.map((s) => (
+                      <option key={s.id} value={s.id} className="bg-slate-950 text-white">
+                        {s.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -197,6 +259,19 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                     <option value="completed" className="bg-slate-950 text-white">Completed</option>
                   </select>
                 </div>
+
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                  <input
+                    id="registration-open-toggle"
+                    type="checkbox"
+                    checked={registrationOpen}
+                    onChange={(e) => setRegistrationOpen(e.target.checked)}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  <label htmlFor="registration-open-toggle" className="text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                    Open Registration Portal
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 justify-end pt-4 border-t border-white/5">
@@ -222,7 +297,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
       {/* Tournaments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {tournaments.map((tour) => {
-          const sName = sports.find(s => s.id === tour.sport)?.name || tour.sport;
+          const sName = getSportName(tour.sport);
           return (
             <Card key={tour.id} className="bg-slate-900/60 border border-white/5 text-white hover:border-white/15 transition-all relative overflow-hidden">
               <div className={`absolute top-0 left-0 w-full h-[3px] ${
@@ -262,13 +337,31 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-2 border-t border-white/5 justify-end">
-                  <button
-                    onClick={() => handleDelete(tour.id)}
-                    className="px-3.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
-                  >
-                    Delete
-                  </button>
+                <div className="grid gap-2 pt-2 border-t border-white/5 md:grid-cols-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      tour.registrationOpen ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                      "bg-red-500/10 border-red-500/30 text-red-400"
+                    }`}>
+                      {tour.registrationOpen ? "Registration Open" : "Registration Closed"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => toggleRegistrationOpen(tour)}
+                      disabled={!tour.id}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${!tour.id ? "opacity-50 cursor-not-allowed" : (tour.registrationOpen ? "bg-slate-700 border border-white/10 text-white hover:bg-slate-600" : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20")}`}
+                      aria-disabled={!tour.id}
+                    >
+                      {tour.registrationOpen ? "Close Portal" : "Open Portal"}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tour.id)}
+                      className="px-3.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
