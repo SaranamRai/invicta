@@ -8,33 +8,6 @@ import { useRouter } from "next/navigation";
 import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
 
-const demoAccounts = [
-  {
-    label: "Supercoordinator",
-    email: "supercoordinator@gmail.com",
-    password: "1234",
-    note: "Create tournaments, fixtures, teams, and sport accounts.",
-  },
-  {
-    label: "Football Coordinator",
-    email: "coordinatorfootball@gmail.com",
-    password: "1234",
-    note: "Manage football teams, volunteers, rules, and match duties.",
-  },
-  {
-    label: "Football Volunteer",
-    email: "volunteerfootball@gmail.com",
-    password: "1234",
-    note: "Update assigned football matches and live feed posts.",
-  },
-  {
-    label: "Admin",
-    email: "admin@gmail.com",
-    password: "1234",
-    note: "View system users, permissions, fixtures, and tournament data.",
-  },
-];
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,21 +42,15 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemoAccount = (account: typeof demoAccounts[number]) => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setError("");
-  };
-
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-6 sm:py-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-5xl"
+        className="relative z-10 w-full max-w-xl"
       >
         <div className="mb-5 sm:mb-7">
-          <div className="mb-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-7">
+          <div className="mb-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="flex h-16 w-40 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-44">
               <img
                 src="/msu-logo-transparent.png"
@@ -101,27 +68,7 @@ export default function LoginPage() {
           <p className="text-center text-xs font-bold uppercase tracking-widest text-slate-500">Choose a role and open the right dashboard</p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[0.95fr_1.25fr]">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="mb-4">
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">Quick Role Login</h2>
-              <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">Tap a role to fill the email and password.</p>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              {demoAccounts.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => fillDemoAccount(account)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-all hover:border-accent hover:bg-accent/10"
-                >
-                  <span className="block text-xs font-black uppercase tracking-widest text-slate-900">{account.label}</span>
-                  <span className="mt-1 block text-xs font-medium leading-relaxed text-slate-500">{account.note}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div className="w-full">
         <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           {/* Subtle Form Watermark */}
           <div className="absolute -right-20 -bottom-20 w-80 h-80 opacity-[0.03] blur-[20px] pointer-events-none select-none rotate-12">
