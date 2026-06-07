@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  assignFixtureVolunteer,
   coordinatorFixtures,
   coordinatorVolunteers,
   createCoordinatorIssue,
@@ -24,6 +25,7 @@ router.put("/teams/:id", updateTeam);
 router.post("/players", createPlayer);
 router.put("/players/:id", updatePlayer);
 router.get("/fixtures", coordinatorFixtures);
+router.patch("/fixtures/:id/volunteer", assignFixtureVolunteer);
 router.get("/volunteers", coordinatorVolunteers);
 router.post("/issues", createCoordinatorIssue);
 router.post("/rules", publishRule);

@@ -40,11 +40,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row">
+    <div className="flex min-h-screen w-full flex-col bg-background lg:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
         <Header />
-        <main className="mx-auto w-full max-w-[1600px] p-4 transition-all duration-300 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-[1440px] p-3 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
           {children}
         </main>
       </div>

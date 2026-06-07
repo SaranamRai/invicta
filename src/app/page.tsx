@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Calendar,
   ClipboardList,
+  LogIn,
   Radio,
   Trophy,
   Users,
@@ -34,13 +35,9 @@ export default function Home() {
   const [teamsData, setTeamsData] = useState<Team[]>([]);
   const [now, setNow] = useState(0);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
-  const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [openTournament, setOpenTournament] = useState<TournamentPayload | null>(null);
-  const [nextTournament, setNextTournament] = useState<TournamentPayload | null>(null);
 
-  const updateRegistrationWindow = (nextTournaments: TournamentPayload[]) => {
-    const nowTime = Date.now();
-    const normalized = nextTournaments
+  const { registrationOpen, openTournament, nextTournament } = useMemo(() => {
+    const normalized = tournaments
       .map((tournament) => ({
         ...tournament,
         startTime: new Date(tournament.startDate).setHours(0, 0, 0, 0),
@@ -53,17 +50,19 @@ export default function Home() {
       );
 
     const activeTournament = normalized.find(
-      (tournament) => nowTime >= tournament.startTime && nowTime <= tournament.endTime
+      (tournament) => now >= tournament.startTime && now <= tournament.endTime
     ) || null;
 
     const upcomingTournament = normalized
-      .filter((tournament) => tournament.startTime > nowTime)
+      .filter((tournament) => tournament.startTime > now)
       .sort((a, b) => a.startTime - b.startTime)[0] || null;
 
-    setRegistrationOpen(Boolean(activeTournament));
-    setOpenTournament(activeTournament);
-    setNextTournament(upcomingTournament);
-  };
+    return {
+      registrationOpen: Boolean(activeTournament),
+      openTournament: activeTournament,
+      nextTournament: upcomingTournament,
+    };
+  }, [now, tournaments]);
 
   const formatDate = (value: string) => {
     const date = new Date(value);
@@ -71,12 +70,6 @@ export default function Home() {
       ? value
       : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   };
-
-  useEffect(() => {
-    if (tournaments.length > 0) {
-      updateRegistrationWindow(tournaments);
-    }
-  }, [tournaments, now]);
 
   useEffect(() => {
     let isMounted = true;
@@ -134,17 +127,23 @@ export default function Home() {
     { label: "Check League Tables", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
   ];
 
+  const easyPaths = [
+    { label: "Visitors", text: "Watch matches, standings, results, rules, and announcements.", href: "/matches", icon: Radio },
+    { label: "Teams", text: "Register only when the tournament registration window is open.", href: registrationOpen ? "/register" : "/", icon: ClipboardList },
+    { label: "Staff", text: "Use role login for supercoordinator, coordinator, volunteer, or admin dashboards.", href: "/login", icon: LogIn },
+  ];
+
   return (
     <div className="space-y-10">
-      <section className="relative overflow-hidden rounded-2xl bg-[#020617] text-white shadow-2xl sm:rounded-[2.5rem]">
+      <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
         <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url('/msu-logo-flat.png')] bg-[length:auto,620px_auto] bg-[position:center,right_2rem_center] bg-no-repeat" />
-        <div className="relative flex flex-col items-start gap-10 p-6 sm:p-10 lg:flex-row lg:items-center lg:justify-between lg:p-20">
-          <div className="max-w-2xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-accent">
+        <div className="relative flex flex-col items-start gap-6 p-5 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
+          <div className="max-w-2xl space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-accent">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
             </div>
-            <h1 className="sport-heading text-4xl font-black tracking-tighter text-white sm:text-6xl lg:text-8xl">
+            <h1 className="sport-heading text-4xl font-black text-white sm:text-5xl lg:text-6xl">
               MSU <span className="text-accent italic">INVICTA.</span>
             </h1>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
@@ -153,17 +152,17 @@ export default function Home() {
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-80 lg:grid-cols-1">
-            <Link href="/sports" className="group relative flex h-14 w-full items-center justify-center overflow-hidden rounded-2xl bg-accent text-accent-foreground shadow-2xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95 sm:h-16">
+            <Link href="/sports" className="group relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl bg-accent text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
               <span className="sport-heading relative z-10 text-xs font-black uppercase tracking-[0.2em]">View Sports</span>
-              <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
+              <div className="absolute inset-0 hidden translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0 sm:block" />
             </Link>
-            <Link href="/matches" className="flex h-14 w-full items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-16">
+            <Link href="/matches" className="flex h-12 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-14">
               View Live Matches
             </Link>
           </div>
         </div>
 
-        <div className="border-t border-white/10 bg-black/40 py-4 backdrop-blur-md">
+        <div className="hidden border-t border-white/10 bg-black/40 py-4 backdrop-blur-md sm:block">
           <div className="flex animate-marquee whitespace-nowrap gap-20">
             {[1, 2, 3].map((n) => (
               <div key={n} className="flex gap-20">
@@ -211,12 +210,12 @@ export default function Home() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         {visitorActions.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className="group flex items-start gap-4 rounded-2xl border-2 border-border bg-card p-5 transition-all hover:border-accent hover:shadow-lg"
+            className="group flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md"
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
               <item.icon size={20} />
@@ -229,7 +228,34 @@ export default function Home() {
         ))}
       </div>
 
-      <section className="rounded-2xl border-2 border-border bg-card p-6 shadow-sm md:p-10">
+      <section className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
+        <div className="mb-5">
+          <h2 className="sport-heading text-xl font-black tracking-tight text-foreground">Start Here</h2>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">Pick the path that matches what you need to do.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {easyPaths.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={cn(
+                "flex min-h-28 items-start gap-4 rounded-xl border border-border bg-secondary/50 p-4 transition-all hover:border-accent hover:bg-accent/10",
+                item.label === "Teams" && !registrationOpen ? "pointer-events-none opacity-60" : ""
+              )}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background text-accent">
+                <item.icon size={19} />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-widest text-foreground">{item.label}</h3>
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-muted-foreground">{item.text}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm md:p-8">
         <div className="mb-8 flex flex-col gap-3 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/20 text-accent">
@@ -280,8 +306,8 @@ export default function Home() {
       </section>
 
       <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-        <div className="space-y-8 lg:col-span-2">
-          <div className="flex items-center justify-between">
+        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-accent" />
               <h2 className="sport-heading text-2xl font-black">Live Scores</h2>
@@ -363,8 +389,8 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
+        <div className="min-w-0 space-y-5 lg:space-y-8">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-primary" />
               <h2 className="sport-heading text-2xl font-black">League Tables</h2>
@@ -377,19 +403,19 @@ export default function Home() {
               <table className="w-full text-left text-sm">
                 <thead className="bg-secondary text-secondary-foreground">
                   <tr>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">Rank</th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest">DEPARTMENT</th>
-                    <th className="px-5 py-4 text-center text-[10px] font-black uppercase tracking-widest">Played</th>
-                    <th className="px-5 py-4 text-right text-[10px] font-black uppercase tracking-widest">Points</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Rank</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">DEPARTMENT</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Played</th>
+                    <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Points</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {standings.map((team) => (
                     <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
-                      <td className="sport-heading px-5 py-5 text-lg font-black">{team.rank}</td>
-                      <td className="px-5 py-5 text-sm font-bold tracking-wide transition-colors group-hover:text-primary">{team.team}</td>
-                      <td className="px-5 py-5 text-center font-bold text-muted-foreground">{team.played}</td>
-                      <td className="sport-heading px-5 py-5 text-right text-lg font-black text-primary">{team.pts}</td>
+                      <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
+                      <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
+                      <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
+                      <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
                     </tr>
                   ))}
                 </tbody>

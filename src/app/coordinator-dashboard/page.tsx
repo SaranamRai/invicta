@@ -9,7 +9,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { Team } from "@/lib/fixture-generator";
-import { CoordinatorVolunteerPayload, createCoordinatorRule, createCoordinatorVolunteer, getCoordinatorVolunteers, getPublicTeams, mapMongoTeam } from "@/lib/api";
+import { AdminFixturePayload, CoordinatorVolunteerPayload, assignCoordinatorFixtureVolunteer, createCoordinatorRule, createCoordinatorVolunteer, getCoordinatorFixtures, getCoordinatorVolunteers, getPublicTeams, mapMongoTeam } from "@/lib/api";
 import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
 
@@ -27,6 +27,7 @@ function CoordinatorDashboardContent() {
   const [account] = useState<RoleAccount | null>(() => getRoleAccount());
   const assignedSport = account?.assignedSport?.trim().toLowerCase() || "";
   const [teams, setTeams] = useState<Team[]>([]);
+  const [fixtures, setFixtures] = useState<AdminFixturePayload[]>([]);
   const [ruleSport, setRuleSport] = useState(assignedSport || "football");
   const [ruleTitle, setRuleTitle] = useState("");
   const [ruleDescription, setRuleDescription] = useState("");
@@ -39,6 +40,8 @@ function CoordinatorDashboardContent() {
   const [volunteerRegistrationNumber, setVolunteerRegistrationNumber] = useState("");
   const [volunteerPhone, setVolunteerPhone] = useState("");
   const [volunteerMessage, setVolunteerMessage] = useState("");
+  const [assignmentMessage, setAssignmentMessage] = useState("");
+  const [assigningFixtureId, setAssigningFixtureId] = useState<string | null>(null);
   const [isCreatingVolunteer, setIsCreatingVolunteer] = useState(false);
   const availableRuleSports = assignedSport ? sports.filter((sport) => sport.id === assignedSport) : sports;
 
@@ -46,13 +49,15 @@ function CoordinatorDashboardContent() {
     let isMounted = true;
 
     async function loadDashboardData() {
-      const [publicTeams, coordinatorVolunteers] = await Promise.all([
+      const [publicTeams, coordinatorVolunteers, coordinatorFixtures] = await Promise.all([
         getPublicTeams(),
         getCoordinatorVolunteers().catch(() => []),
+        getCoordinatorFixtures().catch(() => []),
       ]);
       if (!isMounted) return;
       setTeams(publicTeams.map((team) => mapMongoTeam(team) as Team));
       setVolunteers(coordinatorVolunteers);
+      setFixtures(coordinatorFixtures);
     }
 
     void loadDashboardData();
@@ -76,6 +81,7 @@ function CoordinatorDashboardContent() {
   }, [account, teams]);
 
   const totalPlayers = assignedTeams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
+  const assignedFixtureCount = fixtures.filter((fixture) => fixture.assignedVolunteer).length;
 
   const handleSignOut = async () => {
     clearPortalSession();
@@ -171,6 +177,27 @@ function CoordinatorDashboardContent() {
     }
   };
 
+  const handleAssignVolunteer = async (fixtureId: string, volunteerId: string) => {
+    if (!volunteerId) return;
+
+    setAssignmentMessage("");
+    setAssigningFixtureId(fixtureId);
+
+    try {
+      const updated = await assignCoordinatorFixtureVolunteer(fixtureId, volunteerId);
+      setFixtures((currentFixtures) =>
+        currentFixtures.map((fixture) =>
+          fixture.id === fixtureId ? { ...fixture, assignedVolunteer: updated.assignedVolunteer } : fixture
+        )
+      );
+      setAssignmentMessage("Volunteer duty assigned.");
+    } catch (error) {
+      setAssignmentMessage(error instanceof Error ? error.message : "Could not assign volunteer.");
+    } finally {
+      setAssigningFixtureId(null);
+    }
+  };
+
   return (
     <div className="dashboard-surface min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
@@ -228,6 +255,84 @@ function CoordinatorDashboardContent() {
           <StatCard icon={Trophy} label="Assigned Teams" value={assignedTeams.length} />
           <StatCard icon={UsersRound} label="Players Listed" value={totalPlayers} />
           <StatCard icon={UsersRound} label="Sport Volunteers" value={volunteers.length} />
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="sport-heading text-xl font-black">Assign Match Duties</h2>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">
+                Assign volunteers to fixtures for your sport. Volunteers can update only assigned matches.
+              </p>
+            </div>
+            <span className="w-fit rounded-xl bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {assignedFixtureCount}/{fixtures.length} assigned
+            </span>
+          </div>
+
+          {assignmentMessage && (
+            <div className="mb-4 rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+              {assignmentMessage}
+            </div>
+          )}
+
+          {fixtures.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Fixture</th>
+                    <th className="px-4 py-3">Date & Time</th>
+                    <th className="px-4 py-3">Venue</th>
+                    <th className="px-4 py-3">Volunteer Duty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {fixtures.map((fixture) => {
+                    const assignedVolunteer = volunteers.find((volunteer) => volunteer.id === fixture.assignedVolunteer);
+                    return (
+                      <tr key={fixture.id}>
+                        <td className="px-4 py-4">
+                          <p className="font-black uppercase tracking-wide text-foreground">
+                            {fixture.teamAName || "Team A"} vs {fixture.teamBName || "Team B"}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{fixture.sportName || fixture.sport}</p>
+                        </td>
+                        <td className="px-4 py-4 text-xs font-bold text-muted-foreground">
+                          {fixture.date || "Date TBD"} / {fixture.time || "Time TBD"}
+                        </td>
+                        <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{fixture.venue || "Venue TBD"}</td>
+                        <td className="px-4 py-4">
+                          <div className="flex min-w-[240px] flex-col gap-2 sm:flex-row sm:items-center">
+                            <select
+                              value={fixture.assignedVolunteer || ""}
+                              onChange={(event) => handleAssignVolunteer(fixture.id, event.target.value)}
+                              disabled={assigningFixtureId === fixture.id || volunteers.length === 0}
+                              className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none focus:border-accent disabled:opacity-50"
+                            >
+                              <option value="">Select volunteer</option>
+                              {volunteers.map((volunteer) => (
+                                <option key={volunteer.id} value={volunteer.id}>
+                                  {volunteer.name} / {volunteer.registrationNumber || volunteer.email}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                              {assigningFixtureId === fixture.id ? "Saving..." : assignedVolunteer ? "Assigned" : "Pending"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
+              No fixtures are available for your sport yet.
+            </div>
+          )}
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">

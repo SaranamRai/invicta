@@ -2,6 +2,7 @@ import {
   apiFetch,
   getPublicFixtures,
   getPublicLiveScores,
+  getVolunteerAssignedFixtures,
   mapMongoFixture,
 } from "@/lib/api";
 import { MatchData } from "@/lib/types";
@@ -70,8 +71,14 @@ export const getAllMatches = async (): Promise<MatchData[]> => {
   return fixtures.map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData);
 };
 
+export const getAssignedMatches = async (): Promise<MatchData[]> => {
+  const [fixtures, liveScores] = await Promise.all([getVolunteerAssignedFixtures(), getPublicLiveScores()]);
+  const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+  return fixtures.map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData);
+};
+
 export const getMatchById = async (matchId: string): Promise<MatchData | null> => {
-  const matches = await getAllMatches();
+  const matches = await getAssignedMatches();
   return matches.find((match) => match.id === matchId) || null;
 };
 

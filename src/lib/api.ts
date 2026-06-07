@@ -197,6 +197,7 @@ export interface AdminFixturePayload {
   scoreA?: number;
   scoreB?: number;
   endedAt?: string;
+  assignedVolunteer?: string;
 }
 
 export function getAdminFixtures() {
@@ -263,6 +264,7 @@ export interface MongoFixture {
   endedAt?: string;
   round?: string;
   status?: "upcoming" | "live" | "half-time" | "completed" | "delayed" | "cancelled";
+  assignedVolunteer?: MongoRefName | string;
   createdAt?: string;
 }
 
@@ -407,6 +409,9 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     timer: liveScore?.timer,
     announcements: liveScore?.announcements || [],
     scoreEvents: liveScore?.scoreEvents as never[] || [],
+    assignedVolunteer: typeof fixture.assignedVolunteer === "string"
+      ? fixture.assignedVolunteer
+      : fixture.assignedVolunteer?._id || fixture.assignedVolunteer?.id || "",
   };
 }
 
@@ -443,6 +448,10 @@ export function mapMongoRule(rule: MongoRule) {
 
 export function getPublicFixtures() {
   return publicApiFetch<MongoFixture>("/public/fixtures");
+}
+
+export function getVolunteerAssignedFixtures() {
+  return apiFetch<MongoFixture[]>("/volunteer/assigned-matches");
 }
 
 export function getPublicLiveScores() {
@@ -596,6 +605,17 @@ export function createCoordinatorVolunteer(payload: {
 
 export function getCoordinatorVolunteers() {
   return apiFetch<CoordinatorVolunteerPayload[]>("/coordinator/volunteers");
+}
+
+export function getCoordinatorFixtures() {
+  return apiFetch<AdminFixturePayload[]>("/coordinator/fixtures");
+}
+
+export function assignCoordinatorFixtureVolunteer(fixtureId: string, volunteerId: string) {
+  return apiFetch<{ id: string; assignedVolunteer: string }>(`/coordinator/fixtures/${encodeURIComponent(fixtureId)}/volunteer`, {
+    method: "PATCH",
+    body: JSON.stringify({ volunteerId }),
+  });
 }
 
 export function getAdminTournaments() {

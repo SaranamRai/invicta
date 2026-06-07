@@ -11,7 +11,6 @@ function normalizeSport(value) {
 
 async function requireVolunteerFixture(req, fixtureId) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  if (!assignedSport) return null;
 
   const fixture = await Fixture.findById(fixtureId).lean();
   if (!fixture) {
@@ -26,12 +25,18 @@ async function requireVolunteerFixture(req, fixtureId) {
     throw error;
   }
 
+  if (fixture.assignedVolunteer?.toString?.() !== req.user.id) {
+    const error = new Error("This match is not assigned to this volunteer");
+    error.status = 403;
+    throw error;
+  }
+
   return fixture;
 }
 
 export async function assignedMatches(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  const query = assignedSport ? { sport: assignedSport } : { assignedVolunteer: req.user.id };
+  const query = { assignedVolunteer: req.user.id, ...(assignedSport ? { sport: assignedSport } : {}) };
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
   return res.json(fixtures);
 }

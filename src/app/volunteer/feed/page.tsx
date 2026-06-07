@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { auth } from "@/lib/firebase";
 import { MatchData } from "@/lib/types";
-import { createLiveFeedPost, getAllMatches, uploadFeedImage } from "@/lib/services/mongo-service";
+import { createLiveFeedPost, getAssignedMatches, uploadFeedImage } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
 import { Loader2, Send, Image as ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,7 +22,7 @@ export default function VolunteerLiveFeedPage() {
     let isMounted = true;
 
     async function loadMatches() {
-      const matchesData = await getAllMatches();
+      const matchesData = await getAssignedMatches();
       if (!isMounted) return;
       setMatches(matchesData.filter(m => m.status === "Live" || m.status === "Upcoming"));
     }

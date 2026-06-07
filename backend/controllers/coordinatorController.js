@@ -80,7 +80,23 @@ export async function coordinatorFixtures(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
   const query = assignedSport ? { sport: assignedSport } : {};
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
-  return res.json(fixtures);
+
+  return res.json(fixtures.map((fixture) => ({
+    id: fixture._id.toString(),
+    teamA: fixture.teamA?.toString?.() || "",
+    teamB: fixture.teamB?.toString?.() || "",
+    teamAName: fixture.teamAName || "",
+    teamBName: fixture.teamBName || "",
+    sport: fixture.sport,
+    sportName: fixture.sportName || "",
+    date: fixture.date || "",
+    time: fixture.time || "",
+    venue: fixture.venue || "",
+    status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "scheduled",
+    scoreA: fixture.scoreA || 0,
+    scoreB: fixture.scoreB || 0,
+    assignedVolunteer: fixture.assignedVolunteer?.toString?.() || "",
+  })));
 }
 
 export async function coordinatorVolunteers(req, res) {
@@ -102,6 +118,37 @@ export async function coordinatorVolunteers(req, res) {
 export async function createCoordinatorIssue(req, res) {
   const issue = await Issue.create({ ...req.body, reportedBy: req.user.id, reportedByRole: req.user.role });
   return res.status(201).json(issue);
+}
+
+export async function assignFixtureVolunteer(req, res) {
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const volunteerId = normalizeText(req.body.volunteerId);
+
+  if (!volunteerId) {
+    return res.status(400).json({ message: "Volunteer is required" });
+  }
+
+  const [fixture, volunteer] = await Promise.all([
+    Fixture.findById(req.params.id),
+    Volunteer.findById(volunteerId),
+  ]);
+
+  if (!fixture) return res.status(404).json({ message: "Fixture not found" });
+  if (!volunteer) return res.status(404).json({ message: "Volunteer not found" });
+
+  requireCoordinatorSport(req, fixture.sport);
+
+  if (assignedSport && normalizeSport(volunteer.assignedSport) !== assignedSport) {
+    return res.status(403).json({ message: `Volunteer must belong to ${assignedSport}` });
+  }
+
+  fixture.assignedVolunteer = volunteer._id;
+  await fixture.save();
+
+  return res.json({
+    id: fixture._id.toString(),
+    assignedVolunteer: fixture.assignedVolunteer.toString(),
+  });
 }
 
 function normalizeText(value) {

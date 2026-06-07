@@ -7,7 +7,7 @@ import { Activity, Clock, Trophy, AlertCircle, Play, ListChecks } from "lucide-r
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { getAllMatches, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
+import { getAssignedMatches, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { getPublicLiveFeeds } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/lib/match-clock";
@@ -26,11 +26,10 @@ export default function VolunteerDashboard() {
     let isMounted = true;
 
     async function loadDashboardData() {
-      const [matchesData, feeds] = await Promise.all([getAllMatches(), getPublicLiveFeeds()]);
+      const [matchesData, feeds] = await Promise.all([getAssignedMatches(), getPublicLiveFeeds()]);
       if (!isMounted) return;
 
-      const visibleMatches = assignedSport ? matchesData.filter((match) => match.sport === assignedSport) : matchesData;
-      setMatches(visibleMatches.sort((a, b) => b.lastUpdated - a.lastUpdated));
+      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
       const logs = feeds.map((feed) => ({
         id: feed._id,
         matchId: typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "",

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getAllMatches } from "@/lib/services/mongo-service";
+import { getAssignedMatches } from "@/lib/services/mongo-service";
 import { getRoleAccount } from "@/lib/role-auth";
 
 export default function MatchesSelectionPage() {
@@ -19,10 +19,9 @@ export default function MatchesSelectionPage() {
     let isMounted = true;
 
     async function loadMatches() {
-      const matchesData = await getAllMatches();
+      const matchesData = await getAssignedMatches();
       if (!isMounted) return;
-      const visibleMatches = assignedSport ? matchesData.filter((match) => match.sport === assignedSport) : matchesData;
-      setMatches(visibleMatches.sort((a, b) => b.lastUpdated - a.lastUpdated));
+      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
     }
 
     void loadMatches();

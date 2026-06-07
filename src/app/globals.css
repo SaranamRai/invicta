@@ -63,27 +63,15 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image: 
-    linear-gradient(135deg, rgba(252, 191, 77, 0.03) 25%, transparent 25%), 
-    linear-gradient(225deg, rgba(252, 191, 77, 0.03) 25%, transparent 25%), 
-    linear-gradient(45deg, rgba(252, 191, 77, 0.03) 25%, transparent 25%), 
-    linear-gradient(315deg, rgba(252, 191, 77, 0.03) 25%, transparent 25%),
-    radial-gradient(at 0% 0%, hsla(210,100%,50%,0.05) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(45,100%,50%,0.05) 0, transparent 50%);
-  background-size: 60px 60px, 60px 60px, 60px 60px, 60px 60px, 100% 100%, 100% 100%;
+  background-image:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(255, 255, 255, 0.98));
   background-attachment: fixed;
 }
 
 html {
-  scrollbar-width: none;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-*::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+  scroll-behavior: smooth;
 }
 
 .no-scrollbar {
@@ -98,13 +86,37 @@ body::-webkit-scrollbar,
 .sport-heading {
   font-family: var(--font-heading);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   font-weight: 900;
 }
 
 .scoreboard-number {
   font-family: var(--font-heading);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .sport-heading {
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .input-light {

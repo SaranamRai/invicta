@@ -35,7 +35,7 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-16 w-full flex-wrap items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-xl sm:px-6 lg:h-20 lg:px-8 lg:py-0">
+    <header className="sticky top-0 z-30 hidden min-h-16 w-full items-center justify-between gap-3 border-b border-border bg-background/90 px-6 py-3 backdrop-blur-xl lg:flex lg:h-20 lg:px-8 lg:py-0">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <h2 className="sport-heading text-xl font-black tracking-tighter text-primary sm:text-2xl">INVICTA</h2>
         <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
@@ -48,10 +48,10 @@ export function Header() {
 
 
 
-      <div className="flex items-center gap-3 sm:gap-6">
+      <div className="flex items-center gap-4">
         <ThemeToggle />
 
-        <div className="flex items-center gap-3 border-l border-border pl-3 sm:gap-4 sm:pl-6">
+        <div className="flex items-center gap-3 border-l border-border pl-4">
           <div className="relative">
             <button
               type="button"

@@ -11,11 +11,11 @@ export function Card({ children, className, glass = false, variant = "default", 
   return (
     <div
       className={cn(
-        "rounded-2xl border transition-all duration-300",
-        variant === "default" && "bg-card text-card-foreground shadow-sm border-border p-6",
-        variant === "scoreboard" && "bg-slate-900 text-white border-white/10 p-6 shadow-2xl",
-        variant === "accent" && "bg-accent text-accent-foreground border-accent p-6 shadow-xl",
-        glass && "bg-white/10 backdrop-blur-md border-white/20 dark:bg-slate-900/40 dark:border-slate-700/50 p-6",
+        "rounded-xl border transition-all duration-300",
+        variant === "default" && "bg-card text-card-foreground shadow-sm border-border p-4 sm:p-5",
+        variant === "scoreboard" && "bg-slate-900 text-white border-white/10 p-4 shadow-xl sm:p-5",
+        variant === "accent" && "bg-accent text-accent-foreground border-accent p-4 shadow-lg sm:p-5",
+        glass && "bg-white/10 backdrop-blur-md border-white/20 dark:bg-slate-900/40 dark:border-slate-700/50 p-4 sm:p-5",
         className
       )}
       {...props}
