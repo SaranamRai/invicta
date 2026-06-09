@@ -138,8 +138,6 @@ export async function deleteVenue(req, res) {
   return res.json({ message: "Venue deleted successfully" });
 }
 
-import Sport from "../models/Sport.js";
-
 export async function listSports(_req, res) {
   const sports = await Sport.find().sort({ sportName: 1, name: 1 }).lean();
   return res.json(sports);
