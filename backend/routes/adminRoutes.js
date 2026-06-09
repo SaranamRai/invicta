@@ -34,6 +34,7 @@ router.use((req, res, next) => {
   return next();
 });
 
+router.get("/sports", adminOrSuper, adminHandlers.listSports);
 router.post("/sports", superOnly, adminHandlers.createSport);
 router.put("/sports/:id", superOnly, adminHandlers.updateSport);
 router.delete("/sports/:id", superOnly, adminHandlers.deleteSport);

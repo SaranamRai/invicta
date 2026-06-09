@@ -138,6 +138,13 @@ export async function deleteVenue(req, res) {
   return res.json({ message: "Venue deleted successfully" });
 }
 
+import Sport from "../models/Sport.js";
+
+export async function listSports(_req, res) {
+  const sports = await Sport.find().sort({ sportName: 1, name: 1 }).lean();
+  return res.json(sports);
+}
+
 export async function listPendingRegistrations(_req, res) {
   const teams = await Team.find({ status: "pending" })
     .populate("sportId", "sportName name")
@@ -353,6 +360,7 @@ export async function deleteRoleAccount(req, res) {
 }
 
 export const adminHandlers = {
+  listSports,
   createSport,
   updateSport,
   deleteSport: deleteDoc(Sport),
