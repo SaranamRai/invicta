@@ -194,6 +194,20 @@ export async function listTeams(req, res) {
   return res.json(teams.map(mapTeam));
 }
 
+function normalizeMember(member) {
+  if (typeof member === "string") {
+    const text = normalizeText(member);
+    return text || null;
+  }
+  if (member && typeof member === "object") {
+    const fullName = normalizeText(member.fullName || member.name || "");
+    const registrationNumber = member.registrationNumber || member.regNo ? normalizeText(String(member.registrationNumber || member.regNo)).toUpperCase() : "";
+    if (!fullName && !registrationNumber) return null;
+    return { fullName: fullName || undefined, registrationNumber: registrationNumber || undefined };
+  }
+  return null;
+}
+
 export async function createTeam(req, res) {
   const teamName = normalizeText(req.body.name || req.body.teamName);
   const department = normalizeText(req.body.department || req.body.name || req.body.teamName);
@@ -213,8 +227,9 @@ export async function createTeam(req, res) {
     sportName: sportDoc.name,
     sportId: sportDoc._id,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName),
+    captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : "",
     contactNumber: normalizeText(req.body.contactNumber || req.body.phone),
-    members: Array.isArray(req.body.members) ? req.body.members.map(normalizeText).filter(Boolean) : [],
+    members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember) : [],
     logo: req.body.logo || "",
     status: req.body.status || "approved",
     wins: Number(req.body.wins || 0),
@@ -231,10 +246,13 @@ export async function createTeam(req, res) {
     const members = Array.isArray(team.members) ? team.members : [];
     const createdPlayers = [];
     for (let i = 0; i < members.length; i++) {
-      const memberName = String(members[i] || "").trim();
+      const member = members[i];
+      const memberName = typeof member === "string" ? member.trim() : (member?.fullName || "").trim();
+      const memberRegNo = typeof member === "object" && member !== null ? member.registrationNumber || "" : "";
       if (!memberName) continue;
       const player = await Player.create({
         name: memberName,
+        registrationNo: memberRegNo,
         department: team.department,
         phone: "",
         sportId: team.sportId,
@@ -267,8 +285,9 @@ export async function updateTeam(req, res) {
     sportName: sportDoc.name,
     sportId: sportDoc._id,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName || existingTeam.captainName),
+    captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : existingTeam.captainRegNo,
     contactNumber: normalizeText(req.body.contactNumber || existingTeam.contactNumber),
-    members: Array.isArray(req.body.members) ? req.body.members.map(normalizeText).filter(Boolean) : existingTeam.members,
+    members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember).filter(Boolean) : existingTeam.members,
     logo: req.body.logo ?? existingTeam.logo,
     status: req.body.status || existingTeam.status,
     wins: Number(req.body.wins ?? existingTeam.wins ?? 0),

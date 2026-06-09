@@ -137,13 +137,20 @@ export async function loginRoleAccount(email: string, password: string) {
 export interface TeamSyncPayload {
   id: string;
   name: string;
+  teamName?: string;
   department?: string;
   sport: string;
   sportName?: string;
+  sportId?: string;
+  category?: string;
   members?: unknown[];
   coachCaptain?: string;
   captainName?: string;
+  captainRegNo?: string;
+  captainEmail?: string;
+  captainPhone?: string;
   email?: string;
+  phone?: string;
   contactNumber?: string;
   logo?: string;
   status?: string;
@@ -153,6 +160,7 @@ export interface TeamSyncPayload {
   points?: number;
   registeredAt?: number;
   playerRegisteredAt?: number[];
+  source?: string;
 }
 
 type TeamWritePayload = Omit<TeamSyncPayload, "id">;
