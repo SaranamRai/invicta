@@ -1,25 +1,37 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { sports } from "@/lib/mock-data";
 import { Card } from "@/components/ui/card";
-import { Users, User, ArrowLeft, Trophy } from "lucide-react";
+import { Users, User, ArrowLeft, Trophy, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Team } from "@/lib/fixture-generator";
 import { MatchData } from "@/lib/types";
-import { getPublicFixtures, getPublicLiveScores, getPublicTeams, mapMongoFixture, mapMongoTeam } from "@/lib/api";
+import { getPublicFixtures, getPublicLiveScores, getPublicSports, getPublicTeams, mapMongoFixture, mapMongoTeam, MongoSport } from "@/lib/api";
 
 
 export default function SportDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = React.use(paramsPromise);
-  const sport = sports.find((s) => s.id === params.id);
+  const [sport, setSport] = useState<MongoSport | null>(null);
   const [activeTab, setActiveTab] = useState("Teams");
   const [teams, setTeams] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<MatchData[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sport) return;
-    const sportId = sport.id;
+    let mounted = true;
+    getPublicSports().then((all) => {
+      if (!mounted) return;
+      const found = all.find((s) => s._id === params.id) || null;
+      setSport(found);
+      setLoading(false);
+    });
+    return () => { mounted = false; };
+  }, [params.id]);
+
+  const sportId = sport ? (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-") : "";
+
+  useEffect(() => {
+    if (!sport || !sportId) return;
     let isMounted = true;
 
     async function loadTeams() {
@@ -39,11 +51,10 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [sport]);
+  }, [sport, sportId]);
 
   useEffect(() => {
-    if (!sport) return;
-    const sportId = sport.id;
+    if (!sport || !sportId) return;
     let isMounted = true;
 
     async function loadFixtures() {
@@ -64,9 +75,10 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [sport]);
+  }, [sport, sportId]);
 
 
+  if (loading) return <div className="flex min-h-72 items-center justify-center p-20"><Loader2 className="animate-spin" size={32} /></div>;
   if (!sport) return <div className="p-20 text-center font-black">Sport Not Found</div>;
 
   const totalMembers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
@@ -87,9 +99,9 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             <ArrowLeft size={24} />
           </Link>
           <div>
-            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sport.name}</h1>
+            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sport.sportName || sport.name}</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
-              View registered teams, player names, and fixtures for {sport.name}.
+              View registered teams, player names, and fixtures for {sport.sportName || sport.name}.
             </p>
           </div>
         </div>
@@ -160,7 +172,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             ))}
           </div>
         ) : (
-          <EmptyState activeTab={activeTab} sportName={sport.name} />
+          <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
         )
       ) : activeTab === "Members" ? (
         allMembers.length > 0 ? (
@@ -182,7 +194,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             ))}
           </div>
         ) : (
-          <EmptyState activeTab={activeTab} sportName={sport.name} />
+          <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
         )
       ) : fixtures.length > 0 ? (
         <div className="space-y-4">
@@ -216,7 +228,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
           ))}
         </div>
       ) : (
-        <EmptyState activeTab={activeTab} sportName={sport.name} />
+        <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
       )}
     </div>
   );
