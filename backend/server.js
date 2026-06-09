@@ -109,10 +109,46 @@ async function ensureLegacySportPlayerCounts() {
   }
 }
 
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://127.0.0.1:3000",
-  credentials: true,
-}));
+console.log("CLIENT_URL:", process.env.CLIENT_URL);
+console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_ORIGIN,
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+]
+  .filter(Boolean)
+  .map((origin) => origin.trim().replace(/\/$/, ""));
+
+console.log("Allowed origins:", allowedOrigins);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.trim().replace(/\/$/, "");
+
+      if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      console.error("Blocked by CORS:", cleanOrigin);
+      console.error("Allowed origins:", allowedOrigins);
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/api/health", async (_req, res, next) => {
