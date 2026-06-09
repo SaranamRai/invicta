@@ -117,17 +117,22 @@ async function ensureLegacySportPlayerCounts() {
 console.log("CLIENT_URL:", process.env.CLIENT_URL);
 console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
 const allowedOrigins = [
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
   process.env.FRONTEND_ORIGIN,
+  vercelUrl,
+  process.env.ALLOWED_ORIGINS,
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
 ]
   .filter(Boolean)
-  .map((origin) => origin.trim().replace(/\/$/, ""));
+  .flatMap((origin) => String(origin).split(","))
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter((origin, index, self) => origin && self.indexOf(origin) === index);
 
 console.log("Allowed origins:", allowedOrigins);
 
@@ -139,6 +144,10 @@ app.use(
       const cleanOrigin = origin.trim().replace(/\/$/, "");
 
       if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      if (cleanOrigin.endsWith(".vercel.app") && process.env.NODE_ENV === "production") {
         return callback(null, true);
       }
 
