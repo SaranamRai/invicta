@@ -8,7 +8,7 @@ import { AuthSession, getStoredSession } from "@/lib/api";
 import { canAccessRole, PortalRole, roleHomePath } from "@/lib/role-auth";
 
 interface ProtectedRouteProps {
-  allowedRole: PortalRole;
+  allowedRole: PortalRole | PortalRole[];
   children: React.ReactNode;
 }
 
@@ -16,7 +16,8 @@ export function ProtectedRoute({ allowedRole, children }: ProtectedRouteProps) {
   const router = useRouter();
   const [account, setAccount] = useState<AuthSession | null>(null);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
-  const hasAccess = account ? canAccessRole(account.role, allowedRole) : false;
+  const allowedRoles = Array.isArray(allowedRole) ? allowedRole : [allowedRole];
+  const hasAccess = account ? allowedRoles.some(role => canAccessRole(account.role, role)) : false;
 
   useEffect(() => {
     const readSession = () => {
@@ -41,7 +42,14 @@ export function ProtectedRoute({ allowedRole, children }: ProtectedRouteProps) {
   }, [account, hasCheckedSession, router]);
 
   if (!hasCheckedSession || !account) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-card p-8 shadow-sm">
+          <div className="h-16 w-16 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
+          <p className="text-sm font-semibold text-muted-foreground">Checking portal session...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!hasAccess) {
