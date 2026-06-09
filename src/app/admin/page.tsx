@@ -17,6 +17,7 @@ import { MatchData } from "@/lib/types";
 import { LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { clearPortalSession } from "@/lib/role-auth";
+import { getRoleAccount } from "@/lib/role-auth";
 
 type AdminTab =
   | "dashboard"
@@ -82,6 +83,8 @@ const matchToFixture = (match: MatchData): Fixture => ({
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [account] = useState(() => getRoleAccount());
+  const canEdit = account?.role === "coordinator";
   const [teams, setTeams] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -282,22 +285,22 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "tournaments" && (
-          <TournamentManager teamsCountBySport={teamsCountBySport} />
+          <TournamentManager teamsCountBySport={teamsCountBySport} canEdit={canEdit} />
         )}
 
         {activeTab === "teams" && (
           <TeamManager
             teams={teams}
-            onAddTeam={handleAddTeam}
-            onRemoveTeam={handleRemoveTeam}
-            onUpdateTeam={handleUpdateTeam}
+            onAddTeam={canEdit ? handleAddTeam : undefined}
+            onRemoveTeam={canEdit ? handleRemoveTeam : undefined}
+            onUpdateTeam={canEdit ? handleUpdateTeam : undefined}
           />
         )}
 
         {activeTab === "fixtures" && (
           <FixtureGenerator
             teams={teams}
-            onGenerateFixtures={handleGenerateFixtures}
+            onGenerateFixtures={canEdit ? handleGenerateFixtures : undefined}
           />
         )}
 
@@ -305,8 +308,8 @@ export default function AdminDashboard() {
           <FixtureViewer
             fixtures={fixtures}
             teams={teamNameLookup}
-            onDeleteFixture={handleDeleteFixture}
-            onUpdateFixture={handleUpdateFixture}
+            onDeleteFixture={canEdit ? handleDeleteFixture : undefined}
+            onUpdateFixture={canEdit ? handleUpdateFixture : undefined}
           />
         )}
 

@@ -4,7 +4,8 @@ export function allowRoles(...roles) {
       return res.status(401).json({ message: "Login required" });
     }
 
-    if (req.user.role === "admin" || roles.includes(req.user.role)) {
+    // Only allow explicitly listed roles. Admin is no longer an automatic super-role.
+    if (roles.includes(req.user.role)) {
       return next();
     }
 

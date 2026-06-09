@@ -24,8 +24,8 @@ interface ExtendedTeam extends Team {
 
 interface TeamManagerProps {
   teams: Team[];
-  onAddTeam: (team: Team) => void;
-  onRemoveTeam: (teamId: string) => void;
+  onAddTeam?: (team: Team) => void;
+  onRemoveTeam?: (teamId: string) => void;
   onUpdateTeam?: (team: Team) => void; // Made optional just in case, but we will write it in page.tsx
 }
 
@@ -174,9 +174,11 @@ export function TeamManager({
     if (editingTeamId && onUpdateTeam) {
       onUpdateTeam(teamData);
       alert("Team details updated successfully!");
-    } else {
+    } else if (onAddTeam) {
       onAddTeam(teamData);
       alert("New team registered successfully!");
+    } else {
+      alert("You don't have permission to add teams.");
     }
 
     resetForm();
@@ -212,7 +214,7 @@ export function TeamManager({
             Add new department teams, edit captain contact details, and review player lists before fixtures are created.
           </p>
         </div>
-        {!showForm && (
+        {!showForm && onAddTeam && (
           <button
             onClick={() => {
               resetForm();
@@ -624,23 +626,31 @@ export function TeamManager({
                   {/* Actions Bar inside card */}
                   <div className="p-4 border-t border-white/5 bg-slate-950/30 flex gap-2">
                     <div className="flex-1 flex gap-2">
-                      <button
-                        onClick={() => openEditModal(team)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 transition-colors py-2 text-xs font-bold"
-                      >
-                        <Edit size={13} /> Edit
-                      </button>
+                      {onUpdateTeam ? (
+                        <button
+                          onClick={() => openEditModal(team)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 transition-colors py-2 text-xs font-bold"
+                        >
+                          <Edit size={13} /> Edit
+                        </button>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800/30 border border-white/5 text-slate-500 py-2 text-xs font-bold">Observer</div>
+                      )}
 
-                      <button
-                        onClick={() => {
-                          if (confirm(`Are you sure you want to remove "${team.name}"?`)) {
-                            onRemoveTeam(team.id);
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors py-2 text-xs font-bold"
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
+                      {onRemoveTeam ? (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to remove "${team.name}"?`)) {
+                              onRemoveTeam(team.id);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors py-2 text-xs font-bold"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      ) : (
+                        <div className="text-xs font-bold px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400/40 transition-all">&nbsp;</div>
+                      )}
                     </div>
                   </div>
                 </Card>

@@ -14,7 +14,7 @@ const DEFAULT_TIMESLOTS = ["09:00", "11:00", "14:00", "16:00", "18:00"];
 
 interface FixtureGeneratorProps {
   teams: Team[];
-  onGenerateFixtures: (fixtures: Fixture[]) => void;
+  onGenerateFixtures?: (fixtures: Fixture[]) => void;
 }
 
 export function FixtureGenerator({
@@ -58,7 +58,7 @@ export function FixtureGenerator({
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const fixtures = generateFixturesUtil(targetTeams, startDate, timeslots);
-      onGenerateFixtures(fixtures);
+      if (onGenerateFixtures) onGenerateFixtures(fixtures);
       alert(`Generated ${fixtures.length} fixtures successfully!`);
     } catch (error) {
       alert("Error generating fixtures");
@@ -212,11 +212,11 @@ export function FixtureGenerator({
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={generating || teams.length < 2}
-        className="group relative w-full flex h-16 items-center justify-center overflow-hidden rounded-xl bg-accent text-accent-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-accent/10 disabled:opacity-50"
+        disabled={!onGenerateFixtures || generating || teams.length < 2}
+        className="group relative w-full flex h-16 items-center justify-center overflow-hidden rounded-xl bg-accent text-accent-foreground transition-all hover:scale-[0.98] active:scale-95 shadow-xl shadow-accent/10 disabled:opacity-50"
       >
         <span className="relative z-10 text-sm font-black uppercase tracking-[0.2em] sport-heading">
-          {generating ? "Creating Fixtures..." : "Create and Publish Fixtures"}
+          {onGenerateFixtures ? (generating ? "Creating Fixtures..." : "Create and Publish Fixtures") : "Coordinator only"}
         </span>
         <div className="absolute inset-0 translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0" />
       </button>

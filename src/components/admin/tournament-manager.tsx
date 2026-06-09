@@ -21,9 +21,10 @@ export interface Tournament {
 
 interface TournamentManagerProps {
   teamsCountBySport: Record<string, number>;
+  canEdit?: boolean;
 }
 
-export function TournamentManager({ teamsCountBySport }: TournamentManagerProps) {
+export function TournamentManager({ teamsCountBySport, canEdit = true }: TournamentManagerProps) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -80,7 +81,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
           <h2 className="text-2xl font-black sport-heading text-white">Tournaments Manager</h2>
           <p className="text-sm text-slate-400">Create new tournaments, configure settings and track active events.</p>
         </div>
-        {!showForm && (
+        {!showForm && canEdit && (
           <button
             onClick={() => setShowForm(true)}
             className="group relative flex items-center gap-2 overflow-hidden rounded-xl bg-accent px-6 py-3 text-accent-foreground transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-accent/15 cursor-pointer"
@@ -199,21 +200,23 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                 </div>
               </div>
 
-              <div className="flex gap-3 justify-end pt-4 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-6 py-3 rounded-xl bg-slate-800 border border-white/10 text-white font-bold text-xs uppercase tracking-wider hover:bg-slate-700 active:scale-95 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-8 py-3 rounded-xl bg-accent text-accent-foreground font-black text-xs uppercase tracking-[0.15em] hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all"
-                >
-                  Publish Tournament
-                </button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-3 justify-end pt-4 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(false)}
+                    className="px-6 py-3 rounded-xl bg-slate-800 border border-white/10 text-white font-bold text-xs uppercase tracking-wider hover:bg-slate-700 active:scale-95 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-8 py-3 rounded-xl bg-accent text-accent-foreground font-black text-xs uppercase tracking-[0.15em] hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all"
+                  >
+                    Publish Tournament
+                  </button>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
@@ -262,14 +265,16 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-2 border-t border-white/5 justify-end">
-                  <button
-                    onClick={() => handleDelete(tour.id)}
-                    className="px-3.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
-                  >
-                    Delete
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="flex gap-2 pt-2 border-t border-white/5 justify-end">
+                    <button
+                      onClick={() => handleDelete(tour.id)}
+                      className="px-3.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );

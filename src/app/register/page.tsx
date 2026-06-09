@@ -24,7 +24,7 @@ const playerCountsBySport: Record<string, number> = {
 const normalizeDepartment = (value: string) => value.trim().replace(/\s+/g, " ").toUpperCase();
 const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
 
-function RegisterPageContent() {
+export function RegisterPageContent() {
   const [captainName, setCaptainName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");

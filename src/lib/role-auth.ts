@@ -42,5 +42,5 @@ export function clearPortalSession() {
 }
 
 export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
-  return accountRole === "admin" || accountRole === requiredRole;
+  return accountRole === requiredRole;
 }

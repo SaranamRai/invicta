@@ -5,5 +5,6 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <ProtectedRoute allowedRole="admin">{children}</ProtectedRoute>;
+  // Allow both admin and coordinator to load this UI. Coordinator can edit; admin will be observer-only.
+  return <ProtectedRoute allowedRole={["admin", "coordinator"]}>{children}</ProtectedRoute>;
 }

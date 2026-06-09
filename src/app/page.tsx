@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc } from "firebase/firestore";
 import {
   Activity,
   ArrowUpRight,
@@ -70,6 +70,31 @@ export default function Home() {
     { label: "Follow Matches", text: "Students and visitors can see schedules, live scores, and match updates.", href: "/matches", icon: Radio },
     { label: "Check Standings", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
   ];
+
+  const [regOpen, setRegOpen] = useState(false);
+  const [regEndAt, setRegEndAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    const ref = doc(db, "meta", "registration");
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) {
+        setRegOpen(false);
+        setRegEndAt(null);
+        return;
+      }
+      const data = snap.data();
+      const rawEnd = data.endAt;
+      let millis: number | null = null;
+      if (rawEnd && typeof (rawEnd as any).toMillis === "function") millis = (rawEnd as any).toMillis();
+      else if (typeof rawEnd === "number") millis = rawEnd;
+      else if (rawEnd && (rawEnd as any).seconds) millis = (rawEnd as any).seconds * 1000;
+
+      setRegEndAt(millis);
+      setRegOpen(Boolean(data.open));
+    });
+
+    return () => unsub();
+  }, []);
 
   return (
     <div className="space-y-10">
@@ -164,6 +189,26 @@ export default function Home() {
             </div>
           </Link>
         ))}
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-1.5 rounded-full bg-amber-500" />
+            <h2 className="sport-heading text-xl font-black">Public Registration Portal</h2>
+          </div>
+          <div className="text-sm font-bold text-muted-foreground">{regEndAt ? `Deadline: ${regEndAt ? new Date(regEndAt).toLocaleString() : "-"}` : ""}</div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-xl text-sm text-slate-600">Teams can register using the public portal when the super-coordinator opens registration. The portal automatically closes after the deadline.</p>
+          <div className="flex items-center gap-3">
+            <Link href="/public-register" className={`h-12 rounded-xl px-6 text-sm font-black transition ${regOpen && (!regEndAt || Date.now() <= (regEndAt || 0)) ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-500 pointer-events-none opacity-60"}`}>
+              {regOpen && (!regEndAt || Date.now() <= (regEndAt || 0)) ? "Open for Registration" : "Registration Closed"}
+            </Link>
+            <Link href="/login" className="h-12 rounded-xl border px-6 text-sm font-black">Staff Login</Link>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">

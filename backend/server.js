@@ -17,6 +17,10 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+if (!process.env.JWT_SECRET) {
+  console.warn("Warning: JWT_SECRET not set in environment — using temporary development secret");
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+}
 const defaultAccounts = [
   {
     role: "admin",
@@ -39,6 +43,14 @@ const defaultAccounts = [
     email: process.env.COORDINATOR_EMAIL || "coordinator@gmail.com",
     password: process.env.COORDINATOR_PASSWORD || "1234",
     department: process.env.COORDINATOR_DEPARTMENT || "",
+  },
+  {
+    role: "coordinator",
+    model: Coordinator,
+    name: process.env.SUPER_COORDINATOR_NAME || "Super Coordinator",
+    email: process.env.SUPER_COORDINATOR_EMAIL || "supercoordinator@gmail.com",
+    password: process.env.SUPER_COORDINATOR_PASSWORD || "1234",
+    department: process.env.SUPER_COORDINATOR_DEPARTMENT || "All",
   },
 ];
 

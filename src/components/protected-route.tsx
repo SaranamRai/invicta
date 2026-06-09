@@ -8,7 +8,7 @@ import { AuthSession, getStoredSession } from "@/lib/api";
 import { canAccessRole, PortalRole, roleHomePath } from "@/lib/role-auth";
 
 interface ProtectedRouteProps {
-  allowedRole: PortalRole;
+  allowedRole: PortalRole | PortalRole[];
   children: React.ReactNode;
 }
 
@@ -16,7 +16,11 @@ export function ProtectedRoute({ allowedRole, children }: ProtectedRouteProps) {
   const router = useRouter();
   const [account, setAccount] = useState<AuthSession | null>(null);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
-  const hasAccess = account ? canAccessRole(account.role, allowedRole) : false;
+  const hasAccess = account
+    ? Array.isArray(allowedRole)
+      ? (allowedRole as PortalRole[]).includes(account.role)
+      : canAccessRole(account.role, allowedRole as PortalRole)
+    : false;
 
   useEffect(() => {
     const readSession = () => {
