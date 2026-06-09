@@ -14,6 +14,8 @@ import publicRoutes from "./routes/publicRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
+import Sport from "./models/Sport.js";
+import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
 dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 
@@ -86,6 +88,27 @@ async function ensureDefaultAccounts() {
   }
 }
 
+async function ensureLegacySportPlayerCounts() {
+  const sports = await Sport.find({
+    status: "active",
+    $or: [
+      { maxPlayers: { $exists: false } },
+      { maxPlayers: { $lte: 1 } },
+      { minPlayers: { $exists: false } },
+    ],
+  });
+
+  for (const sport of sports) {
+    const recommended = getRecommendedPlayerCount(sport.sportName || sport.name);
+    if (!recommended || recommended <= 1) continue;
+
+    sport.minPlayers = recommended;
+    sport.maxPlayers = recommended;
+    await sport.save();
+    console.log(`Updated ${sport.sportName || sport.name} player count to ${recommended}`);
+  }
+}
+
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://127.0.0.1:3000",
   credentials: true,
@@ -118,6 +141,7 @@ app.use((error, _req, res, next) => {
 
 await connectDB();
 await ensureDefaultAccounts();
+await ensureLegacySportPlayerCounts();
 
 app.listen(port, "127.0.0.1", () => {
   console.log(`API server running on http://127.0.0.1:${port}`);

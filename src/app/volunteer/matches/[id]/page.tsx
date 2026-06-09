@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
 import { MatchData, MatchPeriod, ScoreEvent } from "@/lib/types";
 import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
@@ -94,7 +93,7 @@ export default function LiveMatchEditPanel() {
       autoStoppingRef.current = true;
       setSaving(true);
       try {
-        const email = auth.currentUser?.email || "volunteer@gmail.com";
+        const email = getRoleAccount()?.email || "volunteer";
         const currentNow = Date.now();
         const timer = formatMatchClock(stopState.elapsedSeconds);
 
@@ -135,7 +134,7 @@ export default function LiveMatchEditPanel() {
 
     setSaving(true);
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
       const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
       const nextFullMatchSeconds = enteredFullMatchSeconds || getMatchFullTimeSeconds(match);
@@ -178,7 +177,7 @@ export default function LiveMatchEditPanel() {
 
     setSaving(true);
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
       const elapsedSeconds = getMatchElapsedSeconds(match, now || currentNow);
       const matchTime = formatMatchClock(elapsedSeconds);
@@ -224,7 +223,7 @@ export default function LiveMatchEditPanel() {
     e.preventDefault();
     setSaving(true);
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const enteredElapsedSeconds = parseMatchClock(timer);
       const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
       const nextFullMatchSeconds = match
@@ -274,7 +273,7 @@ export default function LiveMatchEditPanel() {
     if (!announcement.trim()) return;
     setSaving(true);
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const currentAnnouncements = match?.announcements || [];
       const newAnnouncements = [announcement, ...currentAnnouncements].slice(0, 5); // Keep last 5
       

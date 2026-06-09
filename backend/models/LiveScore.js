@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 
 const liveScoreSchema = new mongoose.Schema({
   fixtureId: { type: mongoose.Schema.Types.ObjectId, ref: "Fixture", required: true },
+  sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
+  sportName: { type: String, trim: true },
+  category: { type: String, enum: ["Male", "Female"] },
   teamAName: { type: String, trim: true },
   teamBName: { type: String, trim: true },
   teamAScore: { type: Number, default: 0 },

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { auth } from "@/lib/firebase";
 import { ActivityLog, MatchData } from "@/lib/types";
 import { Activity, Clock, Trophy, AlertCircle, Play, ListChecks } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -13,6 +12,16 @@ import { cn } from "@/lib/utils";
 import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/lib/match-clock";
 import { getRoleAccount } from "@/lib/role-auth";
 
+function normalizeSportValue(value?: string) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function getSportDisplayName(sportId?: string, sportName?: string) {
+  const name = sportName?.trim();
+  if (name) return name;
+  return sportId || "Assigned sport";
+}
+
 export default function VolunteerDashboard() {
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
   const [updatesToday, setUpdatesToday] = useState(0);
@@ -20,7 +29,9 @@ export default function VolunteerDashboard() {
   const [selectedSport, setSelectedSport] = useState("All");
   const [startingId, setStartingId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
-  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
+  const account = getRoleAccount();
+  const assignedSport = normalizeSportValue(account?.assignedSport);
+  const assignedSportName = getSportDisplayName(assignedSport, account?.assignedSportName);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,7 +77,7 @@ export default function VolunteerDashboard() {
   const startMatch = async (match: MatchData) => {
     setStartingId(match.id);
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const currentNow = new Date().getTime();
       const shouldStartFromBeginning = match.status === "Upcoming" || !match.startedAt;
       const elapsedSeconds = shouldStartFromBeginning ? 0 : getMatchElapsedSeconds(match, now || currentNow);
@@ -88,7 +99,7 @@ export default function VolunteerDashboard() {
 
   const adjustScore = async (match: MatchData, team: "A" | "B", amount: number) => {
     try {
-      const email = auth.currentUser?.email || "volunteer@gmail.com";
+      const email = getRoleAccount()?.email || "volunteer";
       const currentNow = new Date().getTime();
       const nextScoreA = team === "A" ? Math.max(0, match.scoreA + amount) : match.scoreA;
       const nextScoreB = team === "B" ? Math.max(0, match.scoreB + amount) : match.scoreB;
@@ -160,18 +171,23 @@ export default function VolunteerDashboard() {
               <p className="mt-1 text-sm font-semibold leading-relaxed text-muted-foreground">Filter by sport, start the match clock, adjust scores, or open the full control panel.</p>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-border bg-secondary/50 p-1">
-              {sports.map(sport => (
+              {sports.map(sport => {
+                const sportName = sport === assignedSport
+                  ? assignedSportName
+                  : getSportDisplayName(sport, matches.find((match) => match.sport === sport)?.sportName);
+                return (
                 <button
                   key={sport}
                   onClick={() => setSelectedSport(sport)}
                   className={cn(
                     "whitespace-nowrap rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
-                    selectedSport === sport ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground"
+                    (assignedSport ? sport === assignedSport : selectedSport === sport) ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground"
                   )}
                 >
-                  {sport}
+                  {sport === "All" ? sport : sportName}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -185,7 +201,9 @@ export default function VolunteerDashboard() {
                   {isRunning && <div className="absolute left-0 top-0 h-full w-1 bg-accent" />}
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{match.sport} / {match.type}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        {getSportDisplayName(match.sport, match.sportName)} / {match.type}
+                      </span>
                       <h3 className="mt-2 text-lg font-black uppercase tracking-wide text-foreground">{match.teamA} vs {match.teamB}</h3>
                     </div>
                     <span className={cn(

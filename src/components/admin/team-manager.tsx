@@ -5,7 +5,7 @@ import React, { useState, useRef } from "react";
 import {
   Plus, Trash2, Users, Search, Filter,
   Upload, X, Edit, Phone, User,
-  Award, RefreshCw, Calendar
+  Award, RefreshCw, Calendar, CheckCircle2
 } from "lucide-react";
 import { Team } from "@/lib/fixture-generator";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -554,9 +554,16 @@ export function TeamManager({
                       {/* Header details */}
                       <div className="space-y-0.5 min-w-0">
                         <h4 className="font-black text-white text-base truncate leading-snug uppercase">{team.name}</h4>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                          {team.department || "No Department"}
-                        </span>
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">{team.department || "No Department"}</span>
+                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
+                            team.status === "approved" ? "border-emerald-300 bg-emerald-500/10 text-emerald-300" :
+                            team.status === "pending" ? "border-amber-300 bg-amber-500/10 text-amber-300" :
+                            "border-rose-300 bg-rose-500/10 text-rose-300"
+                          }`}>
+                            {team.status ? team.status.toUpperCase() : "UNKNOWN"}
+                          </span>
+                        </div>
 
                         {/* Sport Category badge */}
                         <span className="inline-block text-[9px] font-black uppercase tracking-widest text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded mt-1.5">
@@ -622,26 +629,43 @@ export function TeamManager({
                   </CardContent>
 
                   {/* Actions Bar inside card */}
-                  <div className="p-4 border-t border-white/5 bg-slate-950/30 flex gap-2">
-                    <div className="flex-1 flex gap-2">
-                      <button
-                        onClick={() => openEditModal(team)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 transition-colors py-2 text-xs font-bold"
-                      >
-                        <Edit size={13} /> Edit
-                      </button>
+                  <div className="p-4 border-t border-white/5 bg-slate-950/30 flex gap-2 flex-wrap">
+                    {team.status === "pending" ? (
+                      <>
+                        <button
+                          onClick={() => onUpdateTeam?.({ ...team, status: "approved" })}
+                          className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20 transition-colors py-2 text-xs font-bold"
+                        >
+                          <CheckCircle2 size={13} /> Approve
+                        </button>
+                        <button
+                          onClick={() => onUpdateTeam?.({ ...team, status: "rejected" })}
+                          className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 hover:bg-rose-500/20 transition-colors py-2 text-xs font-bold"
+                        >
+                          <Trash2 size={13} /> Reject
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex gap-2">
+                        <button
+                          onClick={() => openEditModal(team)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 transition-colors py-2 text-xs font-bold"
+                        >
+                          <Edit size={13} /> Edit
+                        </button>
 
-                      <button
-                        onClick={() => {
-                          if (confirm(`Are you sure you want to remove "${team.name}"?`)) {
-                            onRemoveTeam(team.id);
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors py-2 text-xs font-bold"
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to remove "${team.name}"?`)) {
+                              onRemoveTeam(team.id);
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors py-2 text-xs font-bold"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               );

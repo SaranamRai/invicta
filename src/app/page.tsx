@@ -25,6 +25,7 @@ import {
   mapMongoTeam,
   TournamentPayload,
 } from "@/lib/api";
+import { getStoredSession } from "@/lib/api";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 import { MatchData } from "@/lib/types";
@@ -49,11 +50,11 @@ export default function Home() {
         !Number.isNaN(tournament.endTime)
       );
 
-    const activeTournament = normalized.find(
-      (tournament) => now >= tournament.startTime && now <= tournament.endTime
-    ) || null;
+    const validOpenTournaments = normalized.filter((tournament) => now <= tournament.endTime);
+    const activeTournament = validOpenTournaments
+      .sort((a, b) => a.startTime - b.startTime)[0] || null;
 
-    const upcomingTournament = normalized
+    const upcomingTournament = validOpenTournaments
       .filter((tournament) => tournament.startTime > now)
       .sort((a, b) => a.startTime - b.startTime)[0] || null;
 
@@ -127,9 +128,11 @@ export default function Home() {
     { label: "Check League Tables", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
   ];
 
+  const isLoggedIn = typeof window !== "undefined" && Boolean(getStoredSession());
+
   const easyPaths = [
     { label: "Visitors", text: "Watch matches, standings, results, rules, and announcements.", href: "/matches", icon: Radio },
-    { label: "Teams", text: "Register only when the tournament registration window is open.", href: registrationOpen ? "/register" : "/", icon: ClipboardList },
+    { label: "Teams", text: "Register only when the tournament registration window is open.", href: registrationOpen ? (isLoggedIn ? "/register" : "/public-register") : "/", icon: ClipboardList },
     { label: "Staff", text: "Use role login for supercoordinator, coordinator, volunteer, or admin dashboards.", href: "/login", icon: LogIn },
   ];
 
@@ -275,7 +278,7 @@ export default function Home() {
                 Registration is open from {formatDate(openTournament.startDate)} to {formatDate(openTournament.endDate)}.
               </p>
               <Link
-                href="/register"
+                href={isLoggedIn ? "/register" : "/public-register"}
                 className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-accent text-sm font-black uppercase tracking-[0.2em] text-accent-foreground transition-all hover:bg-accent/90"
               >
                 Open Registration

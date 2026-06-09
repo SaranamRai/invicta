@@ -11,6 +11,8 @@ export interface RoleAccount {
   role: PortalRole;
   department?: string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
 }
 
 export const roleHomePath: Record<PortalRole, string> = {
@@ -31,6 +33,8 @@ export function getRoleAccount(): RoleAccount | null {
     role: session.role,
     department: session.department,
     assignedSport: session.assignedSport,
+    assignedSportId: session.assignedSportId,
+    assignedSportName: session.assignedSportName,
   };
 }
 

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { sports } from "@/lib/mock-data";
+import { getPublicSports, MongoSport } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface AdminOverviewProps {
@@ -61,11 +61,16 @@ export function AdminOverview({
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
+  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
+
+  useEffect(() => {
+    getPublicSports().then(setSportsList).catch(() => {});
+  }, []);
 
   // Calculate stats
   const totalTeams = teams.length;
   const totalPlayers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
-  const totalSports = sports.length;
+  const totalSports = sportsList.length || teams.reduce((acc, t) => { acc.add(t.sport); return acc; }, new Set<string>()).size;
 
   const upcomingMatches = fixtures.filter(f => f.status === "scheduled");
   const ongoingMatches = fixtures.filter(f => f.status === "live");
@@ -81,10 +86,11 @@ export function AdminOverview({
 
     // Add recent activities based on teams
     teams.slice(-3).forEach(team => {
+      const sportName = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === team.sport)?.sportName || team.sport : team.sport;
       actList.push({
         id: `act-team-${team.id}`,
         type: "team",
-        message: `New team "${team.name}" was registered for ${sports.find(s => s.id === team.sport)?.name || team.sport}.`,
+        message: `New team "${team.name}" was registered for ${sportName}.`,
         timestamp: "Recently"
       });
     });
@@ -158,10 +164,14 @@ export function AdminOverview({
   };
 
   // Sports breakdown for stats graph
-  const matchesPerSport = sports.map(sport => {
+  const matchesPerSport = (sportsList.length > 0 ? sportsList.map(s => ({ id: normalizeSportValue(s.sportName || s.name || ""), name: s.sportName || s.name || "" })) : []).map(sport => {
     const count = fixtures.filter(f => f.sport === sport.id).length;
     return { name: sport.name, count };
   });
+
+  function normalizeSportValue(value: string) {
+    return value.trim().toLowerCase().replace(/\s+/g, "-");
+  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -289,7 +299,7 @@ export function AdminOverview({
             {ongoingMatches.map((match) => {
               const teamAName = teams.find(t => t.id === match.teamA)?.name || match.teamA;
               const teamBName = teams.find(t => t.id === match.teamB)?.name || match.teamB;
-              const sportLabel = sports.find(s => s.id === match.sport)?.name || match.sport;
+              const sportLabel = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport;
               const scoreA = match.scoreA ?? "-";
               const scoreB = match.scoreB ?? "-";
               return (
@@ -567,7 +577,7 @@ export function AdminOverview({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-black uppercase tracking-wider text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded">
-                          {sports.find(s => s.id === match.sport)?.name || match.sport}
+                          {sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport}
                         </span>
                         <span className="text-xs text-slate-400 font-medium">{match.time} • {match.venue}</span>
                       </div>

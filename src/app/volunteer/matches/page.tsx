@@ -8,12 +8,27 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAssignedMatches } from "@/lib/services/mongo-service";
 import { getRoleAccount } from "@/lib/role-auth";
+import { sports as sportCatalog } from "@/lib/mock-data";
+
+function normalizeSportValue(value?: string) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function getSportDisplayName(sportId?: string, sportName?: string) {
+  const name = sportName?.trim();
+  if (name) return name;
+
+  const normalizedSport = normalizeSportValue(sportId);
+  const sport = sportCatalog.find((item) => item.id === normalizedSport || normalizeSportValue(item.name) === normalizedSport);
+  return sport?.name || sportId || "Assigned sport";
+}
 
 export default function MatchesSelectionPage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"All" | "Live" | "Upcoming" | "Finished">("All");
-  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
+  const account = getRoleAccount();
+  const assignedSport = normalizeSportValue(account?.assignedSport);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,7 +111,9 @@ export default function MatchesSelectionPage() {
                   {match.status === "Live" && <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />}
                   {match.status}
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{match.sport}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {getSportDisplayName(match.sport, match.sportName || account?.assignedSportName)}
+                </span>
               </div>
 
               <div className="space-y-4">

@@ -71,7 +71,12 @@ body {
 html {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
+  scrollbar-gutter: stable both-edges;
   scroll-behavior: smooth;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
 }
 
 .no-scrollbar {

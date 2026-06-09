@@ -4,45 +4,60 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Loader2, Users } from "lucide-react";
 
-import { sports } from "@/lib/mock-data";
-import { Team } from "@/lib/fixture-generator";
-import { ProtectedRoute } from "@/components/protected-route";
 import {
-  createAdminTeam,
-  createCoordinatorTeam,
-  getPublicTeams,
+  getPublicSports,
   getPublicTournaments,
-  getStoredSession,
+  MongoSport,
+  registerPublicTeam,
   TournamentPayload,
 } from "@/lib/api";
 
-const DEPARTMENT_TEAM_LIMIT = 2;
-
-const playerCountsBySport: Record<string, number> = {
-  football: 11,
-  cricket: 11,
-  volleyball: 6,
-  badminton: 2,
-  "table-tennis": 2,
-};
-
 const normalizeDepartment = (value: string) => value.trim().replace(/\s+/g, " ").toUpperCase();
 const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
+const normalizeRegNo = (value: string) => value.trim().replace(/\s+/g, "").toUpperCase();
 
-function RegisterPageContent() {
+type MemberInput = {
+  fullName: string;
+  registrationNumber: string;
+  semester: string;
+  gender: string;
+  email: string;
+  phone: string;
+};
+
+const emptyMember = (): MemberInput => ({
+  fullName: "",
+  registrationNumber: "",
+  semester: "",
+  gender: "",
+  email: "",
+  phone: "",
+});
+
+export default function PublicRegisterPage() {
   const [captainName, setCaptainName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [captainRegNo, setCaptainRegNo] = useState("");
   const [department, setDepartment] = useState("");
-  const [sport, setSport] = useState(sports[0]?.id || "football");
-  const [members, setMembers] = useState<string[]>([]);
+  const [sportId, setSportId] = useState("");
+  const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [members, setMembers] = useState<MemberInput[]>([]);
+  const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [nextTournament, setNextTournament] = useState<TournamentPayload | null>(null);
 
-  const requiredPlayers = playerCountsBySport[sport] || 1;
-  const teamName = useMemo(() => normalizeDepartment(department), [department]);
+  const selectedSport = useMemo(
+    () => sportOptions.find((sport) => sport._id === sportId),
+    [sportId, sportOptions]
+  );
+  const minPlayers = Math.max(1, Number(selectedSport?.minPlayers || 1));
+  const maxPlayers = Math.max(minPlayers, Number(selectedSport?.maxPlayers || minPlayers));
+  const playerCountLabel = minPlayers === maxPlayers
+    ? `${maxPlayers} Player${maxPlayers === 1 ? "" : "s"}`
+    : `${minPlayers}-${maxPlayers} Players`;
 
   const updateRegistrationWindow = (tournaments: TournamentPayload[]) => {
     const nowTime = Date.now();
@@ -81,9 +96,14 @@ function RegisterPageContent() {
     let isMounted = true;
 
     async function loadTournamentSettings() {
-      const tournaments = await getPublicTournaments();
+      const [tournaments, sports] = await Promise.all([
+        getPublicTournaments(),
+        getPublicSports(),
+      ]);
       if (!isMounted) return;
       updateRegistrationWindow(tournaments);
+      setSportOptions(sports);
+      setSportId((current) => current || sports[0]?._id || "");
     }
 
     void loadTournamentSettings();
@@ -93,9 +113,9 @@ function RegisterPageContent() {
     };
   }, []);
 
-  const updateMember = (index: number, value: string) => {
-    const nextMembers = Array.from({ length: requiredPlayers }, (_, i) => members[i] || "");
-    nextMembers[index] = value;
+  const updateMember = (index: number, field: keyof MemberInput, value: string) => {
+    const nextMembers = Array.from({ length: maxPlayers }, (_, i) => members[i] || emptyMember());
+    nextMembers[index] = { ...nextMembers[index], [field]: field === "registrationNumber" ? normalizeRegNo(value) : value };
     setMembers(nextMembers);
   };
 
@@ -105,10 +125,20 @@ function RegisterPageContent() {
     setMessage("");
 
     const cleanDepartment = normalizeDepartment(department);
-    const cleanMembers = Array.from({ length: requiredPlayers }, (_, index) => members[index]?.trim() || "");
+    const cleanMembers = members
+      .slice(0, maxPlayers)
+      .map((member) => ({
+        ...member,
+        fullName: member.fullName.trim(),
+        registrationNumber: normalizeRegNo(member.registrationNumber),
+        department: cleanDepartment,
+        gender: category,
+      }))
+      .filter((member) => member.fullName || member.registrationNumber);
     const cleanPhone = normalizePhone(phone);
+    const cleanCaptainRegNo = normalizeRegNo(captainRegNo);
 
-    if (!captainName.trim() || !email.trim() || !phone.trim() || !cleanDepartment) {
+    if (!captainName.trim() || !cleanCaptainRegNo || !email.trim() || !phone.trim() || !cleanDepartment || !sportId) {
       setStatus("error");
       setMessage("Please fill all required team contact details.");
       return;
@@ -120,45 +150,39 @@ function RegisterPageContent() {
       return;
     }
 
-    if (cleanMembers.some((member) => !member)) {
+    if (cleanMembers.length < minPlayers) {
       setStatus("error");
-      setMessage(`Please enter all ${requiredPlayers} player names for ${sports.find((item) => item.id === sport)?.name || "this sport"}.`);
+      setMessage(`Please enter at least ${minPlayers} player${minPlayers === 1 ? "" : "s"} for ${selectedSport?.sportName || selectedSport?.name || "this sport"}.`);
+      return;
+    }
+
+    if (cleanMembers.some((member) => !member.fullName || !member.registrationNumber)) {
+      setStatus("error");
+      setMessage("Each team member must include full name and registration number.");
       return;
     }
 
     try {
-      const existingTeams = await getPublicTeams();
-      const departmentTeamsCount = existingTeams.filter((team) => {
-        return normalizeDepartment(team.department || team.teamName || "") === cleanDepartment;
-      }).length;
-
-      if (departmentTeamsCount >= DEPARTMENT_TEAM_LIMIT) {
-        setStatus("error");
-        setMessage(`${cleanDepartment} team quota is full. Only the first ${DEPARTMENT_TEAM_LIMIT} registered teams from each department are allowed.`);
-        return;
-      }
-
       const registeredAt = Date.now();
 
-      const teamData: Omit<Team, "id"> & {
-        captainName: string;
-        email: string;
-        phone: string;
-        registeredAt: number;
-        playerRegisteredAt: number[];
-        source: "public-registration";
-      } = {
+      const teamData = {
         name: cleanDepartment,
+        teamName: cleanDepartment,
         department: cleanDepartment,
-        sport,
+        sportId,
+        sportName: selectedSport?.sportName || selectedSport?.name,
+        category,
         members: cleanMembers,
         playerRegisteredAt: cleanMembers.map(() => registeredAt),
         coachCaptain: captainName.trim(),
         contactNumber: cleanPhone,
         captainName: captainName.trim(),
+        captainRegNo: cleanCaptainRegNo,
         email: email.trim(),
+        captainEmail: email.trim(),
         phone: cleanPhone,
-        status: "approved",
+        captainPhone: cleanPhone,
+        status: "pending",
         wins: 0,
         losses: 0,
         draws: 0,
@@ -167,26 +191,18 @@ function RegisterPageContent() {
         source: "public-registration",
       };
 
-      const session = getStoredSession();
-      if (!session) {
-        setStatus("error");
-        setMessage("Please login again before registering a team.");
-        return;
-      }
-
-      const savedTeam = session.role === "admin"
-        ? await createAdminTeam(teamData)
-        : await createCoordinatorTeam(teamData);
+      const savedTeam = await registerPublicTeam(teamData);
 
       setStatus("success");
-      setMessage(`${savedTeam.name || cleanDepartment} has been saved to MongoDB.`);
+      setMessage(`${savedTeam.name || cleanDepartment} has been registered successfully and is pending approval from the supercoordinator.`);
       setCaptainName("");
       setEmail("");
       setPhone("");
+      setCaptainRegNo("");
       setDepartment("");
       setMembers([]);
     } catch (error) {
-      console.error("Team registration failed:", error);
+      console.error("Public team registration failed:", error);
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Registration failed. Please try again.");
     }
@@ -208,15 +224,9 @@ function RegisterPageContent() {
               </div>
               <h1 className="sport-heading text-3xl font-black tracking-tight text-slate-950">Team Registration</h1>
               <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500">
-                Use this form to enter the department, sport, captain contact, and player names for MSU Invicta. Only the first two teams from each department are accepted.
+                Use this form to register a team. Only the first two teams from each department are accepted.
               </p>
             </div>
-            {teamName && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Team Name</p>
-                <p className="font-black uppercase text-slate-950">{teamName}</p>
-              </div>
-            )}
           </div>
 
           {message && (
@@ -238,6 +248,9 @@ function RegisterPageContent() {
                 <Field label="Name *">
                   <input value={captainName} onChange={(event) => setCaptainName(event.target.value)} required className="input-light" placeholder="Captain or representative name" />
                 </Field>
+                <Field label="Captain Registration No. *">
+                  <input value={captainRegNo} onChange={(event) => setCaptainRegNo(normalizeRegNo(event.target.value))} required className="input-light uppercase" placeholder="UNIV2026001" />
+                </Field>
                 <Field label="Email *">
                   <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input-light" placeholder="name@university.edu" />
                 </Field>
@@ -258,15 +271,22 @@ function RegisterPageContent() {
                   <input value={department} onChange={(event) => setDepartment(event.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
                 </Field>
                 <Field label="Sport *">
-                  <select value={sport} onChange={(event) => { setSport(event.target.value); setMembers([]); }} className="input-light">
-                    {sports.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                  <select value={sportId} onChange={(event) => { setSportId(event.target.value); setMembers([]); }} className="input-light" required>
+                    {sportOptions.map((item) => (
+                      <option key={item._id} value={item._id}>{item.sportName || item.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Category *">
+                  <select value={category} onChange={(event) => { setCategory(event.target.value as "Male" | "Female"); setMembers([]); }} className="input-light" required>
+                    {(selectedSport?.categories?.length ? selectedSport.categories : ["Male", "Female"]).map((item) => (
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
                 </Field>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Required</p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">{requiredPlayers}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Allowed</p>
+                  <p className="mt-1 text-2xl font-black text-slate-950">{playerCountLabel}</p>
                 </div>
               </div>
 
@@ -274,23 +294,20 @@ function RegisterPageContent() {
                 <div className="mb-4 flex items-center justify-between gap-4">
                   <div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Player Names</h2>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Enter exactly {requiredPlayers} player names for the selected sport.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Enter player names and registration numbers for the selected sport.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                    {requiredPlayers} slots
+                    {maxPlayers} slots
                   </span>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  {Array.from({ length: requiredPlayers }).map((_, index) => (
-                    <input
-                      key={`${sport}-${index}`}
-                      value={members[index] || ""}
-                      onChange={(event) => updateMember(index, event.target.value)}
-                      required
-                      className="input-light"
-                      placeholder={`Player ${index + 1} name`}
-                    />
+                <div className="space-y-4">
+                  {Array.from({ length: maxPlayers }).map((_, index) => (
+                    <div key={`${sportId}-${category}-${index}`} className="grid gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-3">
+                      <input value={members[index]?.fullName || ""} onChange={(event) => updateMember(index, "fullName", event.target.value)} required={index < minPlayers} className="input-light" placeholder={`Player ${index + 1} full name`} />
+                      <input value={members[index]?.registrationNumber || ""} onChange={(event) => updateMember(index, "registrationNumber", event.target.value)} required={index < minPlayers} className="input-light uppercase" placeholder="Registration no." />
+                      <input value={members[index]?.semester || ""} onChange={(event) => updateMember(index, "semester", event.target.value)} className="input-light" placeholder="Semester" />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -308,7 +325,7 @@ function RegisterPageContent() {
             <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-slate-700">
               <h2 className="text-2xl font-black text-slate-900">Registration Closed</h2>
               <p className="mt-4 text-sm leading-relaxed text-slate-600">
-                The registration portal is currently disabled or outside the configured tournament window. Admins must enable the registration portal and ensure the current date falls between the tournament start and end dates.
+                The registration portal is currently disabled or outside the configured tournament window. Please check with the event staff.
               </p>
               {nextTournament ? (
                 <p className="mt-4 text-sm text-slate-600">
@@ -328,14 +345,6 @@ function RegisterPageContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function RegisterPage() {
-  return (
-    <ProtectedRoute allowedRole="coordinator">
-      <RegisterPageContent />
-    </ProtectedRoute>
   );
 }
 

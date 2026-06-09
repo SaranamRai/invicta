@@ -4,12 +4,25 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Calendar, ChevronDown, Search, Trophy, User, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Team } from "@/lib/fixture-generator";
-import { getPublicTeams, mapMongoTeam } from "@/lib/api";
+import { getVolunteerTeams } from "@/lib/api";
 import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { getRoleAccount } from "@/lib/role-auth";
 
 const allSportsLabel = "All Sports";
+
+function normalizeSportValue(value?: string) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function getSportDisplayName(sportId?: string, sportName?: string) {
+  const name = sportName?.trim();
+  if (name) return name;
+
+  const normalizedSport = normalizeSportValue(sportId);
+  const sport = sports.find((item) => item.id === normalizedSport || normalizeSportValue(item.name) === normalizedSport);
+  return sport?.name || sportId || "Assigned sport";
+}
 
 function formatDate(value?: number) {
   if (!value) {
@@ -33,17 +46,19 @@ export default function VolunteerTeamsPage() {
   const [selectedSport, setSelectedSport] = useState(allSportsLabel);
   const [activeTab, setActiveTab] = useState<"Teams" | "Members">("Teams");
   const [searchQuery, setSearchQuery] = useState("");
-  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
+  const account = getRoleAccount();
+  const assignedSport = normalizeSportValue(account?.assignedSport);
+  const assignedSportName = getSportDisplayName(assignedSport, account?.assignedSportName);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadTeams() {
-      const publicTeams = await getPublicTeams();
+      const volunteerTeams = await getVolunteerTeams().catch(() => []);
       if (!isMounted) return;
       setTeams(
-        publicTeams
-          .map((team) => mapMongoTeam(team) as Team)
+        volunteerTeams
+          .map((team) => team as Team)
           .filter((team) => !assignedSport || team.sport === assignedSport)
           .sort((a, b) => `${a.sport}${a.name}`.localeCompare(`${b.sport}${b.name}`))
       );
@@ -60,8 +75,10 @@ export default function VolunteerTeamsPage() {
 
   const sportOptions = useMemo(() => {
     const registeredSports = assignedSport ? [assignedSport] : sports.map((sport) => sport.id);
-    return [allSportsLabel, ...registeredSports];
+    return assignedSport ? registeredSports : [allSportsLabel, ...registeredSports];
   }, [assignedSport]);
+
+  const effectiveSelectedSport = assignedSport || selectedSport;
 
   const teamCountBySport = useMemo(() => {
     return teams.reduce((counts, team) => {
@@ -77,7 +94,7 @@ export default function VolunteerTeamsPage() {
 
   const filteredTeams = teams.filter((team) => {
     const query = searchQuery.trim().toLowerCase();
-    const matchesSport = selectedSport === allSportsLabel || team.sport === selectedSport;
+    const matchesSport = effectiveSelectedSport === allSportsLabel || team.sport === effectiveSelectedSport;
     const matchesSearch =
       !query ||
       team.name.toLowerCase().includes(query) ||
@@ -94,6 +111,7 @@ export default function VolunteerTeamsPage() {
       teamName: team.name,
       department: team.department || team.name,
       sport: team.sport,
+      sportName: team.sportName,
       registeredAt: team.playerRegisteredAt?.[index] || team.registeredAt,
     }))
   );
@@ -185,7 +203,7 @@ export default function VolunteerTeamsPage() {
           >
             {sportOptions.map((sport) => (
               <option key={sport} value={sport} className="bg-background text-foreground">
-                {sport === allSportsLabel ? sport : `${sportNameById[sport] || sport} (${teamCountBySport[sport] || 0})`}
+                {sport === allSportsLabel ? sport : `${sport === assignedSport ? assignedSportName : sportNameById[sport] || sport} (${teamCountBySport[sport] || 0})`}
               </option>
             ))}
           </select>
@@ -210,7 +228,7 @@ export default function VolunteerTeamsPage() {
                       <div className="min-w-0">
                         <h2 className="truncate text-lg font-black uppercase tracking-wide text-foreground">{team.name}</h2>
                         <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                          {sportNameById[team.sport] || team.sport} / {team.department || "Department"}
+                          {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
                         </p>
                       </div>
                       <span className="w-fit rounded-full bg-secondary px-3 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
@@ -260,7 +278,7 @@ export default function VolunteerTeamsPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{item.member}</p>
                   <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    {sportNameById[item.sport] || item.sport} / {item.department} / {item.teamName}
+                    {getSportDisplayName(item.sport, item.sportName)} / {item.department} / {item.teamName}
                   </p>
                   <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     <Calendar size={11} />

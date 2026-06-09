@@ -2,6 +2,7 @@ export interface Team {
   id: string;
   name: string;
   sport: string;
+  sportName?: string;
   members: string[];
   department?: string;
   coachCaptain?: string;

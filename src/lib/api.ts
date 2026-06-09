@@ -17,6 +17,13 @@ function normalizePublicSport(value?: string) {
   return String(value || "general").trim().toLowerCase().replace(/\s+/g, "-");
 }
 
+function getMemberName(member: unknown) {
+  if (typeof member === "string") return member;
+  if (!member || typeof member !== "object") return "";
+  const value = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+  return value.fullName || value.name || value.registrationNumber || value.regNo || "";
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -35,6 +42,8 @@ export interface AuthSession {
   email: string;
   department?: string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
 }
 
 export const AUTH_STORAGE_KEY = "sportsAuthSession";
@@ -130,7 +139,8 @@ export interface TeamSyncPayload {
   name: string;
   department?: string;
   sport: string;
-  members?: string[];
+  sportName?: string;
+  members?: unknown[];
   coachCaptain?: string;
   captainName?: string;
   email?: string;
@@ -320,10 +330,23 @@ export interface MongoTeam {
   createdAt?: string;
 }
 
+export interface MongoSport {
+  _id: string;
+  sportName?: string;
+  name?: string;
+  categories?: ("Male" | "Female")[];
+  type?: "indoor" | "outdoor";
+  rules?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  status?: "active" | "inactive";
+}
+
 export interface MongoAnnouncement {
   _id: string;
   title: string;
   message: string;
+  priority?: "normal" | "important" | "urgent";
   visibleToPublic?: boolean;
   attachmentName?: string;
   attachmentType?: string;
@@ -363,7 +386,8 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     name: team.teamName,
     department: team.department,
     sport,
-    members: team.members || [],
+    sportName: team.sportName || getRefName(team.sportId, ""),
+    members: (team.members || []).map(getMemberName).filter(Boolean),
     coachCaptain: team.captainName || "",
     contactNumber: team.contactNumber || "",
     email: team.email || "",
@@ -384,14 +408,15 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     : rawStatus === "live" || rawStatus === "half-time"
       ? "Live"
       : "Upcoming";
-  const sportName = fixture.sport || fixture.sportName || getRefName(fixture.sportId, "general");
+  const sportName = fixture.sportName || getRefName(fixture.sportId, fixture.sport || "general");
 
   return {
     id: fixture._id,
     teamA: fixture.teamAName || liveScore?.teamAName || getRefName(fixture.teamA, "Team A"),
     teamB: fixture.teamBName || liveScore?.teamBName || getRefName(fixture.teamB, "Team B"),
     sport: normalizePublicSport(sportName),
-    type: fixture.round || fixture.sportName || getRefName(fixture.sportId, "Match"),
+    sportName,
+    type: fixture.round || sportName || "Match",
     scoreA: Number(liveScore?.teamAScore ?? fixture.scoreA ?? 0),
     scoreB: Number(liveScore?.teamBScore ?? fixture.scoreB ?? 0),
     status,
@@ -465,10 +490,22 @@ export function getPublicLiveFeeds() {
 export function getPublicTeams() {
   return publicApiFetch<MongoTeam>("/public/teams");
 }
+
+export function getCoordinatorTeams() {
+  return apiFetch<TeamSyncPayload[]>("/coordinator/teams");
+}
+
+export function getVolunteerTeams() {
+  return apiFetch<TeamSyncPayload[]>("/volunteer/teams");
+}
+
+export function getPublicSports() {
+  return publicApiFetch<MongoSport>("/public/sports");
+}
 export function getPublicTournaments() {
   return publicApiFetch<TournamentPayload>("/public/tournaments");
 }
-export function registerPublicTeam(team: TeamWritePayload) {
+export function registerPublicTeam(team: unknown) {
   return apiFetch<TeamSyncPayload>("/public/teams", {
     method: "POST",
     body: JSON.stringify(team),
@@ -510,8 +547,16 @@ export interface RoleAccountPayload {
   deptName: string;
   role: "admin" | "supercoordinator" | "volunteer" | "coordinator" | string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
   createdBy?: string;
   createdByRole?: string;
+  status?: string;
+  phone?: string;
+  registrationNo?: string;
+  mustChangePassword?: boolean;
+  emailSent?: boolean;
+  message?: string;
   createdAt?: string;
 }
 
@@ -520,9 +565,25 @@ export interface CoordinatorVolunteerPayload {
   name: string;
   email: string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
   registrationNumber?: string;
   phone?: string;
   createdAt?: string;
+}
+
+export interface CoordinatorPointsTablePayload {
+  id: string;
+  rank: number;
+  department: string;
+  sportId?: string;
+  sportName?: string;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  points: number;
+  updatedAt?: string;
 }
 
 export interface TournamentPayload {
@@ -564,13 +625,19 @@ export function getAdminRoleAccounts() {
   return apiFetch<RoleAccountPayload[]>("/admin/role-accounts");
 }
 
-export function createAdminCoordinator(payload: {
+export interface CreateCoordinatorPayload {
   name: string;
   email: string;
   password: string;
   assignedSport: string;
+  assignedSportId?: string;
+  registrationNo?: string;
+  phone?: string;
   department?: string;
-}) {
+  status?: string;
+}
+
+export function createAdminCoordinator(payload: CreateCoordinatorPayload) {
   return apiFetch<RoleAccountPayload>("/admin/create-coordinator", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -586,6 +653,30 @@ export function createAdminVolunteer(payload: {
   return apiFetch<RoleAccountPayload>("/admin/create-volunteer", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminRoleAccount(id: string, payload: {
+  role: string;
+  name?: string;
+  email?: string;
+  password?: string;
+  assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
+  status?: string;
+  phone?: string;
+}) {
+  return apiFetch<RoleAccountPayload>(`/admin/role-accounts/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAdminRoleAccount(id: string, role: string) {
+  return apiFetch<void>(`/admin/role-accounts/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ role }),
   });
 }
 
@@ -607,8 +698,29 @@ export function getCoordinatorVolunteers() {
   return apiFetch<CoordinatorVolunteerPayload[]>("/coordinator/volunteers");
 }
 
+export function updateCoordinatorVolunteer(volunteerId: string, payload: {
+  name: string;
+  email: string;
+  registrationNumber: string;
+  phone: string;
+  password?: string;
+}) {
+  return apiFetch<CoordinatorVolunteerPayload>(`/coordinator/volunteers/${encodeURIComponent(volunteerId)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getCoordinatorFixtures() {
   return apiFetch<AdminFixturePayload[]>("/coordinator/fixtures");
+}
+
+export function getCoordinatorPointsTable() {
+  return apiFetch<CoordinatorPointsTablePayload[]>("/coordinator/points-table");
+}
+
+export function getCoordinatorAnnouncements() {
+  return apiFetch<MongoAnnouncement[]>("/coordinator/announcements");
 }
 
 export function assignCoordinatorFixtureVolunteer(fixtureId: string, volunteerId: string) {
@@ -631,6 +743,92 @@ export function createAdminTournament(tournament: Omit<TournamentPayload, "id" |
 
 export function deleteAdminTournament(tournamentId: string) {
   return apiFetch(`/admin/tournaments/${encodeURIComponent(tournamentId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function updateAdminAnnouncement(id: string, payload: {
+  title?: string;
+  message?: string;
+  priority?: string;
+  visibleToPublic?: boolean;
+}) {
+  return apiFetch(`/admin/announcements/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAdminAnnouncement(id: string) {
+  return apiFetch(`/admin/announcements/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export interface VenuePayload {
+  _id?: string;
+  id?: string;
+  name: string;
+  location?: string;
+  sportType?: string;
+}
+
+export function getAdminVenues() {
+  return apiFetch<VenuePayload[]>("/admin/venues");
+}
+
+export function createAdminVenue(payload: { name: string; location?: string; sportType?: string }) {
+  return apiFetch<VenuePayload>("/admin/venues", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminVenue(id: string, payload: Partial<VenuePayload>) {
+  return apiFetch<VenuePayload>(`/admin/venues/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAdminVenue(id: string) {
+  return apiFetch(`/admin/venues/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function getAdminPendingRegistrations() {
+  return apiFetch<MongoTeam[]>("/admin/registrations/pending");
+}
+
+export function getAdminSports() {
+  return apiFetch<MongoSport[]>("/admin/sports");
+}
+
+export function createAdminSport(payload: {
+  sportName: string;
+  categories?: ("Male" | "Female")[];
+  type?: "indoor" | "outdoor";
+  rules?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  status?: "active" | "inactive";
+}) {
+  return apiFetch<MongoSport>("/admin/sports", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminSport(id: string, payload: Partial<MongoSport>) {
+  return apiFetch<MongoSport>(`/admin/sports/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAdminSport(id: string) {
+  return apiFetch<void>(`/admin/sports/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }

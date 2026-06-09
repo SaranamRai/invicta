@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Calendar, Clock, MapPin, Zap } from "lucide-react";
 import {
   Team,
@@ -8,7 +8,7 @@ import {
   generateFixtures as generateFixturesUtil,
 } from "@/lib/fixture-generator";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { sports } from "@/lib/mock-data";
+import { getPublicSports, MongoSport } from "@/lib/api";
 
 const DEFAULT_TIMESLOTS = ["09:00", "11:00", "14:00", "16:00", "18:00"];
 
@@ -28,6 +28,11 @@ export function FixtureGenerator({
   const [timeslots, setTimeslots] = useState<string[]>(DEFAULT_TIMESLOTS);
   const [newTimeslot, setNewTimeslot] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
+
+  useEffect(() => {
+    getPublicSports().then(setSportsList).catch(() => {});
+  }, []);
 
   const handleAddTimeslot = () => {
     if (newTimeslot && !timeslots.includes(newTimeslot)) {
@@ -67,9 +72,10 @@ export function FixtureGenerator({
     }
   };
 
-  const teamsBySport = sports.reduce(
+  const teamsBySport = (sportsList.length > 0 ? sportsList : []).reduce(
     (acc, sport) => {
-      acc[sport.id] = teams.filter((t) => t.sport === sport.id).length;
+      const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+      acc[id] = teams.filter((t) => t.sport === id).length;
       return acc;
     },
     {} as Record<string, number>
@@ -119,11 +125,10 @@ export function FixtureGenerator({
               className="w-full rounded-lg bg-slate-950/60 border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-accent appearance-none cursor-pointer"
             >
               <option value="all">All Sports</option>
-              {sports.map((sport) => (
-                <option key={sport.id} value={sport.id}>
-                  {sport.name}
-                </option>
-              ))}
+              {sportsList.map((sport) => {
+                const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+                return <option key={id} value={id}>{sport.sportName || sport.name}</option>;
+              })}
             </select>
           </CardContent>
         </Card>
@@ -135,14 +140,17 @@ export function FixtureGenerator({
               Teams Available for Scheduling
             </label>
             <div className="space-y-2">
-              {sports.map((sport) => (
-                <div key={sport.id} className="flex justify-between text-sm">
-                  <span className="text-slate-400">{sport.name}</span>
-                  <span className="font-bold text-white">
-                    {teamsBySport[sport.id] || 0} teams
-                  </span>
-                </div>
-              ))}
+              {sportsList.map((sport) => {
+                const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+                return (
+                  <div key={id} className="flex justify-between text-sm">
+                    <span className="text-slate-400">{sport.sportName || sport.name}</span>
+                    <span className="font-bold text-white">
+                      {teamsBySport[id] || 0} teams
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

@@ -5,14 +5,19 @@ const fixtureSchema = new mongoose.Schema(
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport", required: true },
     sport: { type: String, required: true, trim: true, lowercase: true },
     sportName: { type: String, trim: true },
+    category: { type: String, enum: ["Male", "Female"], default: "Male" },
     matchTitle: { type: String, required: true, trim: true },
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     teamB: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     teamAName: { type: String, trim: true },
     teamBName: { type: String, trim: true },
+    departmentA: { type: String, trim: true },
+    departmentB: { type: String, trim: true },
     venue: { type: String, trim: true },
     date: { type: String, trim: true },
     time: { type: String, trim: true },
+    startTime: { type: Date },
+    endTime: { type: Date },
     scoreA: { type: Number, default: 0 },
     scoreB: { type: Number, default: 0 },
     endedAt: { type: String },
@@ -23,8 +28,9 @@ const fixtureSchema = new mongoose.Schema(
       default: "upcoming",
     },
     assignedVolunteer: { type: mongoose.Schema.Types.ObjectId, ref: "Volunteer" },
+    createdBy: { type: mongoose.Schema.Types.ObjectId },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: true }
 );
 
 export default mongoose.model("Fixture", fixtureSchema);

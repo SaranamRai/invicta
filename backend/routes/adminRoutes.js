@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { adminHandlers, listIssues, listRoleAccounts, listTournaments, verifyResult } from "../controllers/adminController.js";
+import { adminHandlers, listIssues, listRoleAccounts, listTournaments, reviewTeamRegistration, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
 import {
   createTeam,
+  createFixture,
   deleteFixture,
   deleteTeam,
   listFixtures,
@@ -27,7 +28,7 @@ router.use((req, res, next) => {
     if (req.path && req.path.includes('/tournaments')) {
       console.log('[adminRoutes] incoming:', req.method, req.path, 'body=', JSON.stringify(req.body || {}));
     }
-  } catch (err) {
+    } catch {
     /* ignore logging errors */
   }
   return next();
@@ -43,11 +44,20 @@ router.get("/teams", adminOrSuper, listTeams);
 router.post("/teams", superOnly, createTeam);
 router.put("/teams/:id", superOnly, updateTeam);
 router.delete("/teams/:id", superOnly, deleteTeam);
+router.patch("/team-registrations/:id/review", superOnly, reviewTeamRegistration);
 router.get("/fixtures", adminOrSuper, listFixtures);
+router.post("/fixtures", superOnly, createFixture);
 router.put("/fixtures", superOnly, replaceFixtures);
 router.put("/fixtures/:id", superOnly, updateFixture);
 router.delete("/fixtures/:id", superOnly, deleteFixture);
 router.post("/announcements", superOnly, adminHandlers.createAnnouncement);
+router.put("/announcements/:id", superOnly, adminHandlers.updateAnnouncement);
+router.delete("/announcements/:id", superOnly, adminHandlers.deleteAnnouncement);
+router.get("/venues", adminOrSuper, adminHandlers.listVenues);
+router.post("/venues", superOnly, adminHandlers.createVenue);
+router.put("/venues/:id", superOnly, adminHandlers.updateVenue);
+router.delete("/venues/:id", superOnly, adminHandlers.deleteVenue);
+router.get("/registrations/pending", adminOrSuper, adminHandlers.listPendingRegistrations);
 router.post("/rules", superOnly, adminHandlers.createRule);
 router.post("/results", superOnly, adminHandlers.createResult);
 router.put("/results/:id/verify", adminOrSuper, verifyResult);
@@ -56,6 +66,8 @@ router.post("/create-supercoordinator", superOnly, adminHandlers.createSuperCoor
 router.post("/create-volunteer", superOnly, adminHandlers.createVolunteer);
 router.post("/create-coordinator", superOnly, adminHandlers.createCoordinator);
 router.get("/role-accounts", adminOrSuper, listRoleAccounts);
+router.put("/role-accounts/:id", superOnly, updateRoleAccount);
+router.delete("/role-accounts/:id", superOnly, deleteRoleAccount);
 router.get("/tournaments", adminOrSuper, listTournaments);
 router.post("/tournaments", superOnly, adminHandlers.createTournament);
 router.put("/tournaments/:id", superOnly, adminHandlers.updateTournament);

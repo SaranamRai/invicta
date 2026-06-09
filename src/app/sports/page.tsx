@@ -1,14 +1,32 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { sports } from "@/lib/mock-data";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Trophy } from "lucide-react";
+import { ArrowRight, Loader2, Trophy } from "lucide-react";
 import Link from "next/link";
+import { getPublicSports, MongoSport } from "@/lib/api";
 
 
 export default function SportsPage() {
+  const [sports, setSports] = useState<MongoSport[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    getPublicSports()
+      .then((data) => {
+        if (mounted) setSports(data);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-10">
       <header className="border-b border-border pb-8">
@@ -18,15 +36,20 @@ export default function SportsPage() {
         </p>
       </header>
 
+      {loading ? (
+        <div className="flex min-h-72 items-center justify-center rounded-xl border border-border">
+          <Loader2 className="animate-spin text-muted-foreground" size={28} />
+        </div>
+      ) : (
       <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {sports.length > 0 ? sports.map((sport, i) => (
           <motion.div
-            key={sport.id}
+            key={sport._id}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Link href={`/sports/${sport.id}`}>
+            <Link href={`/sports/${sport._id}`}>
               <Card className="group relative h-72 cursor-pointer overflow-hidden border-2 shadow-2xl hover:border-accent transition-all">
                 {/* Background Glow */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 transition-opacity group-hover:opacity-100" />
@@ -36,8 +59,8 @@ export default function SportsPage() {
                     <Trophy size={40} className="text-accent opacity-50" />
                   </div>
                   <div className="text-center px-6">
-                    <h3 className="text-3xl font-black sport-heading tracking-wide uppercase">{sport.name}</h3>
-                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Teams, players, and fixtures</p>
+                    <h3 className="text-3xl font-black sport-heading tracking-wide uppercase">{sport.sportName || sport.name}</h3>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{sport.categories?.join(" / ") || "Male / Female"}</p>
                   </div>
                 </div>
 
@@ -57,6 +80,7 @@ export default function SportsPage() {
           </div>
         )}
       </div>
+      )}
 
     </div>
   );
