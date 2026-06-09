@@ -19,6 +19,11 @@ import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
 dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 
+if (!process.env.JWT_SECRET) {
+  console.warn("Warning: JWT_SECRET not set in environment - using temporary development secret");
+  process.env.JWT_SECRET ||= "dev_secret_change_me";
+}
+
 const app = express();
 const port = process.env.PORT || 5000;
 const defaultAccounts = [
