@@ -11,7 +11,7 @@ import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
-import { LogOut } from "lucide-react";
+import { Download, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
@@ -25,7 +25,13 @@ import {
   replaceAdminFixtures,
   updateAdminFixture,
   updateAdminTeam,
+  getTeamPendingRegistrations,
+  getTeamApprovedRegistrations,
+  approveTeamRegistration,
+  rejectTeamRegistration,
+  TeamRegistrationPayload,
 } from "@/lib/api";
+import { getExportApprovedRegistrationsUrl } from "@/lib/api";
 
 type AdminTab =
   | "dashboard"
@@ -35,7 +41,8 @@ type AdminTab =
   | "tournaments"
   | "leaderboard"
   | "rules"
-  | "users";
+  | "users"
+  | "approvals";
 
 function escapeHtml(value: string) {
   return value
@@ -51,6 +58,172 @@ function getSportName(sportId: string) {
 
 function getTeamName(teamId: string, teams: Team[]) {
   return teams.find((team) => team.id === teamId)?.name || teamId;
+}
+
+function ApprovalsPanel() {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionMsg, setActionMsg] = useState("");
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  useEffect(() => {
+    loadRegistrations();
+  }, []);
+
+  async function loadRegistrations() {
+    setLoading(true);
+    try {
+      const data = await getTeamPendingRegistrations();
+      setRegistrations(data);
+    } catch {
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApprove(id: string) {
+    try {
+      await approveTeamRegistration(id);
+      setActionMsg("Registration approved successfully.");
+      loadRegistrations();
+    } catch (error) {
+      setActionMsg(error instanceof Error ? error.message : "Approval failed");
+    }
+  }
+
+  async function handleReject(id: string) {
+    if (!rejectReason.trim()) return;
+    try {
+      await rejectTeamRegistration(id, rejectReason.trim());
+      setActionMsg("Registration rejected.");
+      setRejectId(null);
+      setRejectReason("");
+      loadRegistrations();
+    } catch (error) {
+      setActionMsg(error instanceof Error ? error.message : "Rejection failed");
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Pending Approvals</h2>
+          <p className="text-sm text-muted-foreground">Review and approve or reject team registrations.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={loadRegistrations}
+            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
+          >
+            Refresh
+          </button>
+          <a
+            href={getExportApprovedRegistrationsUrl()}
+            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent-foreground"
+          >
+            <Download size={14} />
+            Export Excel
+          </a>
+        </div>
+      </div>
+
+      {actionMsg && (
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+          {actionMsg}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : registrations.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">No pending registrations</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {registrations.map((reg) => (
+            <div key={reg._id} className="rounded-xl border border-border bg-card p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-foreground">{reg.teamName}</h3>
+                    <span className="rounded-full bg-accent/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {reg.department} &middot; Captain: {reg.captainName} ({reg.captainRegNo}) &middot; {reg.captainEmail}
+                  </p>
+                  {reg.members && reg.members.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {reg.members.map((m, i) => (
+                        <span key={i} className="rounded-lg bg-secondary px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                          {m.fullName} ({m.registrationNo})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {reg.teamLogo && (
+                    <div className="mt-2">
+                      <img src={reg.teamLogo} alt="Team logo" className="h-12 w-12 rounded-lg object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    onClick={() => handleApprove(reg._id)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-600"
+                  >
+                    <CheckCircle size={14} />
+                    Approve
+                  </button>
+                  {rejectId === reg._id ? (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Rejection reason..."
+                        className="h-9 rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-medium text-red-700 outline-none placeholder:text-red-300"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleReject(reg._id)}
+                          disabled={!rejectReason.trim()}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => { setRejectId(null); setRejectReason(""); }}
+                          className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setRejectId(reg._id); setRejectReason(""); }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-600 transition-colors hover:bg-red-100"
+                    >
+                      <XCircle size={14} />
+                      Reject
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function buildFixtureFlowchartDoc(fixtures: Fixture[], teams: Team[]) {
@@ -316,6 +489,7 @@ export default function AdminDashboard() {
                   { id: "leaderboard" as const, label: "League Tables" },
                   { id: "rules" as const, label: "Rules" },
                   { id: "users" as const, label: "System Users" },
+                  { id: "approvals" as const, label: "Approvals" },
                 ]
               : [
                   { id: "dashboard" as const, label: "Overview" },
@@ -343,13 +517,26 @@ export default function AdminDashboard() {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === "dashboard" && (
-          <AdminOverview
-            teams={teams}
-            fixtures={fixtures}
-            setActiveTab={setActiveTab}
-            onUpdateTeam={handleUpdateTeam}
-            canManageSetup={canManageSetup}
-          />
+          <>
+            {canManageSetup && (
+              <div className="mb-6 flex justify-end">
+                <a
+                  href={getExportApprovedRegistrationsUrl()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90"
+                >
+                  <Download size={16} />
+                  Download Approved Registrations (Excel)
+                </a>
+              </div>
+            )}
+            <AdminOverview
+              teams={teams}
+              fixtures={fixtures}
+              setActiveTab={setActiveTab}
+              onUpdateTeam={handleUpdateTeam}
+              canManageSetup={canManageSetup}
+            />
+          </>
         )}
 
         {activeTab === "tournaments" && canManageSetup && (
@@ -392,6 +579,10 @@ export default function AdminDashboard() {
         {activeTab === "rules" && <RulesViewer />}
 
         {activeTab === "users" && <UsersViewer teams={teams} canManageAccounts={canManageSetup} />}
+
+        {activeTab === "approvals" && canManageSetup && (
+          <ApprovalsPanel />
+        )}
       </div>
     </div>
   );

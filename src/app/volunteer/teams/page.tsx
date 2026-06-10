@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Calendar, ChevronDown, Search, Trophy, User, UsersRound } from "lucide-react";
+import { Calendar, CheckCircle, ChevronDown, Search, Trophy, User, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Team } from "@/lib/fixture-generator";
-import { getVolunteerTeams } from "@/lib/api";
+import { getVolunteerTeams, getTeamApprovedRegistrations, TeamRegistrationPayload } from "@/lib/api";
 import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { getRoleAccount } from "@/lib/role-auth";
@@ -191,6 +191,8 @@ export default function VolunteerTeamsPage() {
         </Card>
       </div>
 
+      <VolunteerApprovedTeams assignedSport={assignedSport} />
+
       <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3.5 text-muted-foreground" size={16} />
@@ -300,6 +302,61 @@ export default function VolunteerTeamsPage() {
         <EmptyState label="No members found" />
       )}
     </div>
+  );
+}
+
+function VolunteerApprovedTeams({ assignedSport }: { assignedSport: string }) {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const data = await getTeamApprovedRegistrations();
+        if (!mounted) return;
+        const filtered = assignedSport
+          ? data.filter((r) => r.sportId === assignedSport || r.sportName.toLowerCase().replace(/\s+/g, "-") === assignedSport)
+          : data;
+        setRegistrations(filtered);
+      } catch {
+        if (mounted) setRegistrations([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => { mounted = false; };
+  }, [assignedSport]);
+
+  if (loading || registrations.length === 0) return null;
+
+  return (
+    <Card className="p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <CheckCircle size={18} className="text-accent" />
+        <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Approved Team Registrations</h3>
+        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[9px] font-black text-accent">{registrations.length}</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {registrations.slice(0, 9).map((reg) => (
+          <div key={reg._id} className="rounded-xl border border-border bg-secondary/30 p-3">
+            <div className="flex items-start gap-2">
+              {reg.teamLogo && (
+                <img src={reg.teamLogo} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-foreground">{reg.teamName}</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                  {reg.sportName} / {reg.category}
+                </p>
+                <p className="text-[9px] font-semibold text-muted-foreground">{reg.department}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

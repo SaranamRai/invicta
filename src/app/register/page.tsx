@@ -2,22 +2,22 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Users } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Upload, Users, X } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import {
-  createAdminTeam,
-  createCoordinatorTeam,
   getPublicSports,
-  getPublicTeams,
   getPublicTournaments,
-  getStoredSession,
   MongoSport,
-  TeamSyncPayload,
+  submitTeamRegistration,
+  TeamRegistrationWritePayload,
+  TeamRegistrationMember,
   TournamentPayload,
 } from "@/lib/api";
 
-const DEPARTMENT_TEAM_LIMIT = 2;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 const normalizeDepartment = (value: string) => value.trim().replace(/\s+/g, " ").toUpperCase();
 const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
@@ -25,20 +25,37 @@ const normalizeRegNo = (value: string) => value.trim().replace(/\s+/g, "").toUpp
 
 type MemberInput = {
   fullName: string;
-  registrationNumber: string;
+  registrationNo: string;
+  department: string;
+  semester: string;
+  gender: string;
+  email: string;
+  phone: string;
 };
 
-const emptyMember = (): MemberInput => ({ fullName: "", registrationNumber: "" });
+const emptyMember = (): MemberInput => ({
+  fullName: "",
+  registrationNo: "",
+  department: "",
+  semester: "",
+  gender: "",
+  email: "",
+  phone: "",
+});
 
 function RegisterPageContent() {
   const [captainName, setCaptainName] = useState("");
   const [captainRegNo, setCaptainRegNo] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [captainEmail, setCaptainEmail] = useState("");
+  const [captainPhone, setCaptainPhone] = useState("");
   const [department, setDepartment] = useState("");
+  const [teamName, setTeamName] = useState("");
   const [sportId, setSportId] = useState("");
+  const [category, setCategory] = useState<"Male" | "Female">("Male");
   const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [members, setMembers] = useState<MemberInput[]>([]);
+  const [teamLogo, setTeamLogo] = useState<string>("");
+  const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
@@ -50,7 +67,7 @@ function RegisterPageContent() {
   );
   const requiredPlayers = Math.max(1, Number(selectedSport?.minPlayers || 1));
   const maxPlayers = Math.max(requiredPlayers, Number(selectedSport?.maxPlayers || requiredPlayers));
-  const teamName = useMemo(() => normalizeDepartment(department), [department]);
+  const sportCategories = selectedSport?.categories?.length ? selectedSport.categories : ["Male", "Female"];
 
   const updateRegistrationWindow = (tournaments: TournamentPayload[]) => {
     const nowTime = Date.now();
@@ -96,7 +113,9 @@ function RegisterPageContent() {
       if (!isMounted) return;
       updateRegistrationWindow(tournaments);
       setSportOptions(sports);
-      setSportId((current) => current || sports[0]?._id || "");
+      if (sports.length > 0 && !sportId) {
+        setSportId(sports[0]._id);
+      }
     }
 
     void loadData();
@@ -104,11 +123,46 @@ function RegisterPageContent() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [sportId]);
+
+  const handleLogoUpload = (file: File | null) => {
+    if (!file) {
+      setTeamLogoFile(null);
+      setTeamLogo("");
+      return;
+    }
+
+    const ext = "." + file.name.split(".").pop()?.toLowerCase();
+    if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+      setStatus("error");
+      setMessage("Logo must be a JPG, JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setStatus("error");
+      setMessage("Logo must be a JPG, JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setStatus("error");
+      setMessage("Logo must be under 2MB.");
+      return;
+    }
+
+    setTeamLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setTeamLogo(String(e.target?.result || ""));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const updateMember = (index: number, field: keyof MemberInput, value: string) => {
     const nextMembers = Array.from({ length: maxPlayers }, (_, i) => members[i] || emptyMember());
-    nextMembers[index] = { ...nextMembers[index], [field]: field === "registrationNumber" ? normalizeRegNo(value) : value };
+    nextMembers[index] = {
+      ...nextMembers[index],
+      [field]: field === "registrationNo" ? normalizeRegNo(value) : value,
+    };
     setMembers(nextMembers);
   };
 
@@ -118,132 +172,110 @@ function RegisterPageContent() {
     setMessage("");
 
     const cleanDepartment = normalizeDepartment(department);
-    const cleanMembers = members
+    const cleanTeamName = teamName.trim();
+    const cleanCaptainName = captainName.trim();
+    const cleanCaptainRegNo = normalizeRegNo(captainRegNo);
+    const cleanCaptainEmail = captainEmail.trim().toLowerCase();
+    const cleanCaptainPhone = normalizePhone(captainPhone);
+
+    const cleanMembers: TeamRegistrationMember[] = members
       .slice(0, maxPlayers)
       .map((member) => ({
         fullName: member.fullName.trim(),
-        registrationNumber: normalizeRegNo(member.registrationNumber),
+        registrationNo: normalizeRegNo(member.registrationNo),
+        department: member.department.trim() || cleanDepartment,
+        semester: member.semester.trim(),
+        gender: member.gender || category,
+        email: member.email.trim(),
+        phone: member.phone.trim(),
       }))
-      .filter((member) => member.fullName || member.registrationNumber);
-    const cleanPhone = normalizePhone(phone);
-    const cleanCaptainRegNo = normalizeRegNo(captainRegNo);
+      .filter((member) => member.fullName || member.registrationNo);
 
-    if (!captainName.trim() || !cleanCaptainRegNo || !email.trim() || !phone.trim() || !cleanDepartment || !sportId) {
-      setStatus("error");
-      setMessage("Please fill all required team contact details.");
-      return;
-    }
-
-    if (cleanPhone.length !== 10) {
-      setStatus("error");
-      setMessage("Phone number must be exactly 10 digits.");
-      return;
-    }
+    // Validation
+    if (!sportId) { setStatus("error"); setMessage("Please select a sport."); return; }
+    if (!category) { setStatus("error"); setMessage("Please select a category."); return; }
+    if (!cleanDepartment) { setStatus("error"); setMessage("Department is required."); return; }
+    if (!cleanTeamName) { setStatus("error"); setMessage("Team name is required."); return; }
+    if (!cleanCaptainName) { setStatus("error"); setMessage("Captain name is required."); return; }
+    if (!cleanCaptainRegNo) { setStatus("error"); setMessage("Captain registration number is required."); return; }
+    if (!cleanCaptainEmail) { setStatus("error"); setMessage("Captain email is required."); return; }
+    if (!cleanCaptainPhone || cleanCaptainPhone.length !== 10) { setStatus("error"); setMessage("Captain phone must be exactly 10 digits."); return; }
 
     if (cleanMembers.length < requiredPlayers) {
       setStatus("error");
-      setMessage(`Please enter at least ${requiredPlayers} player${requiredPlayers === 1 ? "" : "s"} for ${selectedSport?.sportName || selectedSport?.name || "this sport"}.`);
+      setMessage(`Please enter at least ${requiredPlayers} player${requiredPlayers === 1 ? "" : "s"} for ${selectedSport?.sportName || "this sport"}.`);
       return;
     }
 
-    if (cleanMembers.some((member) => !member.fullName || !member.registrationNumber)) {
+    if (cleanMembers.some((member) => !member.fullName || !member.registrationNo)) {
       setStatus("error");
       setMessage("Each team member must include full name and registration number.");
       return;
     }
 
+    // Check duplicates within submission
+    const allRegNos = [cleanCaptainRegNo, ...cleanMembers.map((m) => m.registrationNo)];
+    if (new Set(allRegNos).size !== allRegNos.length) {
+      setStatus("error");
+      setMessage("Duplicate registration number found in the same team submission.");
+      return;
+    }
+
     try {
-      const existingTeams = await getPublicTeams();
-      const departmentTeamsCount = existingTeams.filter((team) => {
-        return normalizeDepartment(team.department || team.teamName || "") === cleanDepartment;
-      }).length;
+      const sportName = selectedSport?.sportName || selectedSport?.name || "";
 
-      if (departmentTeamsCount >= DEPARTMENT_TEAM_LIMIT) {
-        setStatus("error");
-        setMessage(`${cleanDepartment} team quota is full. Only the first ${DEPARTMENT_TEAM_LIMIT} registered teams from each department are allowed.`);
-        return;
-      }
-
-      const registeredAt = Date.now();
-
-      const sportName = selectedSport?.sportName || selectedSport?.name;
-
-      const teamData: Omit<TeamSyncPayload, "id"> = {
-        name: cleanDepartment,
-        teamName: cleanDepartment,
-        department: cleanDepartment,
+      const payload: TeamRegistrationWritePayload = {
         sportId,
-        sportName: sportName || "",
-        sport: sportName || "",
-        members: cleanMembers,
-        playerRegisteredAt: cleanMembers.map(() => registeredAt),
-        coachCaptain: captainName.trim(),
-        contactNumber: cleanPhone,
-        captainName: captainName.trim(),
+        sportName,
+        category,
+        department: cleanDepartment,
+        teamName: cleanTeamName,
+        teamLogo,
+        captainName: cleanCaptainName,
         captainRegNo: cleanCaptainRegNo,
-        email: email.trim(),
-        phone: cleanPhone,
-        status: "pending",
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        points: 0,
-        registeredAt,
-        source: "public-registration",
+        captainEmail: cleanCaptainEmail,
+        captainPhone: cleanCaptainPhone,
+        members: cleanMembers,
       };
 
-      const session = getStoredSession();
-      if (!session) {
-        setStatus("error");
-        setMessage("Please login again before registering a team.");
-        return;
-      }
-
-      const savedTeam = session.role === "admin" || session.role === "supercoordinator"
-        ? await createAdminTeam(teamData)
-        : await createCoordinatorTeam(teamData);
+      await submitTeamRegistration(payload);
 
       setStatus("success");
-      setMessage(`${savedTeam.name || cleanDepartment} has been registered and is pending approval.`);
+      setMessage(`${cleanTeamName} has been registered successfully and is pending approval.`);
       setCaptainName("");
       setCaptainRegNo("");
-      setEmail("");
-      setPhone("");
+      setCaptainEmail("");
+      setCaptainPhone("");
       setDepartment("");
-      setSportId("");
+      setTeamName("");
       setMembers([]);
+      setTeamLogo("");
+      setTeamLogoFile(null);
     } catch (error) {
-      console.error("Team registration failed:", error);
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Registration failed. Please try again.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-white px-4 py-10 text-slate-950">
-      <div className="mx-auto max-w-4xl">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-950">
+    <div className="min-h-screen bg-white px-4 py-6 text-slate-950 sm:px-4 sm:py-10">
+      <div className="mx-auto w-full max-w-4xl">
+        <Link href="/" className="mb-6 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-950 sm:mb-8">
           <ArrowLeft size={16} />
           Back to Home
         </Link>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
-          <div className="mb-8 flex flex-col gap-3 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 md:p-10">
+          <div className="mb-6 flex flex-col gap-3 border-b border-slate-200 pb-5 sm:mb-8 sm:pb-6 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
                 <Users size={24} />
               </div>
-              <h1 className="sport-heading text-3xl font-black tracking-tight text-slate-950">Team Registration</h1>
+              <h1 className="sport-heading text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Team Registration</h1>
               <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500">
-                Use this form to enter the department, sport, captain contact, and player names for MSU Invicta. Only the first two teams from each department are accepted.
+                Register your team with sport, category, captain details, and player information.
               </p>
             </div>
-            {teamName && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Team Name</p>
-                <p className="font-black uppercase text-slate-950">{teamName}</p>
-              </div>
-            )}
           </div>
 
           {message && (
@@ -260,62 +292,102 @@ function RegisterPageContent() {
           )}
 
           {registrationOpen ? (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Name *">
-                  <input value={captainName} onChange={(event) => setCaptainName(event.target.value)} required className="input-light" placeholder="Captain or representative name" />
-                </Field>
-                <Field label="Captain Registration No. *">
-                  <input value={captainRegNo} onChange={(event) => setCaptainRegNo(normalizeRegNo(event.target.value))} required className="input-light uppercase" placeholder="UNIV2026001" />
-                </Field>
-                <Field label="Email *">
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="input-light" placeholder="name@university.edu" />
-                </Field>
-                <Field label="Phone *">
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="\d{10}"
-                    maxLength={10}
-                    value={phone}
-                    onChange={(event) => setPhone(normalizePhone(event.target.value))}
-                    required
-                    className="input-light"
-                    placeholder="10 digit phone number"
-                  />
-                </Field>
+            <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
+              <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
                 <Field label="Department *">
-                  <input value={department} onChange={(event) => setDepartment(event.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
+                  <input value={department} onChange={(e) => setDepartment(e.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
+                </Field>
+                <Field label="Team Name *">
+                  <input value={teamName} onChange={(e) => setTeamName(e.target.value)} required className="input-light" placeholder="e.g. CSE Warriors" />
                 </Field>
                 <Field label="Sport *">
-                  <select value={sportId} onChange={(event) => { setSportId(event.target.value); setMembers([]); }} className="input-light">
+                  <select value={sportId} onChange={(e) => { setSportId(e.target.value); setMembers([]); }} className="input-light" required>
                     {sportOptions.map((item) => (
                       <option key={item._id} value={item._id}>{item.sportName || item.name}</option>
                     ))}
                   </select>
                 </Field>
+                <Field label="Category *">
+                  <select value={category} onChange={(e) => { setCategory(e.target.value as "Male" | "Female"); setMembers([]); }} className="input-light" required>
+                    {sportCategories.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Captain Name *">
+                  <input value={captainName} onChange={(e) => setCaptainName(e.target.value)} required className="input-light" placeholder="Captain full name" />
+                </Field>
+                <Field label="Captain Registration No. *">
+                  <input value={captainRegNo} onChange={(e) => setCaptainRegNo(normalizeRegNo(e.target.value))} required className="input-light uppercase" placeholder="UNIV2026001" />
+                </Field>
+                <Field label="Captain Email *">
+                  <input type="email" value={captainEmail} onChange={(e) => setCaptainEmail(e.target.value)} required className="input-light" placeholder="name@university.edu" />
+                </Field>
+                <Field label="Captain Phone *">
+                  <input type="tel" inputMode="numeric" pattern="\d{10}" maxLength={10} value={captainPhone} onChange={(e) => setCaptainPhone(normalizePhone(e.target.value))} required className="input-light" placeholder="10 digit phone number" />
+                </Field>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Allowed</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Required</p>
                   <p className="mt-1 text-2xl font-black text-slate-950">{requiredPlayers}-{maxPlayers}</p>
                 </div>
+                <Field label="Team Logo (optional)">
+                  <div className="flex flex-col gap-2">
+                    <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:text-amber-600">
+                      <Upload size={16} />
+                      {teamLogoFile ? teamLogoFile.name : "Upload JPG, PNG, or WebP"}
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        onChange={(e) => handleLogoUpload(e.target.files?.[0] || null)}
+                        className="sr-only"
+                      />
+                    </label>
+                    {teamLogoFile && (
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                        <span className="flex-1 truncate">{teamLogoFile.name}</span>
+                        <button type="button" onClick={() => { setTeamLogoFile(null); setTeamLogo(""); }} className="text-red-500 hover:text-red-700">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </Field>
               </div>
 
               <div>
-                <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Player Names</h2>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Enter player names and registration numbers for the selected sport.</p>
+                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Team Members</h2>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Enter each player&apos;s details.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
                     {maxPlayers} slots
                   </span>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {Array.from({ length: maxPlayers }).map((_, index) => (
-                    <div key={`${sportId}-${index}`} className="grid gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-2">
-                      <input value={members[index]?.fullName || ""} onChange={(event) => updateMember(index, "fullName", event.target.value)} required={index < requiredPlayers} className="input-light" placeholder={`Player ${index + 1} full name`} />
-                      <input value={members[index]?.registrationNumber || ""} onChange={(event) => updateMember(index, "registrationNumber", event.target.value)} required={index < requiredPlayers} className="input-light uppercase" placeholder="Registration no." />
+                    <div key={`${sportId}-${category}-${index}`} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <input
+                        value={members[index]?.fullName || ""}
+                        onChange={(e) => updateMember(index, "fullName", e.target.value)}
+                        required={index < requiredPlayers}
+                        className="input-light"
+                        placeholder={`Player ${index + 1} full name *`}
+                      />
+                      <input
+                        value={members[index]?.registrationNo || ""}
+                        onChange={(e) => updateMember(index, "registrationNo", e.target.value)}
+                        required={index < requiredPlayers}
+                        className="input-light uppercase"
+                        placeholder="Registration no. *"
+                      />
+                      <input
+                        value={members[index]?.semester || ""}
+                        onChange={(e) => updateMember(index, "semester", e.target.value)}
+                        className="input-light"
+                        placeholder="Semester"
+                      />
                     </div>
                   ))}
                 </div>
@@ -331,8 +403,8 @@ function RegisterPageContent() {
               </button>
             </form>
           ) : (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-slate-700">
-              <h2 className="text-2xl font-black text-slate-900">Registration Closed</h2>
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-slate-700 sm:p-8">
+              <h2 className="text-xl font-black text-slate-900 sm:text-2xl">Registration Closed</h2>
               <p className="mt-4 text-sm leading-relaxed text-slate-600">
                 The registration portal is currently disabled or outside the configured tournament window. Admins must enable the registration portal and ensure the current date falls between the tournament start and end dates.
               </p>
@@ -359,7 +431,7 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <ProtectedRoute allowedRole={["coordinator", "admin"]}>
+    <ProtectedRoute allowedRole={["coordinator", "admin", "supercoordinator"]}>
       <RegisterPageContent />
     </ProtectedRoute>
   );

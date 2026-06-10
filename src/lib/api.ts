@@ -840,3 +840,74 @@ export function deleteAdminSport(id: string) {
     method: "DELETE",
   });
 }
+
+// --- Team Registration API (new system) ---
+
+export interface TeamRegistrationMember {
+  fullName: string;
+  registrationNo: string;
+  department?: string;
+  semester?: string;
+  gender?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface TeamRegistrationPayload {
+  _id: string;
+  sportId: string;
+  sportName: string;
+  category: "Male" | "Female";
+  department: string;
+  teamName: string;
+  teamLogo?: string;
+  captainName: string;
+  captainRegNo: string;
+  captainEmail: string;
+  captainPhone: string;
+  members: TeamRegistrationMember[];
+  status: "pending" | "approved" | "rejected";
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TeamRegistrationWritePayload = Omit<TeamRegistrationPayload, "_id" | "status" | "submittedAt" | "reviewedBy" | "reviewedAt" | "rejectionReason" | "createdAt" | "updatedAt">;
+
+export function submitTeamRegistration(payload: TeamRegistrationWritePayload) {
+  return apiFetch<TeamRegistrationPayload>("/registrations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getTeamPendingRegistrations() {
+  return apiFetch<TeamRegistrationPayload[]>("/registrations/pending");
+}
+
+export function getTeamApprovedRegistrations() {
+  return apiFetch<TeamRegistrationPayload[]>("/registrations/approved");
+}
+
+export function approveTeamRegistration(id: string) {
+  return apiFetch<TeamRegistrationPayload>(`/registrations/${encodeURIComponent(id)}/approve`, {
+    method: "PATCH",
+  });
+}
+
+export function rejectTeamRegistration(id: string, rejectionReason: string) {
+  return apiFetch<TeamRegistrationPayload>(`/registrations/${encodeURIComponent(id)}/reject`, {
+    method: "PATCH",
+    body: JSON.stringify({ rejectionReason }),
+  });
+}
+
+export function getExportApprovedRegistrationsUrl() {
+  const session = getStoredSession();
+  const params = new URLSearchParams();
+  const url = `${API_BASE_URL}/registrations/export-excel?${params.toString()}`;
+  return url;
+}

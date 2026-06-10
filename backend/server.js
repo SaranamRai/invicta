@@ -14,6 +14,7 @@ import publicRoutes from "./routes/publicRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
+import registrationRoutes from "./routes/registrationRoutes.js";
 import Sport from "./models/Sport.js";
 import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
@@ -182,6 +183,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
+app.use("/api/registrations", registrationRoutes);
 
 app.use((error, _req, res, next) => {
   void next;

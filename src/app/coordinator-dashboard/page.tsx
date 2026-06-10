@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -22,6 +22,8 @@ import {
   getCoordinatorPointsTable,
   getCoordinatorTeams,
   getCoordinatorVolunteers,
+  getTeamApprovedRegistrations,
+  TeamRegistrationPayload,
 } from "@/lib/api";
 import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
 
@@ -506,6 +508,14 @@ function CoordinatorDashboardContent() {
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-5">
+            <h2 className="sport-heading text-xl font-black">Approved Team Registrations</h2>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Approved teams across all sports visible to your role.</p>
+          </div>
+          <ApprovedTeamsView assignedSport={assignedSport} />
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent">
               <BookOpen size={21} />
@@ -714,6 +724,72 @@ function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label
         </div>
       </div>
     </Card>
+  );
+}
+
+function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const data = await getTeamApprovedRegistrations();
+        if (!mounted) return;
+        const filtered = assignedSport
+          ? data.filter((r) => r.sportId === assignedSport || r.sportName.toLowerCase().replace(/\s+/g, "-") === assignedSport)
+          : data;
+        setRegistrations(filtered);
+      } catch {
+        if (mounted) setRegistrations([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => { mounted = false; };
+  }, [assignedSport]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div>;
+  }
+
+  if (registrations.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border p-6 text-center">
+        <CheckCircle size={32} className="mx-auto text-muted-foreground/40" />
+        <p className="mt-3 text-sm font-semibold text-muted-foreground">No approved registrations found for your assigned sport.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 max-h-80 overflow-y-auto">
+      {registrations.map((reg) => (
+        <div key={reg._id} className="rounded-xl border border-border bg-secondary/30 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-black text-foreground">{reg.teamName}</h4>
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
+          </div>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">{reg.department} &middot; Captain: {reg.captainName}</p>
+          {reg.members && reg.members.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {reg.members.slice(0, 5).map((m, i) => (
+                <span key={i} className="rounded-md bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{m.fullName}</span>
+              ))}
+              {reg.members.length > 5 && (
+                <span className="rounded-md bg-background px-2 py-0.5 text-[9px] font-bold text-muted-foreground">+{reg.members.length - 5}</span>
+              )}
+            </div>
+          )}
+          {reg.teamLogo && (
+            <img src={reg.teamLogo} alt="" className="mt-2 h-10 w-10 rounded-lg object-cover" />
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
