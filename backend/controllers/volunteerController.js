@@ -71,6 +71,34 @@ export async function assignedMatches(req, res) {
   return res.json(fixtures);
 }
 
+function mapVolunteerTeam(team) {
+  return {
+    id: team._id ? team._id.toString() : team.id || "",
+    name: team.teamName || team.name || "",
+    department: team.department || "",
+    sport: team.sport || "",
+    sportName: team.sportName || "",
+    sportId: team.sportId ? team.sportId.toString() : "",
+    category: team.category || "Male",
+    members: (team.members || []).map((m) => {
+      if (typeof m === "string") return m;
+      if (m && typeof m === "object") {
+        return m.fullName || m.name || m.registrationNo || m.registrationNumber || "";
+      }
+      return "";
+    }),
+    coachCaptain: team.captainName || team.coachCaptain || "",
+    captainRegNo: team.captainRegNo || "",
+    captainEmail: team.captainEmail || "",
+    captainPhone: team.captainPhone || "",
+    contactNumber: team.captainPhone || team.contactNumber || "",
+    logo: team.logo || "",
+    status: team.status || "approved",
+    registeredAt: team.registeredAt || (team.submittedAt ? new Date(team.submittedAt).getTime() : Date.now()),
+    playerRegisteredAt: team.playerRegisteredAt || [],
+  };
+}
+
 export async function volunteerTeams(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
   const assignedSportId = req.user.assignedSportId;
@@ -98,30 +126,32 @@ export async function volunteerTeams(req, res) {
   const allTeams = [];
 
   for (const t of registrationTeams) {
-    const key = `${t.teamName}|${t.department}|${t.category}`;
+    const key = `${t.teamName}|${String(t.department || "")}|${t.category || "Male"}`;
     if (!seen.has(key)) {
       seen.add(key);
-      allTeams.push({
-        _id: t._id,
-        teamName: t.teamName,
-        department: t.department,
-        sport: assignedSport,
-        sportName: t.sportName,
-        sportId: t.sportId,
-        category: t.category,
-        captainName: t.captainName,
-        captainRegNo: t.captainRegNo,
-        captainEmail: t.captainEmail,
-        captainPhone: t.captainPhone,
-        contactNumber: t.captainPhone,
-        members: (t.members || []).map((m) => ({
-          fullName: m.fullName || "",
-          registrationNumber: m.registrationNo || "",
-          department: m.department || "",
-        })),
-        status: t.status,
-        registeredAt: t.submittedAt ? new Date(t.submittedAt).getTime() : Date.now(),
-      });
+      allTeams.push(
+        mapVolunteerTeam({
+          _id: t._id,
+          teamName: t.teamName,
+          department: t.department,
+          sport: assignedSport,
+          sportName: t.sportName,
+          sportId: t.sportId,
+          category: t.category,
+          captainName: t.captainName,
+          captainRegNo: t.captainRegNo,
+          captainEmail: t.captainEmail,
+          captainPhone: t.captainPhone,
+          contactNumber: t.captainPhone,
+          members: (t.members || []).map((m) => ({
+            fullName: m.fullName || "",
+            registrationNumber: m.registrationNo || "",
+            department: m.department || "",
+          })),
+          status: t.status,
+          submittedAt: t.submittedAt,
+        })
+      );
     }
   }
 
@@ -129,7 +159,7 @@ export async function volunteerTeams(req, res) {
     const key = `${t.teamName || ""}|${t.department || ""}|${t.category || "Male"}`;
     if (!seen.has(key)) {
       seen.add(key);
-      allTeams.push(t);
+      allTeams.push(mapVolunteerTeam(t));
     }
   }
 
