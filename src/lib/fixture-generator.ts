@@ -3,6 +3,7 @@ export interface Team {
   name: string;
   sport: string;
   sportName?: string;
+  category?: string;
   members: string[];
   department?: string;
   coachCaptain?: string;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Shield, ShieldOff, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -296,10 +296,13 @@ function CoordinatorDashboardContent() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <StatCard icon={Trophy} label="Assigned Teams" value={assignedTeams.length} />
-          <StatCard icon={UsersRound} label="Players Listed" value={totalPlayers} />
-          <StatCard icon={UsersRound} label="Sport Volunteers" value={volunteers.length} />
+        <section className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard icon={Trophy} label="Teams" value={assignedTeams.length} />
+          <StatCard icon={UsersRound} label="Players" value={totalPlayers} />
+          <StatCard icon={UsersRound} label="Volunteers" value={volunteers.length} />
+          <StatCard icon={Shield} label="Male Teams" value={assignedTeams.filter((t) => (t.category || "Male") === "Male").length} color="blue" />
+          <StatCard icon={ShieldOff} label="Female Teams" value={assignedTeams.filter((t) => (t.category || "Male") === "Female").length} color="pink" />
+          <StatCard icon={UsersRound} label="Total Members" value={totalPlayers} />
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -475,25 +478,65 @@ function CoordinatorDashboardContent() {
               <h2 className="sport-heading text-xl font-black">Assigned Teams</h2>
               <p className="mt-1 text-sm font-medium text-muted-foreground">Teams matching your assigned department or sport appear here.</p>
             </div>
-            <div className="divide-y divide-border">
-              {assignedTeams.length > 0 ? assignedTeams.map((team) => (
-                <div key={team.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-base font-black uppercase tracking-wide text-foreground">{team.name}</p>
-                      <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                      {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
-                    </p>
+            {assignedTeams.length > 0 ? (
+              <div className="p-5 space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-2">
+                    <Shield size={14} />
+                    <span className="text-xs font-black uppercase tracking-widest">Male Teams ({assignedTeams.filter((t) => (t.category || "Male") === "Male").length})</span>
                   </div>
-                  <span className="w-fit rounded-xl bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    {team.members?.length || 0} players
-                  </span>
+                  {assignedTeams.filter((t) => (t.category || "Male") === "Male").length > 0 ? (
+                    <div className="space-y-2">
+                      {assignedTeams.filter((t) => (t.category || "Male") === "Male").map((team) => (
+                        <div key={team.id} className="flex flex-col gap-2 rounded-xl border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-wide text-foreground">{team.name}</p>
+                            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
+                            </p>
+                          </div>
+                          <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                            {team.members?.length || 0} players
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold text-muted-foreground italic py-2">No Male teams assigned yet.</p>
+                  )}
                 </div>
-              )) : (
-                <div className="p-10 text-center">
-                  <p className="text-sm font-semibold text-muted-foreground">No teams found for your assignment yet.</p>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-pink-400 border-b border-white/10 pb-2">
+                    <ShieldOff size={14} />
+                    <span className="text-xs font-black uppercase tracking-widest">Female Teams ({assignedTeams.filter((t) => (t.category || "Male") === "Female").length})</span>
+                  </div>
+                  {assignedTeams.filter((t) => (t.category || "Male") === "Female").length > 0 ? (
+                    <div className="space-y-2">
+                      {assignedTeams.filter((t) => (t.category || "Male") === "Female").map((team) => (
+                        <div key={team.id} className="flex flex-col gap-2 rounded-xl border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-wide text-foreground">{team.name}</p>
+                            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
+                            </p>
+                          </div>
+                          <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                            {team.members?.length || 0} players
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold text-muted-foreground italic py-2">No Female teams assigned yet.</p>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="p-10 text-center">
+                <p className="text-sm font-semibold text-muted-foreground">No teams found for your assignment yet.</p>
+              </div>
+            )}
           </Card>
 
           <Card className="p-5">
@@ -711,16 +754,17 @@ function CoordinatorDashboardContent() {
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
+function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number; color?: string }) {
+  const bgClass = color === "blue" ? "bg-blue-500/15 text-blue-400" : color === "pink" ? "bg-pink-500/15 text-pink-400" : "bg-accent/15 text-accent";
   return (
-    <Card className="p-5">
-      <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-accent">
-          <Icon size={22} />
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <div className={"flex h-10 w-10 items-center justify-center rounded-xl shrink-0 " + bgClass}>
+          <Icon size={18} />
         </div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
-          <p className="text-3xl font-black text-foreground">{value}</p>
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+          <p className="text-xl font-black text-foreground">{value}</p>
         </div>
       </div>
     </Card>
@@ -764,31 +808,59 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
     );
   }
 
-  return (
-    <div className="space-y-3 max-h-80 overflow-y-auto">
-      {registrations.map((reg) => (
-        <div key={reg._id} className="rounded-xl border border-border bg-secondary/30 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-black text-foreground">{reg.teamName}</h4>
-            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
-          </div>
-          <p className="mt-1 text-xs font-semibold text-muted-foreground">{reg.department} &middot; Captain: {reg.captainName}</p>
-          {reg.members && reg.members.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {reg.members.slice(0, 5).map((m, i) => (
-                <span key={i} className="rounded-md bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{m.fullName}</span>
-              ))}
-              {reg.members.length > 5 && (
-                <span className="rounded-md bg-background px-2 py-0.5 text-[9px] font-bold text-muted-foreground">+{reg.members.length - 5}</span>
-              )}
-            </div>
-          )}
-          {reg.teamLogo && (
-            <img src={reg.teamLogo} alt="" className="mt-2 h-10 w-10 rounded-lg object-cover" />
-          )}
+  const maleRegs = registrations.filter((r) => r.category === "Male");
+  const femaleRegs = registrations.filter((r) => r.category === "Female");
+
+  function RegCard({ reg }: { reg: TeamRegistrationPayload }) {
+    return (
+      <div className="rounded-xl border border-border bg-secondary/30 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="text-sm font-black text-foreground">{reg.teamName}</h4>
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
         </div>
-      ))}
+        <p className="mt-1 text-xs font-semibold text-muted-foreground">{reg.department} &middot; Captain: {reg.captainName}</p>
+        {reg.members && reg.members.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {reg.members.slice(0, 5).map((m, i) => (
+              <span key={i} className="rounded-md bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{m.fullName}</span>
+            ))}
+            {reg.members.length > 5 && (
+              <span className="rounded-md bg-background px-2 py-0.5 text-[9px] font-bold text-muted-foreground">+{reg.members.length - 5}</span>
+            )}
+          </div>
+        )}
+        {reg.teamLogo && (
+          <img src={reg.teamLogo} alt="" className="mt-2 h-10 w-10 rounded-lg object-cover" />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 max-h-96 overflow-y-auto">
+      {maleRegs.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-1.5">
+            <Shield size={14} />
+            <span className="text-xs font-black uppercase tracking-widest">Male ({maleRegs.length})</span>
+          </div>
+          <div className="space-y-2">
+            {maleRegs.map((reg) => <RegCard key={reg._id} reg={reg} />)}
+          </div>
+        </div>
+      )}
+      {femaleRegs.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-pink-400 border-b border-white/10 pb-1.5">
+            <ShieldOff size={14} />
+            <span className="text-xs font-black uppercase tracking-widest">Female ({femaleRegs.length})</span>
+          </div>
+          <div className="space-y-2">
+            {femaleRegs.map((reg) => <RegCard key={reg._id} reg={reg} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

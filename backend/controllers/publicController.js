@@ -9,6 +9,7 @@ import PointsTable from "../models/PointsTable.js";
 import Gallery from "../models/Gallery.js";
 import Tournament from "../models/Tournament.js";
 import Team from "../models/Team.js";
+import TeamRegistration from "../models/TeamRegistration.js";
 import mongoose from "mongoose";
 import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
 
@@ -314,6 +315,122 @@ export async function registerPublicTeam(req, res) {
     });
   } catch (error) {
     console.error("Public team registration failed:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+function extractMemberName(member) {
+  if (typeof member === "string") return member;
+  return member?.fullName || member?.name || "";
+}
+
+function extractMemberRegNo(member) {
+  if (typeof member === "string") return "";
+  return member?.registrationNumber || member?.regNo || member?.registrationNo || "";
+}
+
+export async function getSportDetailView(req, res) {
+  try {
+    const { sportId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(sportId)) {
+      return res.status(400).json({ message: "Invalid sport ID" });
+    }
+
+    const sport = await Sport.findById(sportId).lean();
+    if (!sport || sport.status !== "active") {
+      return res.status(404).json({ message: "Sport not found" });
+    }
+
+    // Collect approved teams from both models
+    const teamModelTeams = await Team.find({ sportId, status: "approved" }).lean();
+    const registrationTeams = await TeamRegistration.find({ sportId, status: "approved" }).lean();
+
+    // Deduplicate by teamName+department+category, prefer TeamRegistration
+    const seen = new Set();
+    const allTeams = [];
+
+    for (const t of registrationTeams) {
+      const key = `${t.teamName}|${t.department}|${t.category}`;
+      seen.add(key);
+      allTeams.push(t);
+    }
+
+    for (const t of teamModelTeams) {
+      const key = `${t.teamName || ""}|${t.department || ""}|${t.category || "Male"}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allTeams.push(t);
+      }
+    }
+
+    const maleTeams = allTeams.filter((t) => (t.category || "Male") === "Male");
+    const femaleTeams = allTeams.filter((t) => (t.category || "Male") === "Female");
+
+    function buildMemberList(teams, category) {
+      return teams.flatMap((team) =>
+        (team.members || []).map((m) => ({
+          fullName: extractMemberName(m),
+          registrationNo: extractMemberRegNo(m),
+          department: team.department || "",
+          teamName: team.teamName || "",
+          category,
+        }))
+      );
+    }
+
+    const maleMembers = buildMemberList(maleTeams, "Male");
+    const femaleMembers = buildMemberList(femaleTeams, "Female");
+
+    const fixtures = await Fixture.find({ sportId }).lean();
+    const maleFixtures = fixtures.filter((f) => (f.category || "Male") === "Male");
+    const femaleFixtures = fixtures.filter((f) => (f.category || "Male") === "Female");
+
+    function mapTeam(t) {
+      return {
+        _id: t._id,
+        teamName: t.teamName || "",
+        department: t.department || "",
+        category: t.category || "Male",
+        captainName: t.captainName || "",
+        membersCount: (t.members || []).length,
+        status: t.status || "approved",
+      };
+    }
+
+    return res.json({
+      sport: {
+        _id: sport._id,
+        sportName: sport.sportName || sport.name,
+        name: sport.name,
+        type: sport.type,
+        categories: sport.categories,
+        minPlayers: sport.minPlayers,
+        maxPlayers: sport.maxPlayers,
+      },
+      stats: {
+        totalTeams: allTeams.length,
+        totalMembers: maleMembers.length + femaleMembers.length,
+        maleTeams: maleTeams.length,
+        femaleTeams: femaleTeams.length,
+        maleMembers: maleMembers.length,
+        femaleMembers: femaleMembers.length,
+      },
+      teams: {
+        male: maleTeams.map(mapTeam),
+        female: femaleTeams.map(mapTeam),
+      },
+      members: {
+        male: maleMembers,
+        female: femaleMembers,
+      },
+      fixtures: {
+        male: maleFixtures,
+        female: femaleFixtures,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching sport detail:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

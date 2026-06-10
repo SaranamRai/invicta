@@ -1,5 +1,6 @@
 import Fixture from "../models/Fixture.js";
 import Team from "../models/Team.js";
+import TeamRegistration from "../models/TeamRegistration.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Gallery from "../models/Gallery.js";
@@ -72,15 +73,67 @@ export async function assignedMatches(req, res) {
 
 export async function volunteerTeams(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  const sportQuery = req.user.assignedSportId && assignedSport
-    ? { $or: [{ sportId: req.user.assignedSportId }, { sport: assignedSport }] }
-    : req.user.assignedSportId
-      ? { sportId: req.user.assignedSportId }
+  const assignedSportId = req.user.assignedSportId;
+
+  const teamQuery = assignedSportId && assignedSport
+    ? { $or: [{ sportId: assignedSportId }, { sport: assignedSport }], status: "approved" }
+    : assignedSportId
+      ? { sportId: assignedSportId, status: "approved" }
       : assignedSport
-        ? { sport: assignedSport }
-        : {};
-  const teams = await Team.find(sportQuery).sort({ sport: 1, teamName: 1 }).lean();
-  return res.json(teams);
+        ? { sport: assignedSport, status: "approved" }
+        : { status: "approved" };
+
+  const regQuery = assignedSportId
+    ? { sportId: assignedSportId, status: "approved" }
+    : assignedSport
+      ? { sportName: { $regex: new RegExp(`^${assignedSport.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }, status: "approved" }
+      : { status: "approved" };
+
+  const [teamTeams, registrationTeams] = await Promise.all([
+    Team.find(teamQuery).sort({ teamName: 1 }).lean(),
+    TeamRegistration.find(regQuery).sort({ teamName: 1 }).lean(),
+  ]);
+
+  const seen = new Set();
+  const allTeams = [];
+
+  for (const t of registrationTeams) {
+    const key = `${t.teamName}|${t.department}|${t.category}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      allTeams.push({
+        _id: t._id,
+        teamName: t.teamName,
+        department: t.department,
+        sport: assignedSport,
+        sportName: t.sportName,
+        sportId: t.sportId,
+        category: t.category,
+        captainName: t.captainName,
+        captainRegNo: t.captainRegNo,
+        captainEmail: t.captainEmail,
+        captainPhone: t.captainPhone,
+        contactNumber: t.captainPhone,
+        members: (t.members || []).map((m) => ({
+          fullName: m.fullName || "",
+          registrationNumber: m.registrationNo || "",
+          department: m.department || "",
+        })),
+        status: t.status,
+        registeredAt: t.submittedAt ? new Date(t.submittedAt).getTime() : Date.now(),
+      });
+    }
+  }
+
+  for (const t of teamTeams) {
+    const key = `${t.teamName || ""}|${t.department || ""}|${t.category || "Male"}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      allTeams.push(t);
+    }
+  }
+
+  return res.json(allTeams);
 }
 
 export async function updateLiveScore(req, res) {

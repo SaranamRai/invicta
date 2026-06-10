@@ -6,7 +6,7 @@ import {
   Users, Trophy, Calendar, Activity,
   Bell, Play, CheckCircle, Clock, Plus, Zap,
   ArrowRight, Sparkles, BarChart2, ShieldAlert,
-  MapPin, Radio, Timer
+  MapPin, Radio, Timer, Shield, ShieldOff
 } from "lucide-react";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -226,11 +226,13 @@ export function AdminOverview({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
-          { label: "Total Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
-          { label: "Total Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
-          { label: "Total Sports", val: totalSports, icon: Activity, color: "text-sky-600 border-sky-200 bg-sky-50" },
+          { label: "Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
+          { label: "Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
+          { label: "Sports", val: totalSports, icon: Activity, color: "text-sky-600 border-sky-200 bg-sky-50" },
+          { label: "Male Teams", val: teams.filter(t => (t.category || "Male") === "Male").length, icon: Shield, color: "text-blue-600 border-blue-200 bg-blue-50" },
+          { label: "Female Teams", val: teams.filter(t => (t.category || "Male") === "Female").length, icon: ShieldOff, color: "text-pink-600 border-pink-200 bg-pink-50" },
           { label: "Upcoming", val: upcomingMatches.length, icon: Clock, color: "text-blue-600 border-blue-200 bg-blue-50" },
           { label: "Ongoing", val: ongoingMatches.length, icon: Play, color: "text-rose-600 border-rose-200 bg-rose-50" },
           { label: "Completed", val: completedMatches.length, icon: CheckCircle, color: "text-green-600 border-green-200 bg-green-50" }
@@ -238,13 +240,13 @@ export function AdminOverview({
           const Icon = stat.icon;
           return (
             <Card key={idx} className="bg-card border-border shadow-sm hover:border-slate-300 transition-all">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
-                <div className={`p-2.5 rounded-xl border w-fit ${stat.color}`}>
-                  <Icon size={20} />
+              <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
+                <div className={`p-1.5 sm:p-2.5 rounded-xl border w-fit ${stat.color}`}>
+                  <Icon size={16} className="sm:size-[20px]" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">{stat.label}</span>
-                  <span className="text-3xl font-black text-foreground block mt-1 scoreboard-number">{stat.val}</span>
+                <div className="mt-2 sm:mt-4">
+                  <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-muted-foreground block">{stat.label}</span>
+                  <span className="text-xl sm:text-3xl font-black text-foreground block mt-0.5 sm:mt-1 scoreboard-number">{stat.val}</span>
                 </div>
               </CardContent>
             </Card>

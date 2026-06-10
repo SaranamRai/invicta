@@ -1,94 +1,134 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
-import { Users, User, ArrowLeft, Trophy, Loader2 } from "lucide-react";
+import { Users, User, ArrowLeft, Trophy, Loader2, Shield, ShieldOff, Calendar } from "lucide-react";
 import Link from "next/link";
-import { Team } from "@/lib/fixture-generator";
-import { MatchData } from "@/lib/types";
-import { getPublicFixtures, getPublicLiveScores, getPublicSports, getPublicTeams, mapMongoFixture, mapMongoTeam, MongoSport } from "@/lib/api";
+import { getPublicSportDetail, SportDetailResponse } from "@/lib/api";
 
+function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
+          <Icon size={16} />
+        </div>
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TeamCard({ team }: { team: SportDetailResponse["teams"]["male"][number] }) {
+  return (
+    <Card className="p-5 border border-white/10 hover:border-accent/30 transition-all">
+      <div className="flex items-start gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
+          {team.teamName.slice(0, 2)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-black uppercase tracking-wide text-foreground">{team.teamName}</h3>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{team.department || "Department"}</p>
+          <div className="mt-3 flex flex-wrap gap-2 items-center">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+              <Users size={12} /> {team.membersCount} member{team.membersCount === 1 ? "" : "s"}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+              <User size={12} /> {team.captainName || "N/A"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MemberCard({ member }: { member: SportDetailResponse["members"]["male"][number] }) {
+  return (
+    <Card className="p-4 border border-white/5 hover:border-white/20 transition-all">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+          <User size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{member.fullName}</p>
+          <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            {member.registrationNo} &middot; {member.department} &middot; {member.teamName}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function FixtureCard({ fixture }: { fixture: SportDetailResponse["fixtures"]["male"][number] }) {
+  const f = fixture as Record<string, unknown>;
+  return (
+    <Card className="p-5 border border-white/10 hover:border-white/20 transition-all">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-accent/15 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
+              {String(f.status || "upcoming")}
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {String(f.date || "Date TBD")} / {String(f.time || "Time TBD")}
+            </span>
+          </div>
+          <h3 className="text-xl font-black uppercase tracking-wide text-foreground">
+            {String(f.teamA || f.teamAName || "Team A")} <span className="text-accent">VS</span> {String(f.teamB || f.teamBName || "Team B")}
+          </h3>
+          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            {String(f.venue || "Venue TBD")}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function SportDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = React.use(paramsPromise);
-  const [sport, setSport] = useState<MongoSport | null>(null);
+  const [data, setData] = useState<SportDetailResponse | null>(null);
   const [activeTab, setActiveTab] = useState("Teams");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [fixtures, setFixtures] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-    getPublicSports().then((all) => {
-      if (!mounted) return;
-      const found = all.find((s) => s._id === params.id) || null;
-      setSport(found);
+  const fetchDetail = useCallback(async () => {
+    try {
+      const result = await getPublicSportDetail(params.id);
+      setData(result);
+    } catch {
+      setData(null);
+    } finally {
       setLoading(false);
-    });
-    return () => { mounted = false; };
+    }
   }, [params.id]);
 
-  const sportId = sport ? (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-") : "";
-
   useEffect(() => {
-    if (!sport || !sportId) return;
-    let isMounted = true;
-
-    async function loadTeams() {
-      const publicTeams = await getPublicTeams();
-      if (!isMounted) return;
-      const nextTeams = publicTeams
-        .map((team) => mapMongoTeam(team) as Team)
-        .filter((team) => team.sport === sportId);
-
-      setTeams(nextTeams.sort((a, b) => a.name.localeCompare(b.name)));
-    }
-
-    void loadTeams();
-    const interval = window.setInterval(loadTeams, 15000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-    };
-  }, [sport, sportId]);
-
-  useEffect(() => {
-    if (!sport || !sportId) return;
-    let isMounted = true;
-
-    async function loadFixtures() {
-      const [publicFixtures, liveScores] = await Promise.all([getPublicFixtures(), getPublicLiveScores()]);
-      if (!isMounted) return;
-      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-      const nextFixtures = publicFixtures
-        .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
-        .filter((fixture) => fixture.sport === sportId);
-
-      setFixtures(nextFixtures.sort((a, b) => `${a.date || ""}${a.time || ""}`.localeCompare(`${b.date || ""}${b.time || ""}`)));
-    }
-
-    void loadFixtures();
-    const interval = window.setInterval(loadFixtures, 15000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-    };
-  }, [sport, sportId]);
-
+    setLoading(true);
+    fetchDetail();
+    const interval = window.setInterval(fetchDetail, 15000);
+    return () => window.clearInterval(interval);
+  }, [fetchDetail]);
 
   if (loading) return <div className="flex min-h-72 items-center justify-center p-20"><Loader2 className="animate-spin" size={32} /></div>;
-  if (!sport) return <div className="p-20 text-center font-black">Sport Not Found</div>;
+  if (!data) return <div className="p-20 text-center font-black">Sport Not Found</div>;
 
-  const totalMembers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
-  const allMembers = teams.flatMap((team) =>
-    (team.members || []).map((member) => ({
-      member,
-      teamName: team.name,
-      department: team.department || team.name,
-    }))
-  );
+  const { sport, stats, teams, members, fixtures } = data;
+  const sportName = sport.sportName || sport.name || "";
+
+  const hasMaleTeams = teams.male.length > 0;
+  const hasFemaleTeams = teams.female.length > 0;
+  const hasAnyTeams = hasMaleTeams || hasFemaleTeams;
+
+  const hasMaleMembers = members.male.length > 0;
+  const hasFemaleMembers = members.female.length > 0;
+  const hasAnyMembers = hasMaleMembers || hasFemaleMembers;
+
+  const hasMaleFixtures = fixtures.male.length > 0;
+  const hasFemaleFixtures = fixtures.female.length > 0;
+  const hasAnyFixtures = hasMaleFixtures || hasFemaleFixtures;
 
   return (
     <div className="space-y-10">
@@ -99,9 +139,9 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             <ArrowLeft size={24} />
           </Link>
           <div>
-            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sport.sportName || sport.name}</h1>
+            <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary uppercase">{sportName}</h1>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
-              View registered teams, player names, and fixtures for {sport.sportName || sport.name}.
+              View registered teams, player names, and fixtures for {sportName}.
             </p>
           </div>
         </div>
@@ -122,128 +162,215 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
       </header>
 
       {/* Stats Summary */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
-              <Trophy size={20} />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-accent/20 flex items-center justify-center text-accent shrink-0">
+              <Trophy size={18} />
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Registered Teams</p>
-              <p className="text-2xl font-black sport-heading">{teams.length}</p>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Teams</p>
+              <p className="text-xl font-black sport-heading">{stats.totalTeams}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-              <Users size={20} />
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0">
+              <Users size={18} />
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total Members</p>
-              <p className="text-2xl font-black sport-heading">{totalMembers}</p>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Members</p>
+              <p className="text-xl font-black sport-heading">{stats.totalMembers}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+              <Shield size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Teams</p>
+              <p className="text-xl font-black sport-heading">{stats.maleTeams}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
+              <ShieldOff size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Teams</p>
+              <p className="text-xl font-black sport-heading">{stats.femaleTeams}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+              <Users size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Members</p>
+              <p className="text-xl font-black sport-heading">{stats.maleMembers}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
+              <Users size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Members</p>
+              <p className="text-xl font-black sport-heading">{stats.femaleMembers}</p>
             </div>
           </div>
         </Card>
       </div>
-
 
       {/* Main Content */}
       {activeTab === "Teams" ? (
-        teams.length > 0 ? (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {teams.map((team) => (
-              <Card key={team.id} className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
-                    {team.name.slice(0, 2)}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-black uppercase tracking-wide text-foreground">{team.name}</h3>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      {team.department || "Department"}
-                    </p>
-                    <p className="mt-3 text-xs font-bold text-muted-foreground">
-                      {team.members?.length || 0} registered member{team.members?.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
-        )
-      ) : activeTab === "Members" ? (
-        allMembers.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {allMembers.map((item, index) => (
-              <Card key={`${item.teamName}-${item.member}-${index}`} className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
-                    <User size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{item.member}</p>
-                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      {item.department} / {item.teamName}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
-        )
-      ) : fixtures.length > 0 ? (
-        <div className="space-y-4">
-          {fixtures.map((fixture) => (
-            <Card key={fixture.id} className="p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-accent/15 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
-                      {fixture.status}
-                    </span>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      {fixture.date || "Date TBD"} / {fixture.time || "Time TBD"}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-black uppercase tracking-wide text-foreground">
-                    {fixture.teamA} <span className="text-accent">VS</span> {fixture.teamB}
-                  </h3>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    {fixture.venue || "Venue TBD"}
-                  </p>
-                </div>
-                <Link
-                  href="/matches"
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-secondary px-5 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
-                >
-                  View All Matches
-                </Link>
+        <div className="space-y-10">
+          {!hasAnyTeams ? (
+            <div className="min-h-[300px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-16">
+              <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
+                <Users size={40} className="text-slate-500" />
               </div>
-            </Card>
-          ))}
+              <h3 className="text-2xl font-black sport-heading text-foreground uppercase">No Teams Registered</h3>
+              <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
+                Registered {sportName} teams will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Male Teams */}
+              <CategorySection label="Male Teams" icon={Shield}>
+                {hasMaleTeams ? (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {teams.male.map((team) => (
+                      <TeamCard key={team._id} team={team} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Male teams registered yet.
+                  </p>
+                )}
+              </CategorySection>
+
+              {/* Female Teams */}
+              <CategorySection label="Female Teams" icon={ShieldOff}>
+                {hasFemaleTeams ? (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {teams.female.map((team) => (
+                      <TeamCard key={team._id} team={team} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Female teams registered yet.
+                  </p>
+                )}
+              </CategorySection>
+            </>
+          )}
+        </div>
+      ) : activeTab === "Members" ? (
+        <div className="space-y-10">
+          {!hasAnyMembers ? (
+            <div className="min-h-[300px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-16">
+              <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
+                <User size={40} className="text-slate-500" />
+              </div>
+              <h3 className="text-2xl font-black sport-heading text-foreground uppercase">No Members Registered</h3>
+              <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
+                Registered {sportName} members will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Male Members */}
+              <CategorySection label="Male Members" icon={Shield}>
+                {hasMaleMembers ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {members.male.map((member, i) => (
+                      <MemberCard key={`male-${member.registrationNo || member.fullName}-${i}`} member={member} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Male members registered yet.
+                  </p>
+                )}
+              </CategorySection>
+
+              {/* Female Members */}
+              <CategorySection label="Female Members" icon={ShieldOff}>
+                {hasFemaleMembers ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {members.female.map((member, i) => (
+                      <MemberCard key={`female-${member.registrationNo || member.fullName}-${i}`} member={member} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Female members registered yet.
+                  </p>
+                )}
+              </CategorySection>
+            </>
+          )}
         </div>
       ) : (
-        <EmptyState activeTab={activeTab} sportName={sport.sportName || sport.name || ""} />
-      )}
-    </div>
-  );
-}
+        <div className="space-y-10">
+          {!hasAnyFixtures ? (
+            <div className="min-h-[300px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-16">
+              <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
+                <Calendar size={40} className="text-slate-500" />
+              </div>
+              <h3 className="text-2xl font-black sport-heading text-foreground uppercase">No Fixtures Scheduled</h3>
+              <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
+                {sportName} fixtures will appear here once scheduled.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Male Fixtures */}
+              <CategorySection label="Male Fixtures" icon={Shield}>
+                {hasMaleFixtures ? (
+                  <div className="space-y-3">
+                    {fixtures.male.map((fixture) => (
+                      <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Male fixtures scheduled yet.
+                  </p>
+                )}
+              </CategorySection>
 
-function EmptyState({ activeTab, sportName }: { activeTab: string; sportName: string }) {
-  return (
-    <div className="min-h-[400px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-20">
-      <div className="h-24 w-24 rounded-full bg-secondary flex items-center justify-center mb-8">
-        {activeTab === "Teams" ? <Users size={48} className="text-slate-500" /> : <User size={48} className="text-slate-500" />}
-      </div>
-      <h3 className="text-3xl font-black sport-heading text-foreground uppercase">No {activeTab} Registered</h3>
-      <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
-        Registered {sportName} {activeTab.toLowerCase()} will appear here automatically.
-      </p>
+              {/* Female Fixtures */}
+              <CategorySection label="Female Fixtures" icon={ShieldOff}>
+                {hasFemaleFixtures ? (
+                  <div className="space-y-3">
+                    {fixtures.female.map((fixture) => (
+                      <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
+                    No Female fixtures scheduled yet.
+                  </p>
+                )}
+              </CategorySection>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -325,9 +325,13 @@ export interface MongoTeam {
   sportName?: string;
   sportId?: MongoRefName | string;
   captainName?: string;
+  captainRegNo?: string;
+  captainEmail?: string;
+  captainPhone?: string;
   email?: string;
   contactNumber?: string;
-  members?: string[];
+  category?: string;
+  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string }[];
   wins?: number;
   losses?: number;
   draws?: number;
@@ -348,6 +352,48 @@ export interface MongoSport {
   minPlayers?: number;
   maxPlayers?: number;
   status?: "active" | "inactive";
+}
+
+export interface SportDetailTeam {
+  _id: string;
+  teamName: string;
+  department: string;
+  category: string;
+  captainName: string;
+  membersCount: number;
+  status: string;
+}
+
+export interface SportDetailMember {
+  fullName: string;
+  registrationNo: string;
+  department: string;
+  teamName: string;
+  category: string;
+}
+
+export interface SportDetailResponse {
+  sport: MongoSport;
+  stats: {
+    totalTeams: number;
+    totalMembers: number;
+    maleTeams: number;
+    femaleTeams: number;
+    maleMembers: number;
+    femaleMembers: number;
+  };
+  teams: {
+    male: SportDetailTeam[];
+    female: SportDetailTeam[];
+  };
+  members: {
+    male: SportDetailMember[];
+    female: SportDetailMember[];
+  };
+  fixtures: {
+    male: unknown[];
+    female: unknown[];
+  };
 }
 
 export interface MongoAnnouncement {
@@ -395,8 +441,12 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     department: team.department,
     sport,
     sportName: team.sportName || getRefName(team.sportId, ""),
+    category: team.category,
     members: (team.members || []).map(getMemberName).filter(Boolean),
     coachCaptain: team.captainName || "",
+    captainRegNo: team.captainRegNo || "",
+    captainEmail: team.captainEmail || "",
+    captainPhone: team.captainPhone || "",
     contactNumber: team.contactNumber || "",
     email: team.email || "",
     status: team.status,
@@ -510,6 +560,11 @@ export function getVolunteerTeams() {
 export function getPublicSports() {
   return publicApiFetch<MongoSport>("/public/sports");
 }
+
+export function getPublicSportDetail(sportId: string) {
+  return apiFetch<SportDetailResponse>(`/public/sports/${encodeURIComponent(sportId)}/detail`);
+}
+
 export function getPublicTournaments() {
   return publicApiFetch<TournamentPayload>("/public/tournaments");
 }

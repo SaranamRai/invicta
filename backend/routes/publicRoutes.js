@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listPublic, registerPublicTeam } from "../controllers/publicController.js";
+import { listPublic, registerPublicTeam, getSportDetailView } from "../controllers/publicController.js";
 
 const router = Router();
 
@@ -15,5 +15,6 @@ router.get("/gallery", listPublic("gallery"));
 router.get("/tournaments", listPublic("tournaments"));
 router.get("/teams", listPublic("teams"));
 router.post("/teams", registerPublicTeam);
+router.get("/sports/:sportId/detail", getSportDetailView);
 
 export default router;
