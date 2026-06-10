@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+img, picture, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #020617;
@@ -121,6 +137,29 @@ a {
   .sport-heading {
     word-break: normal;
     overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-compact .nav-link {
+    font-size: 9px !important;
+    padding: 6px 10px !important;
+    gap: 4px !important;
+  }
+
+  .nav-compact .nav-link svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .dashboard-logo {
+    width: 120px !important;
+    height: 44px !important;
+  }
+
+  .dashboard-logo-sm {
+    width: 100px !important;
+    height: 36px !important;
   }
 }
 

@@ -199,7 +199,7 @@ function RegisterPageContent() {
         return;
       }
 
-      const savedTeam = session.role === "admin"
+      const savedTeam = session.role === "admin" || session.role === "supercoordinator"
         ? await createAdminTeam(teamData)
         : await createCoordinatorTeam(teamData);
 
@@ -359,7 +359,7 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <ProtectedRoute allowedRole="coordinator">
+    <ProtectedRoute allowedRole={["coordinator", "admin"]}>
       <RegisterPageContent />
     </ProtectedRoute>
   );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Calendar, HelpCircle, Images, LayoutDashboard, LogIn, Megaphone, Target, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Home", href: "/" },
@@ -24,26 +25,29 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="sticky top-0 z-40 border-b border-border bg-background/95 px-3 py-3 text-foreground backdrop-blur-xl lg:hidden">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
+      <aside className="sticky top-0 z-40 border-b border-border bg-background/95 px-2 py-2 text-foreground backdrop-blur-xl lg:hidden">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <Link href="/" className="flex min-w-0 shrink items-center gap-2">
             <img
               src="/msu-logo-flat.png"
               alt="Medhavi Skills University"
-              className="h-9 w-24 object-contain"
+              className="h-7 w-20 max-w-full object-contain sm:h-9 sm:w-24"
             />
-            <span className="sport-heading text-base font-black text-primary">Invicta</span>
+            <span className="sport-heading text-sm font-black text-primary sm:text-base">Invicta</span>
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-3 text-[10px] font-black uppercase tracking-widest text-accent-foreground"
-          >
-            <LogIn size={14} />
-            Login
-          </Link>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-accent px-2.5 text-[9px] font-black uppercase tracking-widest text-accent-foreground sm:h-10 sm:px-3 sm:text-[10px]"
+            >
+              <LogIn size={12} className="sm:size-[14px]" />
+              <span className="hidden sm:inline">Login</span>
+            </Link>
+          </div>
         </div>
 
-        <nav className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+        <nav className="nav-compact no-scrollbar flex flex-nowrap gap-1 overflow-x-auto pb-0.5">
           {menuItems.slice(0, 6).map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -51,13 +55,13 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "inline-flex min-w-fit items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all",
+                  "nav-link inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all sm:gap-2 sm:px-3 sm:py-2 sm:text-[10px]",
                   isActive
                     ? "border-accent bg-accent text-accent-foreground"
                     : "border-border bg-card text-muted-foreground"
                 )}
               >
-                <item.icon size={14} />
+                <item.icon size={12} className="sm:size-[14px]" />
                 {item.label}
               </Link>
             );

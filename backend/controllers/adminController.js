@@ -140,7 +140,15 @@ export async function deleteVenue(req, res) {
 
 export async function listSports(_req, res) {
   const sports = await Sport.find().sort({ sportName: 1, name: 1 }).lean();
-  return res.json(sports);
+  // Deduplicate by normalized sport name to prevent duplicates
+  const seen = new Set();
+  const unique = sports.filter((s) => {
+    const key = String(s.sportName || s.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return res.json(unique);
 }
 
 export async function listPendingRegistrations(_req, res) {

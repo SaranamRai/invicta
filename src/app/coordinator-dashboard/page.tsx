@@ -244,27 +244,27 @@ function CoordinatorDashboardContent() {
   return (
     <div className="dashboard-surface min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-44 items-center overflow-hidden">
-              <img src="/msu-logo-transparent.png" alt="Medhavi Skills University" className="h-auto w-full object-contain" />
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="dashboard-logo flex h-11 w-32 shrink-0 items-center overflow-hidden sm:h-14 sm:w-44">
+              <img src="/msu-logo-transparent.png" alt="Medhavi Skills University" className="h-auto w-full max-w-full object-contain" />
             </div>
-            <div>
-              <h1 className="sport-heading text-2xl font-black">Coordinator Dashboard</h1>
-              <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+            <div className="min-w-0">
+              <h1 className="sport-heading text-lg font-black sm:text-2xl">Coordinator Dashboard</h1>
+              <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
                 Manage your assigned department or sport teams, review fixtures, and prepare team details for admin approval.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <button
               type="button"
               onClick={handleSignOut}
-              className="flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs font-black uppercase tracking-widest text-red-500 transition-all hover:bg-red-500 hover:text-white"
+              className="flex items-center gap-1.5 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 transition-all hover:bg-red-500 hover:text-white sm:gap-2 sm:px-4 sm:py-3 sm:text-xs"
             >
-              <LogOut size={16} />
+              <LogOut size={14} className="sm:size-[16px]" />
               Sign Out
             </button>
           </div>
@@ -435,7 +435,7 @@ function CoordinatorDashboardContent() {
                         </td>
                         <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{fixture.venue || "Venue TBD"}</td>
                         <td className="px-4 py-4">
-                          <div className="flex min-w-[240px] flex-col gap-2 sm:flex-row sm:items-center">
+                          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                             <select
                               value={fixture.assignedVolunteer || ""}
                               onChange={(event) => handleAssignVolunteer(fixture.id, event.target.value)}

@@ -299,11 +299,17 @@ export async function publishRule(req, res) {
 
   requireCoordinatorSport(req, sport);
 
-  let sportDoc = await Sport.findOne({ name: sportName });
+  let sportDoc = await Sport.findOne({
+    $or: [
+      { sportName: new RegExp(`^${sportName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+      { name: new RegExp(`^${sportName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    ],
+  });
   if (!sportDoc) {
     sportDoc = await Sport.create({
+      sportName,
       name: sportName,
-      category: "Inter-Department",
+      categories: ["Male", "Female"],
       status: "active",
     });
   }

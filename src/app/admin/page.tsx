@@ -268,20 +268,20 @@ export default function AdminDashboard() {
     <div className="dashboard-surface min-h-screen bg-background text-foreground pb-12">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex h-16 w-48 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <div className="dashboard-logo flex h-11 w-36 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
               <img
                 src="/msu-logo-transparent.png"
                 alt="Medhavi Skills University"
-                className="h-auto w-full object-contain"
+                className="h-auto w-full max-w-full object-contain"
               />
             </div>
-            <div className="space-y-1">
-              <h1 className="sport-heading text-2xl font-black sm:text-3xl">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h1 className="sport-heading text-lg font-black sm:text-3xl">
                 {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}
               </h1>
-              <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+              <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
                 {canManageSetup
                   ? "Set up tournaments, add sport teams, publish fixtures, and manage sport-level coordinators and volunteers."
                   : "View system role accounts, coordinator hierarchy, volunteers, teams, fixtures, and tournament permissions."}
@@ -289,14 +289,14 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <button
               onClick={handleLogout}
-              className="group relative flex items-center gap-2 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:px-6"
+              className="group relative flex items-center gap-1.5 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:gap-2 sm:px-6 sm:py-3"
             >
-              <LogOut size={18} />
-              <span className="text-xs font-black uppercase tracking-[0.2em]">
+              <LogOut size={16} className="sm:size-[18px]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] sm:text-xs sm:tracking-[0.2em]">
                 Sign Out
               </span>
             </button>
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
 
         {/* Navigation Tabs */}
         <div className="border-t border-border flex">
-          <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
+          <div className="mx-auto flex w-full max-w-7xl gap-0.5 overflow-x-auto px-3 sm:gap-1 sm:px-6">
             {(canManageSetup
               ? [
                   { id: "dashboard" as const, label: "Overview" },
@@ -327,7 +327,7 @@ export default function AdminDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap border-b-2 px-4 py-4 text-xs font-black uppercase tracking-[0.1em] transition-all cursor-pointer sm:px-6 sm:text-sm ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:px-6 sm:py-4 sm:text-sm sm:tracking-[0.1em] ${
                   activeTab === tab.id
                     ? "border-accent text-accent"
                     : "border-transparent text-muted-foreground hover:text-foreground"

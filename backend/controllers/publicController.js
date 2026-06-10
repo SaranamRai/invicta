@@ -62,6 +62,14 @@ export function listPublic(resource) {
     let data = await query.lean();
     if (resource === "sports") {
       data = data.map(withPlayerCountFallback);
+      // Deduplicate by normalized sport name to prevent duplicate cards
+      const seen = new Set();
+      data = data.filter((s) => {
+        const key = String(s.sportName || s.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
     return res.json(data);
   };

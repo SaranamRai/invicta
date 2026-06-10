@@ -11,6 +11,13 @@ import { getRoleAccount } from "@/lib/role-auth";
 
 const allSportsLabel = "All Sports";
 
+function getMemberName(member: unknown): string {
+  if (typeof member === "string") return member;
+  if (!member || typeof member !== "object") return "";
+  const m = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+  return m.fullName || m.name || m.registrationNumber || m.regNo || "";
+}
+
 function normalizeSportValue(value?: string) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
 }
@@ -100,14 +107,14 @@ export default function VolunteerTeamsPage() {
       team.name.toLowerCase().includes(query) ||
       (team.department || "").toLowerCase().includes(query) ||
       (team.coachCaptain || "").toLowerCase().includes(query) ||
-      (team.members || []).some((member) => member.toLowerCase().includes(query));
+      (team.members || []).some((member) => getMemberName(member).toLowerCase().includes(query));
 
     return matchesSport && matchesSearch;
   });
 
   const members = filteredTeams.flatMap((team) =>
     (team.members || []).map((member, index) => ({
-      member,
+      member: getMemberName(member),
       teamName: team.name,
       department: team.department || team.name,
       sport: team.sport,
@@ -248,8 +255,8 @@ export default function VolunteerTeamsPage() {
                     {team.members?.length ? (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {team.members.slice(0, 6).map((member, index) => (
-                          <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                            {member}
+                          <span key={`${team.id}-${getMemberName(member)}-${index}`} className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
+                            {getMemberName(member)}
                           </span>
                         ))}
                         {team.members.length > 6 && (

@@ -44,7 +44,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
         <Header />
-        <main className="mx-auto w-full max-w-[1440px] p-3 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
+        <main className="mx-auto w-full max-w-[1440px] px-2 py-2 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
           {children}
         </main>
       </div>

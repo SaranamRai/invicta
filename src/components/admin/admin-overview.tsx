@@ -84,6 +84,12 @@ export function AdminOverview({
     const actList: ActivityItem[] = [];
     const notifList: string[] = [];
 
+    // Check for pending teams needing approval
+    const pendingTeams = teams.filter(t => t.status === "pending");
+    if (pendingTeams.length > 0) {
+      notifList.push(`${pendingTeams.length} team${pendingTeams.length === 1 ? "" : "s"} pending approval. Go to Teams to review and approve or reject.`);
+    }
+
     // Add recent activities based on teams
     teams.slice(-3).forEach(team => {
       const sportName = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === team.sport)?.sportName || team.sport : team.sport;
@@ -220,7 +226,7 @@ export function AdminOverview({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
           { label: "Total Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
           { label: "Total Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },

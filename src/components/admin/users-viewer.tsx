@@ -273,15 +273,22 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
     }
   };
 
+  function getMemberName(member: unknown): string {
+    if (typeof member === "string") return member.trim();
+    if (!member || typeof member !== "object") return "";
+    const m = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+    return m.fullName || m.name || m.registrationNumber || m.regNo || "";
+  }
+
   const players = useMemo<PlayerUser[]>(
     () =>
       sortByName(
         teams.flatMap((team) =>
           (team.members || [])
-            .filter((member) => member.trim())
+            .filter((member) => getMemberName(member))
             .map((member, index) => ({
               id: `${team.id}-${index}`,
-              fullName: member.trim(),
+              fullName: getMemberName(member),
               teamName: team.name,
               department: team.department || team.name,
               sport: team.sport,

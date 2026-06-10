@@ -58,6 +58,13 @@ export function TeamManager({
   // Members input (tag style)
   const [memberInput, setMemberInput] = useState("");
   const [membersList, setMembersList] = useState<string[]>([]);
+
+  function getMemberName(member: unknown): string {
+    if (typeof member === "string") return member;
+    if (!member || typeof member !== "object") return "";
+    const m = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+    return m.fullName || m.name || m.registrationNumber || m.regNo || "";
+  }
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddMember = (e: React.KeyboardEvent) => {
@@ -121,7 +128,7 @@ export function TeamManager({
     setLogo(team.logo || "");
     setWins(team.wins || 0);
     setLosses(team.losses || 0);
-    setMembersList(team.members || []);
+    setMembersList((team.members || []).map((m) => getMemberName(m)));
     setRegisteredAt(team.registeredAt);
     setPlayerRegisteredAt(team.playerRegisteredAt || []);
     setShowForm(true);
@@ -408,7 +415,7 @@ export function TeamManager({
                     ) : (
                       membersList.map((m, i) => (
                         <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/95 border border-white/10 text-xs font-semibold text-slate-200">
-                          <span>{m}</span>
+                          <span>{getMemberName(m)}</span>
                           <button
                             type="button"
                             onClick={() => handleRemoveMember(m)}
@@ -615,7 +622,7 @@ export function TeamManager({
                         <div className="flex flex-wrap gap-1">
                           {team.members.slice(0, 4).map((member, mIdx) => (
                             <span key={mIdx} className="text-[9px] font-medium px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-white/5">
-                              {member}
+                              {getMemberName(member)}
                             </span>
                           ))}
                           {team.members.length > 4 && (
