@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Home", href: "/" },
+  { icon: LayoutDashboard, label: "Home", href: "/public-dashboard" },
   { icon: Trophy, label: "Standings", href: "/standings" },
   { icon: Calendar, label: "Matches", href: "/matches" },
   { icon: Target, label: "Sports", href: "/sports" },
@@ -27,7 +27,7 @@ export function Sidebar() {
     <>
       <aside className="sticky top-0 z-40 border-b border-border bg-background/95 px-2 py-2 text-foreground backdrop-blur-xl lg:hidden">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <Link href="/" className="flex min-w-0 shrink items-center gap-2">
+          <Link href="/public-dashboard" className="flex min-w-0 shrink items-center gap-2">
             <img
               src="/msu-logo-flat.png"
               alt="Medhavi Skills University"
@@ -71,7 +71,7 @@ export function Sidebar() {
 
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-[#020617] text-white lg:block">
         <div className="no-scrollbar flex h-full flex-col overflow-y-auto px-5 py-6">
-          <Link href="/" className="mb-7 block">
+          <Link href="/public-dashboard" className="mb-7 block">
             <img
               src="/msu-logo-flat.png"
               alt="Medhavi Skills University"
