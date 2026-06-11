@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Calendar,
   ClipboardList,
+  Home,
   LogIn,
   Radio,
   Trophy,
@@ -147,8 +148,11 @@ export default function PublicDashboard() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
             </div>
-            <div className="rounded-xl bg-white/95 p-3 shadow-lg shadow-black/20 sm:inline-flex">
-              <InvictaLogo className="h-20 w-72 sm:h-24 sm:w-96 lg:h-28 lg:w-[28rem]" />
+            <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+              <span className="sport-heading text-5xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
+                MSU
+              </span>
+              <InvictaLogo className="h-16 w-56 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
             </div>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
@@ -162,6 +166,10 @@ export default function PublicDashboard() {
             </Link>
             <Link href="/matches" className="flex h-12 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-14">
               View Live Matches
+            </Link>
+            <Link href="/" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white">
+              <Home size={14} className="text-accent" />
+              Landing Page
             </Link>
           </div>
         </div>

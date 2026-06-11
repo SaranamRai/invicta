@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
   Activity,
+  ChevronRight,
   X,
   Radio,
   Minimize2,
+  Maximize2,
   Calendar,
   MapPin,
   Clock,
+  ChevronDown
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -43,7 +46,7 @@ export function LiveSportsPanel() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
   const [highlightedTeam, setHighlightedTeam] = useState<{ [matchId: string]: "A" | "B" | "both" | null }>({});
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const prevScoresRef = useRef<{ [matchId: string]: { scoreA: number; scoreB: number } }>({});
 
   const loadMatches = async () => {
@@ -54,7 +57,7 @@ export function LiveSportsPanel() {
       ]);
 
       const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-      const mappedMatches = fixtures.map((fixture) =>
+      const mappedMatches = fixtures.map((fixture) => 
         mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData
       );
 
@@ -191,18 +194,18 @@ export function LiveSportsPanel() {
                           <div className="text-right truncate font-bold text-xs uppercase tracking-wide text-foreground">
                             {match.teamA}
                           </div>
-
+                          
                           {/* Score Pill */}
                           <div className="flex items-center gap-1.5 bg-background border border-border px-2.5 py-1 rounded-lg font-black text-sm text-foreground">
                             <span className={cn(
-                              "transition-all duration-300",
+                              "transition-all duration-300", 
                               highlight === "A" || highlight === "both" ? "text-accent scale-125" : ""
                             )}>
                               {match.scoreA ?? 0}
                             </span>
                             <span className="text-muted-foreground/50">:</span>
                             <span className={cn(
-                              "transition-all duration-300",
+                              "transition-all duration-300", 
                               highlight === "B" || highlight === "both" ? "text-accent scale-125" : ""
                             )}>
                               {match.scoreB ?? 0}

@@ -127,15 +127,22 @@ export async function apiDownload(path: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const fullUrl = `${API_BASE_URL}${path}`;
+  const response = await fetch(fullUrl, {
     ...options,
     headers,
   });
 
   if (!response.ok) {
     const data = await response.clone().json().catch(() => null);
-    const text = data?.message || await response.text().catch(() => "");
-    throw new ApiError(text || `Download failed (status ${response.status})`, response.status);
+    let message = data?.message;
+
+    if (!message) {
+      const text = await response.text().catch(() => "");
+      if (text) message = text.slice(0, 100);
+    }
+
+    throw new ApiError(message || `Download failed (status ${response.status})`, response.status);
   }
 
   return {
@@ -396,6 +403,9 @@ export interface SportDetailMember {
   department: string;
   teamName: string;
   category: string;
+  role?: string;
+  position?: string;
+  profilePhoto?: string;
 }
 
 export interface SportDetailResponse {
