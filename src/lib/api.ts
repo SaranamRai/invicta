@@ -1,5 +1,29 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
+function getRefName(value: MongoRefName | string | undefined, fallback = "") {
+  if (!value) return fallback;
+  if (typeof value === "string") return value;
+  return value.teamName || value.name || fallback;
+}
+
+function toTimestamp(value?: string | number) {
+  if (typeof value === "number") return value;
+  if (!value) return Date.now();
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
+function normalizePublicSport(value?: string) {
+  return String(value || "general").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function getMemberName(member: unknown) {
+  if (typeof member === "string") return member;
+  if (!member || typeof member !== "object") return "";
+  const value = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+  return value.fullName || value.name || value.registrationNumber || value.regNo || "";
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -12,12 +36,14 @@ export class ApiError extends Error {
 
 export interface AuthSession {
   token: string;
-  role: "admin" | "volunteer" | "coordinator";
+  role: "admin" | "supercoordinator" | "volunteer" | "coordinator";
   name: string;
   id: string;
   email: string;
   department?: string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
 }
 
 export const AUTH_STORAGE_KEY = "sportsAuthSession";
@@ -58,7 +84,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const fullUrl = `${API_BASE_URL}${path}`;
+  const response = await fetch(fullUrl, {
     ...options,
     headers,
   });
@@ -66,12 +93,27 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message =
-      data?.message ||
-      (response.status >= 500
-        ? "The login server is unavailable. Please start the backend and try again."
-        : "API request failed");
-    throw new ApiError(message, response.status);
+    // Try to extract a helpful error message from the response body or raw text
+    let message = data?.message;
+
+    if (!message) {
+      try {
+        const text = await response.clone().text();
+        if (text) message = text.slice(0, 100);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!message) {
+      message = response.status >= 500
+        ? "The backend server is unavailable. Please start the backend and try again."
+        : `API request failed (status ${response.status})`;
+    }
+
+    // Include request URL in the error to aid debugging in browser console
+    const errorMessage = `${message} — ${fullUrl}`;
+    throw new ApiError(errorMessage, response.status);
   }
 
   return data as T;
@@ -85,22 +127,15 @@ export async function apiDownload(path: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${session.token}`);
   }
 
-  const fullUrl = `${API_BASE_URL}${path}`;
-  const response = await fetch(fullUrl, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
 
   if (!response.ok) {
     const data = await response.clone().json().catch(() => null);
-    let message = data?.message;
-
-    if (!message) {
-      const text = await response.text().catch(() => "");
-      if (text) message = text.slice(0, 100);
-    }
-
-    throw new ApiError(message || `Download failed (status ${response.status})`, response.status);
+    const text = data?.message || await response.text().catch(() => "");
+    throw new ApiError(text || `Download failed (status ${response.status})`, response.status);
   }
 
   return {
@@ -125,6 +160,128 @@ export async function loginRoleAccount(email: string, password: string) {
   });
 }
 
+export interface TeamSyncPayload {
+  id: string;
+  name: string;
+  teamName?: string;
+  department?: string;
+  sport: string;
+  sportName?: string;
+  sportId?: string;
+  category?: string;
+  members?: unknown[];
+  coachCaptain?: string;
+  captainName?: string;
+  captainRegNo?: string;
+  captainEmail?: string;
+  captainPhone?: string;
+  email?: string;
+  phone?: string;
+  contactNumber?: string;
+  logo?: string;
+  status?: string;
+  wins?: number;
+  losses?: number;
+  draws?: number;
+  points?: number;
+  registeredAt?: number;
+  playerRegisteredAt?: number[];
+  source?: string;
+}
+
+type TeamWritePayload = Omit<TeamSyncPayload, "id">;
+
+export function getAdminTeams() {
+  return apiFetch<TeamSyncPayload[]>("/admin/teams");
+}
+
+export function getAdminPlayers() {
+  return apiFetch<unknown[]>("/admin/players");
+}
+
+export function createAdminTeam(team: TeamWritePayload) {
+  return apiFetch<TeamSyncPayload>("/admin/teams", {
+    method: "POST",
+    body: JSON.stringify(team),
+  });
+}
+
+export function createCoordinatorTeam(team: TeamWritePayload) {
+  return apiFetch<TeamSyncPayload>("/coordinator/teams", {
+    method: "POST",
+    body: JSON.stringify(team),
+  });
+}
+
+export function updateAdminTeam(team: TeamSyncPayload) {
+  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(team.id)}`, {
+    method: "PUT",
+    body: JSON.stringify(team),
+  });
+}
+
+export function deleteAdminTeam(teamId: string) {
+  return apiFetch(`/admin/teams/${encodeURIComponent(teamId)}`, {
+    method: "DELETE",
+  });
+}
+
+export interface AdminFixturePayload {
+  id: string;
+  teamA: string;
+  teamB: string;
+  teamAName?: string;
+  teamBName?: string;
+  sport: string;
+  sportName?: string;
+  date: string;
+  time: string;
+  venue: string;
+  status: "scheduled" | "live" | "completed";
+  scoreA?: number;
+  scoreB?: number;
+  endedAt?: string;
+  assignedVolunteer?: string;
+}
+
+export function getAdminFixtures() {
+  return apiFetch<AdminFixturePayload[]>("/admin/fixtures");
+}
+
+export function replaceAdminFixtures(fixtures: Omit<AdminFixturePayload, "id">[]) {
+  return apiFetch<AdminFixturePayload[]>("/admin/fixtures", {
+    method: "PUT",
+    body: JSON.stringify({ fixtures }),
+  });
+}
+
+export function updateAdminFixture(fixture: AdminFixturePayload) {
+  return apiFetch<AdminFixturePayload>(`/admin/fixtures/${encodeURIComponent(fixture.id)}`, {
+    method: "PUT",
+    body: JSON.stringify(fixture),
+  });
+}
+
+export function deleteAdminFixture(fixtureId: string) {
+  return apiFetch(`/admin/fixtures/${encodeURIComponent(fixtureId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function createAdminAnnouncement(payload: {
+  title: string;
+  message: string;
+  visibleToPublic?: boolean;
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentHtml?: string;
+}) {
+  return apiFetch("/admin/announcements", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export interface MongoRefName {
   _id?: string;
   id?: string;
@@ -136,14 +293,22 @@ export interface MongoRefName {
 export interface MongoFixture {
   _id: string;
   sportId?: MongoRefName | string;
+  sport?: string;
+  sportName?: string;
   matchTitle?: string;
   teamA?: MongoRefName | string;
   teamB?: MongoRefName | string;
+  teamAName?: string;
+  teamBName?: string;
   venue?: string;
   date?: string;
   time?: string;
+  scoreA?: number;
+  scoreB?: number;
+  endedAt?: string;
   round?: string;
   status?: "upcoming" | "live" | "half-time" | "completed" | "delayed" | "cancelled";
+  assignedVolunteer?: MongoRefName | string;
   createdAt?: string;
 }
 
@@ -155,6 +320,16 @@ export interface MongoLiveScore {
   teamAScore?: number;
   teamBScore?: number;
   currentStatus?: string;
+  timer?: string;
+  period?: string;
+  startedAt?: number;
+  endedAt?: number;
+  timerStartedAt?: number;
+  elapsedSeconds?: number;
+  fullMatchSeconds?: number;
+  clockRunning?: boolean;
+  announcements?: string[];
+  scoreEvents?: unknown[];
   updatedAt?: string;
 }
 
@@ -162,6 +337,8 @@ export interface MongoLiveFeed {
   _id: string;
   fixtureId?: MongoRefName | string;
   message: string;
+  imageUrl?: string;
+  volunteerEmail?: string;
   type?: string;
   createdAt?: string;
 }
@@ -170,14 +347,220 @@ export interface MongoTeam {
   _id: string;
   teamName: string;
   department?: string;
+  sport?: string;
+  sportName?: string;
   sportId?: MongoRefName | string;
   captainName?: string;
+  captainRegNo?: string;
+  captainEmail?: string;
+  captainPhone?: string;
+  email?: string;
+  contactNumber?: string;
+  category?: string;
+  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string }[];
+  wins?: number;
+  losses?: number;
+  draws?: number;
+  points?: number;
+  registeredAt?: number;
+  playerRegisteredAt?: number[];
   status?: "pending" | "approved" | "rejected";
   createdAt?: string;
 }
 
+export interface MongoSport {
+  _id: string;
+  sportName?: string;
+  name?: string;
+  categories?: ("Male" | "Female")[];
+  type?: "indoor" | "outdoor";
+  rules?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  status?: "active" | "inactive";
+}
+
+export interface SportDetailTeam {
+  _id: string;
+  teamName: string;
+  department: string;
+  category: string;
+  captainName: string;
+  membersCount: number;
+  status: string;
+}
+
+export interface SportDetailMember {
+  fullName: string;
+  registrationNo: string;
+  department: string;
+  teamName: string;
+  category: string;
+}
+
+export interface SportDetailResponse {
+  sport: MongoSport;
+  stats: {
+    totalTeams: number;
+    totalMembers: number;
+    maleTeams: number;
+    femaleTeams: number;
+    maleMembers: number;
+    femaleMembers: number;
+  };
+  teams: {
+    male: SportDetailTeam[];
+    female: SportDetailTeam[];
+  };
+  members: {
+    male: SportDetailMember[];
+    female: SportDetailMember[];
+  };
+  fixtures: {
+    male: unknown[];
+    female: unknown[];
+  };
+}
+
+export interface MongoAnnouncement {
+  _id: string;
+  title: string;
+  message: string;
+  priority?: "normal" | "important" | "urgent";
+  visibleToPublic?: boolean;
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentHtml?: string;
+  createdAt?: string;
+}
+
+export interface MongoRule {
+  _id: string;
+  title: string;
+  rules?: string;
+  description?: string;
+  sport?: string;
+  sportName?: string;
+  attachmentData?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentKind?: "document" | "image";
+  createdByName?: string;
+  createdByEmail?: string;
+  createdAt?: string;
+}
+
+export interface MongoGalleryImage {
+  _id: string;
+  title?: string;
+  imageUrl?: string;
+  caption?: string;
+  createdAt?: string;
+}
+
+export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
+  const sport = normalizePublicSport(team.sport || team.sportName || getRefName(team.sportId, ""));
+
+  return {
+    id: team._id,
+    name: team.teamName,
+    department: team.department,
+    sport,
+    sportName: team.sportName || getRefName(team.sportId, ""),
+    category: team.category,
+    members: (team.members || []).map(getMemberName).filter(Boolean),
+    coachCaptain: team.captainName || "",
+    captainRegNo: team.captainRegNo || "",
+    captainEmail: team.captainEmail || "",
+    captainPhone: team.captainPhone || "",
+    contactNumber: team.contactNumber || "",
+    email: team.email || "",
+    status: team.status,
+    wins: team.wins || 0,
+    losses: team.losses || 0,
+    draws: team.draws || 0,
+    points: team.points || 0,
+    registeredAt: team.registeredAt || toTimestamp(team.createdAt),
+    playerRegisteredAt: team.playerRegisteredAt || [],
+  };
+}
+
+export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScore) {
+  const rawStatus = liveScore?.currentStatus || fixture.status || "upcoming";
+  const status = rawStatus === "completed"
+    ? "Finished"
+    : rawStatus === "live" || rawStatus === "half-time"
+      ? "Live"
+      : "Upcoming";
+  const sportName = fixture.sportName || getRefName(fixture.sportId, fixture.sport || "general");
+
+  return {
+    id: fixture._id,
+    teamA: fixture.teamAName || liveScore?.teamAName || getRefName(fixture.teamA, "Team A"),
+    teamB: fixture.teamBName || liveScore?.teamBName || getRefName(fixture.teamB, "Team B"),
+    sport: normalizePublicSport(sportName),
+    sportName,
+    type: fixture.round || sportName || "Match",
+    scoreA: Number(liveScore?.teamAScore ?? fixture.scoreA ?? 0),
+    scoreB: Number(liveScore?.teamBScore ?? fixture.scoreB ?? 0),
+    status,
+    time: fixture.time,
+    date: fixture.date,
+    venue: fixture.venue,
+    lastUpdated: toTimestamp(liveScore?.updatedAt || fixture.createdAt),
+    startedAt: liveScore?.startedAt,
+    endedAt: liveScore?.endedAt ?? (fixture.endedAt ? toTimestamp(fixture.endedAt) : undefined),
+    timerStartedAt: liveScore?.timerStartedAt,
+    elapsedSeconds: liveScore?.elapsedSeconds,
+    fullMatchSeconds: liveScore?.fullMatchSeconds,
+    clockRunning: liveScore?.clockRunning,
+    period: liveScore?.period as never,
+    timer: liveScore?.timer,
+    announcements: liveScore?.announcements || [],
+    scoreEvents: liveScore?.scoreEvents as never[] || [],
+    assignedVolunteer: typeof fixture.assignedVolunteer === "string"
+      ? fixture.assignedVolunteer
+      : fixture.assignedVolunteer?._id || fixture.assignedVolunteer?.id || "",
+  };
+}
+
+export function mapMongoAnnouncement(announcement: MongoAnnouncement) {
+  return {
+    id: announcement._id,
+    title: announcement.title,
+    message: announcement.message,
+    timestamp: toTimestamp(announcement.createdAt),
+    type: "info" as const,
+    href: "/announcements",
+    attachmentName: announcement.attachmentName,
+    attachmentType: announcement.attachmentType,
+    attachmentHtml: announcement.attachmentHtml,
+  };
+}
+
+export function mapMongoRule(rule: MongoRule) {
+  return {
+    id: rule._id,
+    title: rule.title,
+    description: rule.description || rule.rules || "",
+    sport: rule.sport,
+    sportName: rule.sportName,
+    createdBy: rule.createdByName,
+    createdByEmail: rule.createdByEmail,
+    createdAt: toTimestamp(rule.createdAt),
+    attachmentUrl: rule.attachmentData,
+    attachmentName: rule.attachmentName,
+    attachmentType: rule.attachmentType,
+    attachmentKind: rule.attachmentKind,
+  };
+}
+
 export function getPublicFixtures() {
   return publicApiFetch<MongoFixture>("/public/fixtures");
+}
+
+export function getVolunteerAssignedFixtures() {
+  return apiFetch<MongoFixture[]>("/volunteer/assigned-matches");
 }
 
 export function getPublicLiveScores() {
@@ -191,8 +574,6 @@ export function getPublicLiveFeeds() {
 export function getPublicTeams() {
   return publicApiFetch<MongoTeam>("/public/teams");
 }
-<<<<<<< HEAD
-=======
 
 export function getCoordinatorTeams() {
   return apiFetch<TeamSyncPayload[]>("/coordinator/teams");
@@ -644,4 +1025,3 @@ export async function downloadApprovedRegistrationsExcel() {
 
   return filename;
 }
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)

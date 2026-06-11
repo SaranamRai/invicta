@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { AdminOverview } from "@/components/admin/admin-overview";
 import { TeamManager } from "@/components/admin/team-manager";
 import { FixtureGenerator } from "@/components/admin/fixture-generator";
@@ -13,16 +11,10 @@ import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
-import { MatchData } from "@/lib/types";
-import { LogOut } from "lucide-react";
+import { Download, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-<<<<<<< HEAD
-import { clearPortalSession } from "@/lib/role-auth";
-=======
-import { InvictaLogo } from "@/components/invicta-logo";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
 import {
   createAdminAnnouncement,
   createAdminTeam,
@@ -40,7 +32,6 @@ import {
   TeamRegistrationPayload,
   downloadApprovedRegistrationsExcel,
 } from "@/lib/api";
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 
 type AdminTab =
   | "dashboard"
@@ -50,41 +41,26 @@ type AdminTab =
   | "tournaments"
   | "leaderboard"
   | "rules"
-  | "users";
+  | "users"
+  | "approvals";
 
-const fixtureStatusToMatchStatus: Record<Fixture["status"], MatchData["status"]> = {
-  scheduled: "Upcoming",
-  live: "Live",
-  completed: "Finished",
-};
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-const matchStatusToFixtureStatus: Record<MatchData["status"], Fixture["status"]> = {
-  Upcoming: "scheduled",
-  Live: "live",
-  Finished: "completed",
-};
+function getSportName(sportId: string) {
+  return sports.find((sport) => sport.id === sportId)?.name || sportId;
+}
 
-const fixtureToMatch = (fixture: Fixture, teams: Team[]): MatchData => {
-  const teamA = teams.find((team) => team.id === fixture.teamA);
-  const teamB = teams.find((team) => team.id === fixture.teamB);
+function getTeamName(teamId: string, teams: Team[]) {
+  return teams.find((team) => team.id === teamId)?.name || teamId;
+}
 
-<<<<<<< HEAD
-  const match: MatchData = {
-    id: fixture.id,
-    teamA: teamA?.name || fixture.teamA,
-    teamB: teamB?.name || fixture.teamB,
-    sport: fixture.sport,
-    type: "Inter-Department",
-    scoreA: fixture.scoreA ?? 0,
-    scoreB: fixture.scoreB ?? 0,
-    status: fixtureStatusToMatchStatus[fixture.status],
-    time: fixture.time,
-    date: fixture.date,
-    venue: fixture.venue,
-    lastUpdated: Date.now(),
-  };
-=======
-function DownloadApprovedRegistrationsButton({ className }: { className?: string }) {
+function DownloadApprovedRegistrationsButton({ compact = false }: { compact?: boolean }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -108,17 +84,12 @@ function DownloadApprovedRegistrationsButton({ className }: { className?: string
         type="button"
         onClick={handleDownload}
         disabled={isDownloading}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60",
-          className
-        )}
+        className={`inline-flex items-center gap-2 rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "py-2" : "py-2.5"}`}
       >
-        <Download size={16} />
-        {isDownloading ? "Downloading..." : "Download Approved Registrations (Excel)"}
+        <Download size={compact ? 14 : 16} />
+        {isDownloading ? "Downloading..." : compact ? "Export Excel" : "Download Approved Registrations (Excel)"}
       </button>
-      {message && (
-        <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>
-      )}
+      {message && <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>}
     </div>
   );
 }
@@ -129,30 +100,33 @@ function ApprovalsPanel() {
   const [actionMsg, setActionMsg] = useState("");
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 
-  if (fixture.endedAt) {
-    match.endedAt = new Date(fixture.endedAt).getTime();
+  useEffect(() => {
+    loadRegistrations();
+  }, []);
+
+  async function loadRegistrations() {
+    setLoading(true);
+    try {
+      const data = await getTeamPendingRegistrations();
+      setRegistrations(data);
+    } catch {
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  return match;
-};
+  async function handleApprove(id: string) {
+    try {
+      await approveTeamRegistration(id);
+      setActionMsg("Registration approved successfully.");
+      loadRegistrations();
+    } catch (error) {
+      setActionMsg(error instanceof Error ? error.message : "Approval failed");
+    }
+  }
 
-<<<<<<< HEAD
-const matchToFixture = (match: MatchData): Fixture => ({
-  id: match.id,
-  teamA: match.teamA,
-  teamB: match.teamB,
-  sport: match.sport,
-  date: match.date || new Date(match.lastUpdated || Date.now()).toISOString().split("T")[0],
-  time: match.time || "09:00",
-  venue: match.venue || "Arena",
-  status: matchStatusToFixtureStatus[match.status],
-  scoreA: match.scoreA,
-  scoreB: match.scoreB,
-  endedAt: match.endedAt ? new Date(match.endedAt).toISOString() : undefined,
-});
-=======
   async function handleReject(id: string) {
     if (!rejectReason.trim()) return;
     try {
@@ -180,7 +154,7 @@ const matchToFixture = (match: MatchData): Fixture => ({
           >
             Refresh
           </button>
-          <DownloadApprovedRegistrationsButton className="py-2" />
+          <DownloadApprovedRegistrationsButton compact />
         </div>
       </div>
 
@@ -346,47 +320,58 @@ function buildFixtureFlowchartDoc(fixtures: Fixture[], teams: Team[]) {
     </html>
   `;
 }
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const account = getRoleAccount();
+  const canManageSetup = account?.role === "supercoordinator";
   const [teams, setTeams] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AdminTab>(canManageSetup ? "dashboard" : "users");
 
   useEffect(() => {
-    const unsubscribeTeams = onSnapshot(collection(db, "teams"), (snapshot) => {
-      setTeams(snapshot.docs.map((teamDoc) => ({ id: teamDoc.id, ...teamDoc.data() } as Team)));
-    });
+    let isMounted = true;
 
-    const unsubscribeMatches = onSnapshot(collection(db, "matches"), (snapshot) => {
-      const nextFixtures = snapshot.docs.map((matchDoc) => {
-        const match = { id: matchDoc.id, ...matchDoc.data() } as MatchData;
-        return matchToFixture(match);
-      });
+    async function loadAdminData() {
+      try {
+        const [nextTeams, nextFixtures] = await Promise.all([
+          getAdminTeams(),
+          getAdminFixtures(),
+        ]);
 
-      setFixtures(nextFixtures.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)));
-    });
+        if (!isMounted) return;
+
+        setTeams(nextTeams as Team[]);
+        setFixtures(nextFixtures as Fixture[]);
+      } catch (error) {
+        console.error("Failed to load Mongo admin data:", error);
+      }
+    }
+
+    void loadAdminData();
 
     return () => {
-      unsubscribeTeams();
-      unsubscribeMatches();
+      isMounted = false;
     };
   }, []);
 
   // Add team handler
   const handleAddTeam = async (team: Team) => {
-    await setDoc(doc(db, "teams", team.id), team);
+    const savedTeam = await createAdminTeam(team);
+    setTeams((currentTeams) => [savedTeam as Team, ...currentTeams]);
   };
 
   // Remove team handler
   const handleRemoveTeam = async (teamId: string) => {
-    await deleteDoc(doc(db, "teams", teamId));
+    await deleteAdminTeam(teamId);
+    setTeams((currentTeams) => currentTeams.filter((team) => team.id !== teamId));
+    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.teamA !== teamId && fixture.teamB !== teamId));
   };
 
   // Update team handler
   const handleUpdateTeam = async (updatedTeam: Team) => {
-    await setDoc(doc(db, "teams", updatedTeam.id), updatedTeam, { merge: true });
+    const savedTeam = await updateAdminTeam(updatedTeam);
+    setTeams((currentTeams) => currentTeams.map((team) => team.id === savedTeam.id ? savedTeam as Team : team));
   };
 
   // Recalculate team standings (wins/losses) based on completed fixtures
@@ -422,23 +407,26 @@ export default function AdminDashboard() {
     });
 
     updatedTeams.forEach((team) => {
-      setDoc(doc(db, "teams", team.id), team, { merge: true });
+      void updateAdminTeam(team).catch((error) => console.error("Mongo standings update failed:", error));
     });
+    setTeams(updatedTeams);
   };
 
   // Save fixtures to Firestore so user and volunteer dashboards update in real time.
   const handleGenerateFixtures = async (newFixtures: Fixture[]) => {
-    await Promise.all(fixtures.map((fixture) => deleteDoc(doc(db, "matches", fixture.id))));
-    await Promise.all(
-      newFixtures.map((fixture) => setDoc(doc(db, "matches", fixture.id), fixtureToMatch(fixture, teams)))
-    );
+    const savedFixtures = await replaceAdminFixtures(newFixtures);
+    setFixtures(savedFixtures as Fixture[]);
+
     if (newFixtures.length > 0) {
-      await addDoc(collection(db, "notifications"), {
+      const scheduleDocumentHtml = buildFixtureFlowchartDoc(newFixtures, teams);
+
+      await createAdminAnnouncement({
         title: "Fixtures Published",
-        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published to the Match Center.`,
-        timestamp: Date.now(),
-        type: "info",
-        href: "/matches",
+        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published. Download the flowchart schedule from Announcements.`,
+        visibleToPublic: true,
+        attachmentName: "invicta-fixture-flowchart.doc",
+        attachmentType: "application/msword",
+        attachmentHtml: scheduleDocumentHtml,
       });
     }
     // Reset standings count
@@ -447,14 +435,17 @@ export default function AdminDashboard() {
 
   // Delete single fixture
   const handleDeleteFixture = async (fixtureId: string) => {
-    await deleteDoc(doc(db, "matches", fixtureId));
+    await deleteAdminFixture(fixtureId);
+    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.id !== fixtureId));
     recalculateStandings(fixtures.filter((fixture) => fixture.id !== fixtureId));
   };
 
   // Update fixture handler
   const handleUpdateFixture = async (updatedFixture: Fixture) => {
-    await setDoc(doc(db, "matches", updatedFixture.id), fixtureToMatch(updatedFixture, teams), { merge: true });
-    recalculateStandings(fixtures.map((fixture) => fixture.id === updatedFixture.id ? updatedFixture : fixture));
+    const savedFixture = await updateAdminFixture(updatedFixture);
+    const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
+    setFixtures(nextFixtures);
+    recalculateStandings(nextFixtures);
   };
 
   const handleLogout = () => {
@@ -478,24 +469,15 @@ export default function AdminDashboard() {
     <div className="dashboard-surface min-h-screen bg-background text-foreground pb-12">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-<<<<<<< HEAD
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex h-16 w-48 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <div className="dashboard-logo flex h-11 w-36 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
               <img
                 src="/msu-logo-transparent.png"
                 alt="Medhavi Skills University"
-                className="h-auto w-full object-contain"
+                className="h-auto w-full max-w-full object-contain"
               />
             </div>
-            <div className="space-y-1">
-              <h1 className="sport-heading text-2xl font-black sm:text-3xl">INVICTA ADMIN</h1>
-              <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
-                Set up teams, publish fixtures, review schedules, and monitor tournament results.
-=======
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
             <div className="space-y-0.5 sm:space-y-1">
               <h1 className="sport-heading text-lg font-black sm:text-3xl">
                 {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}
@@ -504,19 +486,18 @@ export default function AdminDashboard() {
                 {canManageSetup
                   ? "Set up tournaments, add sport teams, publish fixtures, and manage sport-level coordinators and volunteers."
                   : "View system role accounts, coordinator hierarchy, volunteers, teams, fixtures, and tournament permissions."}
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <button
               onClick={handleLogout}
-              className="group relative flex items-center gap-2 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:px-6"
+              className="group relative flex items-center gap-1.5 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:gap-2 sm:px-6 sm:py-3"
             >
-              <LogOut size={18} />
-              <span className="text-xs font-black uppercase tracking-[0.2em]">
+              <LogOut size={16} className="sm:size-[18px]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] sm:text-xs sm:tracking-[0.2em]">
                 Sign Out
               </span>
             </button>
@@ -525,21 +506,30 @@ export default function AdminDashboard() {
 
         {/* Navigation Tabs */}
         <div className="border-t border-border flex">
-          <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
-            {[
-              { id: "dashboard" as const, label: "Overview" },
-              { id: "tournaments" as const, label: "Sports Setup" },
-              { id: "teams" as const, label: "Teams" },
-              { id: "fixtures" as const, label: "Create Fixtures" },
-              { id: "schedule" as const, label: "Match Schedule" },
-              { id: "leaderboard" as const, label: "Standings" },
-              { id: "rules" as const, label: "Rules" },
-              { id: "users" as const, label: "Registrations" },
-            ].map((tab) => (
+          <div className="mx-auto flex w-full max-w-7xl gap-0.5 overflow-x-auto px-3 sm:gap-1 sm:px-6">
+            {(canManageSetup
+              ? [
+                  { id: "dashboard" as const, label: "Overview" },
+                  { id: "tournaments" as const, label: "Sports Setup" },
+                  { id: "teams" as const, label: "Teams" },
+                  { id: "fixtures" as const, label: "Create Fixtures" },
+                  { id: "schedule" as const, label: "Match Schedule" },
+                  { id: "leaderboard" as const, label: "League Tables" },
+                  { id: "rules" as const, label: "Rules" },
+                  { id: "users" as const, label: "System Users" },
+                  { id: "approvals" as const, label: "Approvals" },
+                ]
+              : [
+                  { id: "dashboard" as const, label: "Overview" },
+                  { id: "schedule" as const, label: "Match Schedule" },
+                  { id: "leaderboard" as const, label: "League Tables" },
+                  { id: "rules" as const, label: "Rules" },
+                  { id: "users" as const, label: "System Users" },
+                ]).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap border-b-2 px-4 py-4 text-xs font-black uppercase tracking-[0.1em] transition-all cursor-pointer sm:px-6 sm:text-sm ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:px-6 sm:py-4 sm:text-sm sm:tracking-[0.1em] ${
                   activeTab === tab.id
                     ? "border-accent text-accent"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -555,18 +545,10 @@ export default function AdminDashboard() {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === "dashboard" && (
-<<<<<<< HEAD
-          <AdminOverview
-            teams={teams}
-            fixtures={fixtures}
-            setActiveTab={setActiveTab}
-            onUpdateTeam={handleUpdateTeam}
-          />
-=======
           <>
             {canManageSetup && (
               <div className="mb-6 flex justify-end">
-                <DownloadApprovedRegistrationsButton className="py-2.5" />
+                <DownloadApprovedRegistrationsButton />
               </div>
             )}
             <AdminOverview
@@ -577,14 +559,13 @@ export default function AdminDashboard() {
               canManageSetup={canManageSetup}
             />
           </>
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
         )}
 
-        {activeTab === "tournaments" && (
+        {activeTab === "tournaments" && canManageSetup && (
           <TournamentManager teamsCountBySport={teamsCountBySport} />
         )}
 
-        {activeTab === "teams" && (
+        {activeTab === "teams" && canManageSetup && (
           <TeamManager
             teams={teams}
             onAddTeam={handleAddTeam}
@@ -593,7 +574,7 @@ export default function AdminDashboard() {
           />
         )}
 
-        {activeTab === "fixtures" && (
+        {activeTab === "fixtures" && canManageSetup && (
           <FixtureGenerator
             teams={teams}
             onGenerateFixtures={handleGenerateFixtures}
@@ -619,7 +600,11 @@ export default function AdminDashboard() {
 
         {activeTab === "rules" && <RulesViewer />}
 
-        {activeTab === "users" && <UsersViewer teams={teams} />}
+        {activeTab === "users" && <UsersViewer teams={teams} canManageAccounts={canManageSetup} />}
+
+        {activeTab === "approvals" && canManageSetup && (
+          <ApprovalsPanel />
+        )}
       </div>
     </div>
   );

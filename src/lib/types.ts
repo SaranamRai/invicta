@@ -19,6 +19,7 @@ export interface MatchData {
   teamA: string;
   teamB: string;
   sport: string;
+  sportName?: string;
   type: string;
   scoreA: number;
   scoreB: number;
@@ -56,6 +57,10 @@ export interface NotificationData {
   message: string;
   timestamp: number;
   type: "info" | "warning" | "success";
+  href?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentHtml?: string;
 }
 
 export interface LiveFeedPost {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   GraduationCap,
@@ -9,14 +9,12 @@ import {
   ShieldCheck,
   UserRoundCheck,
   UsersRound,
+  UserPlus,
 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { db } from "@/lib/firebase";
+import { createAdminCoordinator, createAdminVolunteer, getAdminRoleAccounts, getPublicSports, updateAdminRoleAccount, deleteAdminRoleAccount, MongoSport } from "@/lib/api";
 import { Team } from "@/lib/fixture-generator";
-import { sports } from "@/lib/mock-data";
-import { ROLE_COLLECTION } from "@/lib/role-auth";
 
 interface AppUser {
   id: string;
@@ -24,6 +22,10 @@ interface AppUser {
   email: string;
   deptName: string;
   role: "admin" | "volunteer" | "coordinator" | string;
+  assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
+  createdByRole?: string;
   createdAt?: unknown;
 }
 
@@ -57,59 +59,236 @@ function formatCreatedAt(value: unknown) {
   });
 }
 
-function getSportName(sportId: string) {
-  return sports.find((sport) => sport.id === sportId)?.name || sportId || "Not assigned";
+function normalizeSportValue(value?: string) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function getSportName(sportId?: string, sportName?: string) {
+  const name = sportName?.trim();
+  if (name) return name;
+  return sportId || "Not assigned";
 }
 
 function sortByName<T extends { fullName: string }>(users: T[]) {
   return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 }
 
-export function UsersViewer({ teams }: { teams: Team[] }) {
+export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[]; canManageAccounts?: boolean }) {
+  const generateTempPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let pwd = "";
+    for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    return pwd;
+  };
+
   const [activeSection, setActiveSection] = useState<"volunteers" | "players">("volunteers");
   const [roleAccounts, setRoleAccounts] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [accountRole, setAccountRole] = useState<"coordinator" | "volunteer">("coordinator");
+  const [accountSport, setAccountSport] = useState("");
+  const [accountSportId, setAccountSportId] = useState("");
+  const [accountSportName, setAccountSportName] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState(() => generateTempPassword());
+  const [accountRegistrationNo, setAccountRegistrationNo] = useState("");
+  const [accountPhone, setAccountPhone] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
+  const [, setAutoGeneratePassword] = useState(true);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editSport, setEditSport] = useState("");
+  const [editSportId, setEditSportId] = useState("");
+  const [editSportName, setEditSportName] = useState("");
+  const [editStatus, setEditStatus] = useState("active");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchRoleAccounts() {
+  const fetchRoleAccounts = React.useCallback(async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, ROLE_COLLECTION));
-        const fetchedUsers: AppUser[] = [];
-
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          fetchedUsers.push({
-            id: docSnap.id,
-            fullName: data.name || data.fullName || data.displayName || "Unknown",
-            email: data.email || "No email",
-            deptName: data.deptName || data.department || "Not assigned",
-            role: data.role || "",
-            createdAt: data.createdAt,
-          });
-        });
-
-        setRoleAccounts(fetchedUsers);
+        setRoleAccounts(await getAdminRoleAccounts());
       } catch (error) {
-        console.error("Firestore role accounts fetch error", error);
+        console.error("Mongo role accounts fetch error", error);
         setRoleAccounts([]);
       } finally {
         setLoading(false);
       }
+  }, []);
+
+  const handleSportChange = (value: string) => {
+    setAccountSport(value);
+    const selected = sportsList.find(
+      (s) => normalizeSportValue(s.sportName || s.name || "") === value
+    );
+    if (selected) {
+      setAccountSportId(selected._id);
+      setAccountSportName(selected.sportName || selected.name || "");
+    } else {
+      setAccountSportId("");
+      setAccountSportName("");
+    }
+  };
+
+  const sportInitialized = useRef(false);
+
+  useEffect(() => {
+    void Promise.resolve().then(fetchRoleAccounts);
+    getPublicSports().then(list => {
+      setSportsList(list);
+      if (list.length > 0 && !sportInitialized.current) {
+        sportInitialized.current = true;
+        const first = list[0];
+        setAccountSport(normalizeSportValue(first.sportName || first.name || ""));
+        setAccountSportId(first._id);
+        setAccountSportName(first.sportName || first.name || "");
+      }
+    }).catch(() => {});
+  }, [fetchRoleAccounts]);
+
+  const handleCreateAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAccountError("");
+
+    const finalPassword = accountPassword.trim() || generateTempPassword();
+
+    const payload = {
+      name: accountName.trim(),
+      email: accountEmail.trim().toLowerCase(),
+      password: finalPassword,
+      assignedSport: accountSport,
+      assignedSportId: accountSportId || undefined,
+      assignedSportName: accountSportName || undefined,
+      registrationNo: accountRegistrationNo.trim() || undefined,
+      phone: accountPhone.trim() || undefined,
+    };
+
+    if (!payload.name || !payload.email || !payload.assignedSport) {
+      setAccountError("Coordinator Name, Email Address, and Assigned Sport are required.");
+      return;
     }
 
-    fetchRoleAccounts();
-  }, []);
+    setIsCreatingAccount(true);
+
+    try {
+      const result = accountRole === "coordinator"
+        ? await createAdminCoordinator(payload)
+        : await createAdminVolunteer(payload);
+
+      setAccountName("");
+      setAccountEmail("");
+      setAccountPassword("");
+      setAccountRegistrationNo("");
+      setAccountPhone("");
+      setAutoGeneratePassword(true);
+      if (sportsList.length > 0) {
+        const first = sportsList[0];
+        setAccountSport(normalizeSportValue(first.sportName || first.name || ""));
+        setAccountSportId(first._id);
+        setAccountSportName(first.sportName || first.name || "");
+      }
+
+      const msg = (result as { message?: string })?.message;
+      if (msg) setAccountError(msg === "Account created successfully" ? "" : msg);
+
+      await fetchRoleAccounts();
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : "Could not create account.");
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
+  const openEditModal = (user: AppUser) => {
+    setEditingUser(user);
+    setEditName(user.fullName);
+    setEditEmail(user.email);
+    setEditPassword("");
+    setEditSportId(user.assignedSportId || "");
+    setEditSportName(user.assignedSportName || "");
+    setEditSport(user.assignedSport || "");
+    setEditStatus(user.deptName === "inactive" ? "inactive" : "active");
+    setEditError("");
+    setEditSaving(false);
+    setDeleteConfirm(null);
+  };
+
+  const closeEditModal = () => {
+    setEditingUser(null);
+    setDeleteConfirm(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingUser) return;
+    setEditError("");
+
+    if (!editName.trim() || !editEmail.trim()) {
+      setEditError("Name and email are required");
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const payload: {
+        role: string; name: string; email: string; assignedSport: string; assignedSportId?: string; assignedSportName?: string; status: string; password?: string;
+      } = {
+        role: editingUser.role,
+        name: editName.trim(),
+        email: editEmail.trim().toLowerCase(),
+        assignedSport: editSport,
+        assignedSportId: editSportId || undefined,
+        assignedSportName: editSportName || undefined,
+        status: editStatus,
+      };
+      if (editPassword.trim()) payload.password = editPassword.trim();
+
+      await updateAdminRoleAccount(editingUser.id, payload);
+      closeEditModal();
+      await fetchRoleAccounts();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Could not update account");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async (user: AppUser) => {
+    if (deleteConfirm !== user.id) {
+      setDeleteConfirm(user.id);
+      return;
+    }
+
+    try {
+      await deleteAdminRoleAccount(user.id, user.role);
+      setDeleteConfirm(null);
+      closeEditModal();
+      await fetchRoleAccounts();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Could not delete account");
+    }
+  };
+
+  function getMemberName(member: unknown): string {
+    if (typeof member === "string") return member.trim();
+    if (!member || typeof member !== "object") return "";
+    const m = member as { fullName?: string; name?: string; registrationNumber?: string; regNo?: string };
+    return m.fullName || m.name || m.registrationNumber || m.regNo || "";
+  }
 
   const players = useMemo<PlayerUser[]>(
     () =>
       sortByName(
         teams.flatMap((team) =>
           (team.members || [])
-            .filter((member) => member.trim())
+            .filter((member) => getMemberName(member))
             .map((member, index) => ({
               id: `${team.id}-${index}`,
-              fullName: member.trim(),
+              fullName: getMemberName(member),
               teamName: team.name,
               department: team.department || team.name,
               sport: team.sport,
@@ -131,7 +310,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
   );
   const filteredPlayers = sortByName(
     players.filter((player) =>
-      [player.fullName, player.teamName, player.department, getSportName(player.sport)]
+        [player.fullName, player.teamName, player.department, getSportName(player.sport)]
         .join(" ")
         .toLowerCase()
         .includes(query)
@@ -144,7 +323,7 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
         <div>
           <h2 className="text-2xl font-black sport-heading text-white">Role Accounts and Players</h2>
           <p className="text-sm text-slate-400">
-            Review Admin, Volunteer, and Coordinator login accounts from Firestore, plus players registered under teams.
+            Review admin, supercoordinator, coordinator, and volunteer accounts from MongoDB, plus players registered under teams.
           </p>
         </div>
 
@@ -153,6 +332,112 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
           <CountCard label="Players" value={players.length} />
         </div>
       </div>
+
+      {canManageAccounts && (
+        <Card className="bg-slate-900/60 border-white/5">
+          <CardContent className="p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <UserPlus size={19} />
+              </div>
+              <div>
+                <h3 className="sport-heading text-lg font-black text-white">Add Sport Role Account</h3>
+                <p className="text-xs font-semibold text-slate-400">Supercoordinator can add one coordinator per sport and volunteers under that sport.</p>
+              </div>
+            </div>
+
+            {accountError && (
+              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-300">
+                {accountError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAccount} className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <select
+                  value={accountRole}
+                  onChange={(event) => setAccountRole(event.target.value as "coordinator" | "volunteer")}
+                  className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+                >
+                  <option value="coordinator">Coordinator</option>
+                  <option value="volunteer">Volunteer</option>
+                </select>
+                <select
+                  value={accountSport}
+                  onChange={(event) => handleSportChange(event.target.value)}
+                  className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+                >
+                  {sportsList.length === 0 ? (
+                    <option value="" disabled>Loading sports...</option>
+                  ) : (
+                    <>
+                      <option value="" disabled>Select Assigned Sport</option>
+                      {sportsList.map((sport) => {
+                        const id = normalizeSportValue(sport.sportName || sport.name || "");
+                        return <option key={id} value={id}>{sport.sportName || sport.name}</option>;
+                      })}
+                    </>
+                  )}
+                </select>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={(event) => setAccountName(event.target.value)}
+                  placeholder="Coordinator Name"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+                />
+                <input
+                  type="email"
+                  value={accountEmail}
+                  onChange={(event) => setAccountEmail(event.target.value)}
+                  placeholder="Email Address"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <input
+                  type="text"
+                  value={accountRegistrationNo}
+                  onChange={(event) => setAccountRegistrationNo(event.target.value)}
+                  placeholder="Registration Number"
+                  className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+                />
+                <input
+                  type="tel"
+                  value={accountPhone}
+                  onChange={(event) => setAccountPhone(event.target.value)}
+                  placeholder="Phone Number"
+                  className="h-12 rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+                />
+                <div className="relative min-w-0">
+                  <input
+                    type="text"
+                    value={accountPassword}
+                    onChange={(event) => { setAccountPassword(event.target.value); setAutoGeneratePassword(false); }}
+                    placeholder="Password (auto-generated)"
+                    className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 pr-20 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setAccountPassword(generateTempPassword()); setAutoGeneratePassword(false); }}
+                    className="absolute right-1 top-1 h-10 rounded-lg bg-slate-800 px-3 text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-white transition-colors"
+                  >
+                    Generate
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingAccount}
+                  className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:px-5"
+                >
+                  <UserPlus size={15} className="shrink-0" />
+                  <span className="truncate">{isCreatingAccount ? "Creating..." : "Create Coordinator"}</span>
+                </button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-slate-900/60 border-white/5">
         <CardContent className="p-4">
@@ -194,9 +479,34 @@ export function UsersViewer({ teams }: { teams: Team[] }) {
       </Card>
 
       {activeSection === "volunteers" ? (
-        <VolunteersTable volunteers={filteredVolunteers} loading={loading} />
+        <VolunteersTable volunteers={filteredVolunteers} loading={loading} onEdit={canManageAccounts ? openEditModal : undefined} />
       ) : (
         <PlayersTable players={filteredPlayers} />
+      )}
+
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          name={editName}
+          email={editEmail}
+          password={editPassword}
+          sport={editSport}
+          status={editStatus}
+          sportsList={sportsList}
+          saving={editSaving}
+          error={editError}
+          deleteConfirm={deleteConfirm}
+          onNameChange={setEditName}
+          onEmailChange={setEditEmail}
+          onPasswordChange={setEditPassword}
+          onSportChange={setEditSport}
+          onSportIdChange={setEditSportId}
+          onSportNameChange={setEditSportName}
+          onStatusChange={setEditStatus}
+          onSave={handleEditSave}
+          onDelete={handleDeleteAccount}
+          onClose={closeEditModal}
+        />
       )}
     </div>
   );
@@ -211,14 +521,14 @@ function CountCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loading: boolean }) {
+function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[]; loading: boolean; onEdit?: (user: AppUser) => void }) {
   return (
     <Card className="bg-slate-900/60 border-white/5 text-white">
       <CardContent className="p-0 overflow-hidden">
         {loading ? (
           <EmptyState label="Loading role accounts..." spinning />
         ) : volunteers.length === 0 ? (
-          <EmptyState label="No Role Accounts Found" detail="Create roleAccounts documents using Firebase Auth UID as the document ID." />
+          <EmptyState label="No Role Accounts Found" detail="Create role accounts from the admin dashboard." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -229,6 +539,7 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
                   <th className="px-6 py-4">Department / Group</th>
                   <th className="px-6 py-4">Joined Date</th>
                   <th className="px-6 py-4 text-right">Role</th>
+                  {onEdit && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -246,7 +557,7 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
                     <td className="px-6 py-5 text-slate-300 font-bold">
                       <div className="flex items-center gap-1.5 text-xs">
                         <GraduationCap size={14} className="text-slate-500" />
-                        <span className="uppercase">{volunteer.deptName}</span>
+                        <span className="uppercase">{volunteer.assignedSportName || (volunteer.assignedSport ? getSportName(volunteer.assignedSport, volunteer.assignedSportName) : volunteer.deptName)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-slate-400 text-xs">
@@ -258,6 +569,17 @@ function VolunteersTable({ volunteers, loading }: { volunteers: AppUser[]; loadi
                     <td className="px-6 py-5 text-right">
                       <RolePill icon={ShieldCheck} label={volunteer.role || "No role"} />
                     </td>
+                    {onEdit && (
+                      <td className="px-6 py-5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(volunteer)}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:bg-accent hover:text-accent-foreground hover:border-accent"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -296,7 +618,7 @@ function PlayersTable({ players }: { players: PlayerUser[] }) {
                     </td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-black uppercase tracking-wide">{player.teamName}</td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-bold uppercase">{player.department}</td>
-                    <td className="px-6 py-5 text-slate-400 text-xs font-bold">{getSportName(player.sport)}</td>
+                    <td className="px-6 py-5 text-slate-400 text-xs font-bold">{player.sport || "N/A"}</td>
                     <td className="px-6 py-5 text-slate-400 text-xs">
                       <div className="flex items-center gap-1.5">
                         <Calendar size={13} className="text-slate-600" />
@@ -334,6 +656,130 @@ function RolePill({ icon: Icon, label }: { icon: React.ElementType; label: strin
       <Icon size={11} />
       {label}
     </span>
+  );
+}
+
+function EditUserModal({
+  user, name, email, password, sport, status, sportsList, saving, error, deleteConfirm,
+  onNameChange, onEmailChange, onPasswordChange, onSportChange, onSportIdChange, onSportNameChange, onStatusChange,
+  onSave, onDelete, onClose,
+}: {
+  user: AppUser;
+  name: string; email: string; password: string; sport: string; status: string;
+  sportsList: MongoSport[];
+  saving: boolean; error: string; deleteConfirm: string | null;
+  onNameChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
+  onPasswordChange: (v: string) => void;
+  onSportChange: (v: string) => void;
+  onSportIdChange: (v: string) => void;
+  onSportNameChange: (v: string) => void;
+  onStatusChange: (v: string) => void;
+  onSave: () => void;
+  onDelete: (user: AppUser) => void;
+  onClose: () => void;
+}) {
+  const handleEditSportChange = (value: string) => {
+    onSportChange(value);
+    const selected = sportsList.find(
+      (s) => normalizeSportValue(s.sportName || s.name || "") === value
+    );
+    if (selected) {
+      onSportIdChange(selected._id);
+      onSportNameChange(selected.sportName || selected.name || "");
+    } else {
+      onSportIdChange("");
+      onSportNameChange("");
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-black sport-heading text-white mb-1">Edit {user.role} Account</h3>
+        <p className="text-xs text-slate-400 mb-5">Update details for <strong className="text-white">{user.fullName}</strong></p>
+
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-300">{error}</div>
+        )}
+
+        <div className="space-y-3">
+          <input
+            type="text" value={name} onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Full name"
+            className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+          />
+          <input
+            type="email" value={email} onChange={(e) => onEmailChange(e.target.value)}
+            placeholder="Email address"
+            className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+          />
+          <input
+            type="text" value={password} onChange={(e) => onPasswordChange(e.target.value)}
+            placeholder="New password (leave blank to keep current)"
+            className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+          />
+
+          {(user.role === "coordinator" || user.role === "volunteer") && (
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                value={sport}
+                onChange={(e) => handleEditSportChange(e.target.value)}
+                className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+              >
+                {sportsList.length === 0 ? (
+                  <option value="" disabled>Loading sports...</option>
+                ) : (
+                  <>
+                    <option value="" disabled>Select Assigned Sport</option>
+                    {sportsList.map((s) => {
+                      const id = normalizeSportValue(s.sportName || s.name || "");
+                      return <option key={id} value={id}>{s.sportName || s.name}</option>;
+                    })}
+                  </>
+                )}
+              </select>
+              <select
+                value={status}
+                onChange={(e) => onStatusChange(e.target.value)}
+                className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-between gap-3 pt-4 border-t border-white/5">
+            <button
+              type="button"
+              onClick={() => onDelete(user)}
+              disabled={saving}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-5 text-[10px] font-black uppercase tracking-widest text-red-300 transition-all hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {deleteConfirm === user.id ? "Confirm Delete?" : "Delete"}
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

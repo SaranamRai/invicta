@@ -7,7 +7,6 @@ import { clearPortalSession } from "@/lib/role-auth";
 import { Calendar, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { InvictaLogo } from "@/components/invicta-logo";
 
 const navigation = [
   { name: "Match Dashboard", href: "/volunteer", icon: LayoutDashboard },
@@ -22,27 +21,21 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-surface min-h-screen bg-background text-foreground flex flex-col md:flex-row">
       <div className="flex w-full flex-col border-b border-border bg-card md:w-72 md:border-b-0 md:border-r">
-<<<<<<< HEAD
-        <div className="border-b border-border p-4 sm:p-6">
-          <div className="flex items-center gap-4 md:block md:space-y-4">
-            <div className="flex h-14 w-44 max-w-full items-center justify-start overflow-hidden sm:h-20 sm:w-60">
+        <div className="border-b border-border p-3 sm:p-6">
+          <div className="flex items-center gap-3 md:block md:space-y-4">
+            <div className="dashboard-logo flex h-10 w-28 max-w-full shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
               <img
                 src="/msu-logo-transparent.png"
                 alt="Medhavi Skills University"
-                className="h-auto w-full object-contain"
+                className="h-auto w-full max-w-full object-contain"
               />
             </div>
-            <span className="block text-[18px] font-bold uppercase tracking-[0.32em] text-foreground font-serif italic sm:text-[20px] sm:tracking-[0.4em]">Invicta</span>
-=======
-        <div className="border-b border-border p-3 sm:p-6">
-          <div className="flex items-center gap-3 md:block md:space-y-4">
-            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
+            <span className="block text-sm font-bold uppercase tracking-[0.2em] text-foreground font-serif italic sm:text-[20px] sm:tracking-[0.4em]">Invicta</span>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mt-2">Volunteer Match Tools</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-accent mt-1.5 sm:text-[10px] sm:tracking-[0.2em] sm:mt-2">Volunteer Match Tools</p>
         </div>
 
-        <nav className="flex gap-2 overflow-x-auto p-4 md:flex-1 md:flex-col md:space-y-2 md:overflow-visible">
+        <nav className="flex flex-wrap gap-2 overflow-x-auto p-4 md:flex-1 md:flex-col md:space-y-2 md:overflow-visible">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -50,7 +43,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex min-w-fit items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all md:min-w-0",
+                  "flex min-w-fit whitespace-nowrap items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all md:min-w-0",
                   isActive
                     ? "bg-accent/20 text-accent border border-accent/30"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary"

@@ -2,9 +2,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import bcrypt from "bcryptjs";
+import { fileURLToPath } from "node:url";
 
-import { connectDB } from "./config/db.js";
+import { connectDB, getDBStatus } from "./config/db.js";
 import Admin from "./models/Admin.js";
+import SuperCoordinator from "./models/SuperCoordinator.js";
 import Coordinator from "./models/Coordinator.js";
 import Volunteer from "./models/Volunteer.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -12,8 +14,16 @@ import publicRoutes from "./routes/publicRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
+import registrationRoutes from "./routes/registrationRoutes.js";
+import Sport from "./models/Sport.js";
+import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
-dotenv.config();
+dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
+
+if (!process.env.JWT_SECRET) {
+  console.warn("Warning: JWT_SECRET not set in environment - using temporary development secret");
+  process.env.JWT_SECRET ||= "dev_secret_change_me";
+}
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -26,11 +36,26 @@ const defaultAccounts = [
     password: process.env.ADMIN_PASSWORD || "1234",
   },
   {
+    role: "supercoordinator",
+    model: SuperCoordinator,
+    name: process.env.SUPERCOORDINATOR_NAME || "Super Coordinator",
+    email: process.env.SUPERCOORDINATOR_EMAIL || "supercoordinator@gmail.com",
+    password: process.env.SUPERCOORDINATOR_PASSWORD || "1234",
+  },
+  {
     role: "volunteer",
     model: Volunteer,
     name: process.env.VOLUNTEER_NAME || "Volunteer",
     email: process.env.VOLUNTEER_EMAIL || "volunteer@gmail.com",
     password: process.env.VOLUNTEER_PASSWORD || "1234",
+  },
+  {
+    role: "volunteer",
+    model: Volunteer,
+    name: process.env.FOOTBALL_VOLUNTEER_NAME || "Football Volunteer",
+    email: process.env.FOOTBALL_VOLUNTEER_EMAIL || "volunteerfootball@gmail.com",
+    password: process.env.FOOTBALL_VOLUNTEER_PASSWORD || "1234",
+    assignedSport: "football",
   },
   {
     role: "coordinator",
@@ -39,6 +64,15 @@ const defaultAccounts = [
     email: process.env.COORDINATOR_EMAIL || "coordinator@gmail.com",
     password: process.env.COORDINATOR_PASSWORD || "1234",
     department: process.env.COORDINATOR_DEPARTMENT || "",
+  },
+  {
+    role: "coordinator",
+    model: Coordinator,
+    name: process.env.FOOTBALL_COORDINATOR_NAME || "Football Coordinator",
+    email: process.env.FOOTBALL_COORDINATOR_EMAIL || "coordinatorfootball@gmail.com",
+    password: process.env.FOOTBALL_COORDINATOR_PASSWORD || "1234",
+    department: process.env.FOOTBALL_COORDINATOR_DEPARTMENT || "",
+    assignedSport: "football",
   },
 ];
 
@@ -53,18 +87,13 @@ async function ensureDefaultAccounts() {
       email,
       password: await bcrypt.hash(account.password, 12),
       department: account.department,
+      assignedSport: account.assignedSport,
     });
 
     console.log(`Default ${account.role} account created: ${email}`);
   }
 }
 
-<<<<<<< HEAD
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://127.0.0.1:3000",
-  credentials: true,
-}));
-=======
 async function ensureLegacySportPlayerCounts() {
   const sports = await Sport.find({
     status: "active",
@@ -97,10 +126,8 @@ const allowedOrigins = [
   vercelUrl,
   process.env.ALLOWED_ORIGINS,
   "http://localhost:3000",
-  "http://localhost:3001",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
-  "http://127.0.0.1:3001",
   "http://127.0.0.1:5173",
 ]
   .filter(Boolean)
@@ -137,11 +164,18 @@ app.use(
 );
 
 app.options("*", cors());
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 app.use(express.json({ limit: "10mb" }));
 
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "sports-management-api" });
+app.get("/api/health", async (_req, res, next) => {
+  try {
+    res.json({
+      status: "ok",
+      service: "sports-management-api",
+      database: await getDBStatus(),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use("/api/auth", authRoutes);
@@ -149,6 +183,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
+app.use("/api/registrations", registrationRoutes);
 
 app.use((error, _req, res, next) => {
   void next;
@@ -158,7 +193,8 @@ app.use((error, _req, res, next) => {
 
 await connectDB();
 await ensureDefaultAccounts();
+await ensureLegacySportPlayerCounts();
 
-app.listen(port, () => {
+app.listen(port, "127.0.0.1", () => {
   console.log(`API server running on http://127.0.0.1:${port}`);
 });

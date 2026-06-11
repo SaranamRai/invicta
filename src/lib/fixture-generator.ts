@@ -2,6 +2,8 @@ export interface Team {
   id: string;
   name: string;
   sport: string;
+  sportName?: string;
+  category?: string;
   members: string[];
   department?: string;
   coachCaptain?: string;
@@ -123,10 +125,12 @@ function normalizeConflictValue(value?: string) {
 
 function getTeamConflictKeys(teamId: string, teamsById: Map<string, Team>) {
   const team = teamsById.get(teamId);
+  const teamName = normalizeConflictValue(team?.name || teamId);
   const department = normalizeConflictValue(team?.department || team?.name || teamId);
 
   return [
     `team:${teamId}`,
+    `team-name:${teamName}`,
     `department:${department}`,
   ];
 }

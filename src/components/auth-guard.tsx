@@ -10,11 +10,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
   const pathname = usePathname();
 
-<<<<<<< HEAD
-=======
   const isLandingPage = pathname === "/";
-  const isAboutPage = pathname === "/about";
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
   const isAuthPage = pathname === "/login";
   const isTeamRegistrationPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
@@ -23,11 +19,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminPage = pathname.startsWith("/admin") || pathname.startsWith("/admin-dashboard");
   const isCoordinatorPage = pathname.startsWith("/coordinator-dashboard");
 
-<<<<<<< HEAD
-  if (isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
-=======
-  if (isLandingPage || isAboutPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
->>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
+  if (isLandingPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
     return <>{children}</>;
   }
 
@@ -49,11 +41,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row">
+    <div className="flex min-h-screen w-full flex-col bg-background lg:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
         <Header />
-        <main className="mx-auto w-full max-w-[1600px] p-4 transition-all duration-300 sm:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-[1440px] px-2 py-2 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
           {children}
         </main>
       </div>

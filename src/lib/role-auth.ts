@@ -1,6 +1,6 @@
 import { AuthSession, clearSession, getStoredSession, storeSession } from "@/lib/api";
 
-export type PortalRole = "admin" | "volunteer" | "coordinator";
+export type PortalRole = "admin" | "supercoordinator" | "volunteer" | "coordinator";
 
 export const ROLE_COLLECTION = "roleAccounts";
 
@@ -11,11 +11,14 @@ export interface RoleAccount {
   role: PortalRole;
   department?: string;
   assignedSport?: string;
+  assignedSportId?: string;
+  assignedSportName?: string;
 }
 
 export const roleHomePath: Record<PortalRole, string> = {
-  admin: "/admin-dashboard",
-  volunteer: "/volunteer-dashboard",
+  admin: "/admin",
+  supercoordinator: "/admin",
+  volunteer: "/volunteer",
   coordinator: "/coordinator-dashboard",
 };
 
@@ -30,6 +33,8 @@ export function getRoleAccount(): RoleAccount | null {
     role: session.role,
     department: session.department,
     assignedSport: session.assignedSport,
+    assignedSportId: session.assignedSportId,
+    assignedSportName: session.assignedSportName,
   };
 }
 
@@ -42,5 +47,9 @@ export function clearPortalSession() {
 }
 
 export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
-  return accountRole === "admin" || accountRole === requiredRole;
+  if (requiredRole === "admin") {
+    return accountRole === "admin" || accountRole === "supercoordinator";
+  }
+
+  return accountRole === requiredRole;
 }
