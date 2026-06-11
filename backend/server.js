@@ -59,10 +59,85 @@ async function ensureDefaultAccounts() {
   }
 }
 
+<<<<<<< HEAD
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://127.0.0.1:3000",
   credentials: true,
 }));
+=======
+async function ensureLegacySportPlayerCounts() {
+  const sports = await Sport.find({
+    status: "active",
+    $or: [
+      { maxPlayers: { $exists: false } },
+      { maxPlayers: { $lte: 1 } },
+      { minPlayers: { $exists: false } },
+    ],
+  });
+
+  for (const sport of sports) {
+    const recommended = getRecommendedPlayerCount(sport.sportName || sport.name);
+    if (!recommended || recommended <= 1) continue;
+
+    sport.minPlayers = recommended;
+    sport.maxPlayers = recommended;
+    await sport.save();
+    console.log(`Updated ${sport.sportName || sport.name} player count to ${recommended}`);
+  }
+}
+
+console.log("CLIENT_URL:", process.env.CLIENT_URL);
+console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_ORIGIN,
+  vercelUrl,
+  process.env.ALLOWED_ORIGINS,
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:5173",
+]
+  .filter(Boolean)
+  .flatMap((origin) => String(origin).split(","))
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter((origin, index, self) => origin && self.indexOf(origin) === index);
+
+console.log("Allowed origins:", allowedOrigins);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.trim().replace(/\/$/, "");
+
+      if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      if (cleanOrigin.endsWith(".vercel.app") && process.env.NODE_ENV === "production") {
+        return callback(null, true);
+      }
+
+      console.error("Blocked by CORS:", cleanOrigin);
+      console.error("Allowed origins:", allowedOrigins);
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+app.options("*", cors());
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/api/health", (_req, res) => {

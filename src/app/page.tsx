@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+<<<<<<< HEAD
 import { motion } from "framer-motion";
 import { collection, onSnapshot } from "firebase/firestore";
 import {
@@ -21,6 +22,18 @@ import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 import { MatchData } from "@/lib/types";
 import { cn } from "@/lib/utils";
+=======
+import { ArrowRight, Mail } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { LiveSportsPanel } from "@/components/live-sports-panel";
+import { InvictaLogo } from "@/components/invicta-logo";
+
+const navLinks = [
+  { label: "Home", href: "/#home" },
+  { label: "About Us", href: "/about" },
+  { label: "Contact", href: "/#contact" },
+];
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 
 export default function Home() {
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
@@ -72,6 +85,7 @@ export default function Home() {
   ];
 
   return (
+<<<<<<< HEAD
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-2xl bg-[#020617] text-white shadow-2xl sm:rounded-[2.5rem]">
         <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url('/msu-logo-flat.png')] bg-[length:auto,620px_auto] bg-[position:center,right_2rem_center] bg-no-repeat" />
@@ -86,6 +100,117 @@ export default function Home() {
             </h1>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
+=======
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M10 11h20v26H10zM30 11h8v26h-8M30 24h8M14 37l-3 5M26 37l3 5" {...common} />
+      <circle cx="38" cy="16" r="3" {...common} />
+    </svg>
+  );
+}
+
+const sports = [
+  "Cricket",
+  "Badminton",
+  "Football",
+  "Volleyball",
+  "Arm Wrestling",
+  "Table Tennis",
+];
+
+export default function LandingPage() {
+  return (
+    <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
+      <LiveSportsPanel />
+      <header className="absolute inset-x-0 top-0 z-40">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
+          <Link href="/" aria-label="Invicta home">
+            <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
+          </Link>
+
+          <nav className="flex items-center gap-4 sm:gap-8">
+            {navLinks.map((link, index) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className={`relative whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:text-[#f4c35a] sm:text-xs sm:tracking-[0.24em] ${index === 0 ? "text-[#f4c35a]" : "text-foreground/80"}`}
+              >
+                {link.label}
+                {index === 0 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-28">
+          <div className="absolute inset-0 bg-[url('/badminton-bg.png')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_36%,var(--landing-overlay-48)_68%,var(--landing-overlay-42)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
+          <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
+
+          <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
+            <div className="max-w-4xl">
+              <p className="mb-5 text-[10px] font-black uppercase tracking-[0.38em] text-[#f4c35a] sm:text-xs">
+                Medhavi Skills University Sports
+              </p>
+              <h1 className="landing-display text-[3.25rem] font-black italic leading-[0.82] tracking-[-0.035em] sm:text-8xl lg:text-[8.5rem]">
+                <span className="block">BUILT FOR</span>
+                <span className="landing-gold-text block">CHAMPIONS</span>
+              </h1>
+              <p className="mt-8 max-w-lg text-sm font-semibold uppercase leading-7 tracking-[0.2em] text-foreground/60 sm:text-base">
+                Passion in every game.
+                <br />
+                Performance that defines you.
+              </p>
+
+              <Link
+                href="/public-dashboard"
+                className="landing-slant group mt-10 inline-flex items-center gap-3 bg-[#e5ad3b] px-9 py-4 text-xs font-black uppercase tracking-[0.22em] text-black transition-all hover:bg-[#f7cf70]"
+              >
+                Explore Now
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section id="sports" className="border-y border-border bg-background px-5 py-20 sm:px-8 transition-colors duration-300">
+          <div className="mx-auto max-w-6xl">
+            <p className="text-center text-[10px] font-black uppercase tracking-[0.4em] text-[#f4c35a]">Invicta Sports</p>
+            <h2 className="landing-display mt-3 text-center text-3xl font-black uppercase tracking-[0.13em] sm:text-4xl">
+              One Spirit. Every Game.
+            </h2>
+
+            <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              {sports.map((sport) => (
+                <Link key={sport} href="/sports" className="group flex flex-col items-center gap-4">
+                  <div className="landing-sport-card landing-slant grid aspect-square w-full place-items-center border border-landing-card-border bg-gradient-to-br from-landing-card-bg to-transparent transition-all group-hover:border-[#f4c35a]/80 group-hover:bg-[#f4c35a]/10">
+                    <span className="h-14 w-14 text-[#e5ad3b] transition-transform duration-300 group-hover:scale-110">
+                      <SportMark name={sport} />
+                    </span>
+                  </div>
+                  <span className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-foreground/50 transition-colors group-hover:text-[#f4c35a]">
+                    {sport}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer id="contact" className="bg-landing-footer-bg border-t border-landing-footer-border px-5 py-14 sm:px-8 transition-colors duration-300">
+        <div className="mx-auto grid max-w-7xl gap-10 border-b border-landing-footer-border pb-12 md:grid-cols-3 md:items-start">
+          <div>
+            <InvictaLogo className="h-14 w-52" />
+            <p className="mt-4 max-w-sm text-sm leading-6 text-foreground/50">
+              The official public sports experience for MSU Invicta.
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
             </p>
           </div>
 
@@ -100,6 +225,7 @@ export default function Home() {
           </div>
         </div>
 
+<<<<<<< HEAD
         <div className="border-t border-white/10 bg-black/40 py-4 backdrop-blur-md">
           <div className="flex animate-marquee whitespace-nowrap gap-20">
             {[1, 2, 3].map((n) => (
@@ -119,6 +245,12 @@ export default function Home() {
               </div>
             ))}
           </div>
+=======
+        <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35 sm:flex-row">
+          <span>© 2026 Invicta. All rights reserved.</span>
+          <span className="text-accent/50 font-black">Managed & Powered by SoCSE</span>
+          <span>Medhavi Skills University</span>
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
         </div>
       </section>
 

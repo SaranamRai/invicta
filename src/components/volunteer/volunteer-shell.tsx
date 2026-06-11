@@ -7,6 +7,7 @@ import { clearPortalSession } from "@/lib/role-auth";
 import { Calendar, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
 
 const navigation = [
   { name: "Match Dashboard", href: "/volunteer", icon: LayoutDashboard },
@@ -21,6 +22,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-surface min-h-screen bg-background text-foreground flex flex-col md:flex-row">
       <div className="flex w-full flex-col border-b border-border bg-card md:w-72 md:border-b-0 md:border-r">
+<<<<<<< HEAD
         <div className="border-b border-border p-4 sm:p-6">
           <div className="flex items-center gap-4 md:block md:space-y-4">
             <div className="flex h-14 w-44 max-w-full items-center justify-start overflow-hidden sm:h-20 sm:w-60">
@@ -31,6 +33,11 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
               />
             </div>
             <span className="block text-[18px] font-bold uppercase tracking-[0.32em] text-foreground font-serif italic sm:text-[20px] sm:tracking-[0.4em]">Invicta</span>
+=======
+        <div className="border-b border-border p-3 sm:p-6">
+          <div className="flex items-center gap-3 md:block md:space-y-4">
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mt-2">Volunteer Match Tools</p>
         </div>

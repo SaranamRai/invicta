@@ -10,7 +10,11 @@ import { BookOpen, Calendar, ClipboardList, FileUp, LogOut, Send, ShieldCheck, T
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
+<<<<<<< HEAD
 import { db, storage } from "@/lib/firebase";
+=======
+import { InvictaLogo } from "@/components/invicta-logo";
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 import { Team } from "@/lib/fixture-generator";
 import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
@@ -120,6 +124,7 @@ function CoordinatorDashboardContent() {
   return (
     <div className="dashboard-surface min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
+<<<<<<< HEAD
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-44 items-center overflow-hidden">
@@ -128,6 +133,14 @@ function CoordinatorDashboardContent() {
             <div>
               <h1 className="sport-heading text-2xl font-black">Coordinator Dashboard</h1>
               <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+=======
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-14 sm:w-52" />
+            <div className="min-w-0">
+              <h1 className="sport-heading text-lg font-black sm:text-2xl">Coordinator Dashboard</h1>
+              <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
                 Manage your assigned department or sport teams, review fixtures, and prepare team details for admin approval.
               </p>
             </div>

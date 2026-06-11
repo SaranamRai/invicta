@@ -7,6 +7,11 @@ import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucid
 import { useRouter } from "next/navigation";
 import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
+<<<<<<< HEAD
+=======
+import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -49,6 +54,7 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-3xl"
       >
+<<<<<<< HEAD
         <div className="mb-8 sm:mb-10">
           <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-7">
             <div className="flex h-16 w-40 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-44">
@@ -64,6 +70,11 @@ export default function LoginPage() {
               <span className="text-[22px] font-bold uppercase tracking-[0.42em] text-slate-900 font-serif italic sm:text-[28px] sm:tracking-[0.6em]">Invicta</span>
               <span className="h-[1.5px] w-16 bg-accent sm:w-20" />
             </div>
+=======
+        <div className="mb-5 sm:mb-7">
+          <div className="mb-4 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <InvictaLogo className="h-20 w-72 sm:h-24 sm:w-96" />
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
           </div>
           <p className="text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.2em]">Admin, Volunteer & Coordinator Login</p>
         </div>

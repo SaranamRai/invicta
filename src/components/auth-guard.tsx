@@ -10,6 +10,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
   const pathname = usePathname();
 
+<<<<<<< HEAD
+=======
+  const isLandingPage = pathname === "/";
+  const isAboutPage = pathname === "/about";
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
   const isAuthPage = pathname === "/login";
   const isTeamRegistrationPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
@@ -18,7 +23,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminPage = pathname.startsWith("/admin") || pathname.startsWith("/admin-dashboard");
   const isCoordinatorPage = pathname.startsWith("/coordinator-dashboard");
 
+<<<<<<< HEAD
   if (isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
+=======
+  if (isLandingPage || isAboutPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
+>>>>>>> d5c6ec3 (Fix Excel download and dashboard updates)
     return <>{children}</>;
   }
 

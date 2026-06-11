@@ -1,10 +1,13 @@
 import type { NextConfig } from "next";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const apiProxyTarget = process.env.API_PROXY_TARGET || "http://127.0.0.1:5000";
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: process.cwd(),
+    root: projectRoot,
   },
   devIndicators: false,
   allowedDevOrigins: ["192.168.56.1"],
