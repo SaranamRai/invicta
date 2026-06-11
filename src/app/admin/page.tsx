@@ -30,8 +30,8 @@ import {
   approveTeamRegistration,
   rejectTeamRegistration,
   TeamRegistrationPayload,
+  downloadApprovedRegistrationsExcel,
 } from "@/lib/api";
-import { getExportApprovedRegistrationsUrl } from "@/lib/api";
 
 type AdminTab =
   | "dashboard"
@@ -58,6 +58,40 @@ function getSportName(sportId: string) {
 
 function getTeamName(teamId: string, teams: Team[]) {
   return teams.find((team) => team.id === teamId)?.name || teamId;
+}
+
+function DownloadApprovedRegistrationsButton({ compact = false }: { compact?: boolean }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleDownload() {
+    setIsDownloading(true);
+    setMessage("");
+
+    try {
+      const filename = await downloadApprovedRegistrationsExcel();
+      setMessage(`Downloaded ${filename}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not download approved registrations.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className={`inline-flex items-center gap-2 rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "py-2" : "py-2.5"}`}
+      >
+        <Download size={compact ? 14 : 16} />
+        {isDownloading ? "Downloading..." : compact ? "Export Excel" : "Download Approved Registrations (Excel)"}
+      </button>
+      {message && <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>}
+    </div>
+  );
 }
 
 function ApprovalsPanel() {
@@ -120,13 +154,7 @@ function ApprovalsPanel() {
           >
             Refresh
           </button>
-          <a
-            href={getExportApprovedRegistrationsUrl()}
-            className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent-foreground"
-          >
-            <Download size={14} />
-            Export Excel
-          </a>
+          <DownloadApprovedRegistrationsButton compact />
         </div>
       </div>
 
@@ -520,13 +548,7 @@ export default function AdminDashboard() {
           <>
             {canManageSetup && (
               <div className="mb-6 flex justify-end">
-                <a
-                  href={getExportApprovedRegistrationsUrl()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90"
-                >
-                  <Download size={16} />
-                  Download Approved Registrations (Excel)
-                </a>
+                <DownloadApprovedRegistrationsButton />
               </div>
             )}
             <AdminOverview

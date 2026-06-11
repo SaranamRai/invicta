@@ -119,6 +119,32 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return data as T;
 }
 
+export async function apiDownload(path: string, options: RequestInit = {}) {
+  const session = getStoredSession();
+  const headers = new Headers(options.headers);
+
+  if (session?.token) {
+    headers.set("Authorization", `Bearer ${session.token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const data = await response.clone().json().catch(() => null);
+    const text = data?.message || await response.text().catch(() => "");
+    throw new ApiError(text || `Download failed (status ${response.status})`, response.status);
+  }
+
+  return {
+    blob: await response.blob(),
+    contentDisposition: response.headers.get("Content-Disposition"),
+    contentType: response.headers.get("Content-Type"),
+  };
+}
+
 async function publicApiFetch<T>(path: string): Promise<T[]> {
   try {
     return await apiFetch<T[]>(path);
@@ -960,9 +986,42 @@ export function rejectTeamRegistration(id: string, rejectionReason: string) {
   });
 }
 
-export function getExportApprovedRegistrationsUrl() {
-  const session = getStoredSession();
-  const params = new URLSearchParams();
-  const url = `${API_BASE_URL}/registrations/export-excel?${params.toString()}`;
-  return url;
+function getFilenameFromContentDisposition(value: string | null) {
+  if (!value) return "";
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1].replace(/"/g, ""));
+
+  const match = value.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || "";
+}
+
+export async function downloadApprovedRegistrationsExcel() {
+  const { blob, contentDisposition, contentType } = await apiDownload("/registrations/export-excel");
+  const filename = getFilenameFromContentDisposition(contentDisposition) || "approved_registrations.xlsx";
+
+  if (!blob.size) {
+    throw new ApiError("The export completed but returned an empty file.", 500);
+  }
+
+  const excelTypes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "application/octet-stream",
+  ];
+
+  if (contentType && !excelTypes.some((type) => contentType.includes(type))) {
+    throw new ApiError("The server did not return an Excel file.", 500);
+  }
+
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(downloadUrl);
+
+  return filename;
 }

@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { InvictaLogo } from "@/components/invicta-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getPublicAnnouncements, mapMongoAnnouncement } from "@/lib/api";
 import { NotificationData } from "@/lib/types";
@@ -37,11 +38,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 hidden min-h-16 w-full items-center justify-between gap-3 border-b border-border bg-background/90 px-6 py-3 backdrop-blur-xl lg:flex lg:h-20 lg:px-8 lg:py-0">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-        <h2 className="sport-heading text-xl font-black tracking-tighter text-primary sm:text-2xl">INVICTA</h2>
-        <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
-        <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground sm:tracking-[0.2em]">
-          Public sports updates for visitors
-        </span>
+        <Link href="/public-dashboard" aria-label="Invicta home">
+          <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
+        </Link>
       </div>
 
 
