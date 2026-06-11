@@ -1,8 +1,24 @@
 import mongoose from "mongoose";
 
+let mongoServer;
+
 export async function connectDB() {
-  const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/sports_management";
+  let mongoUri = process.env.MONGO_URI;
   const dbName = process.env.MONGO_DB_NAME || "sports_management";
+
+  if (!mongoUri) {
+    console.log("No MONGO_URI specified. Attempting to start in-memory MongoDB server...");
+    try {
+      const { MongoMemoryServer } = await import("mongodb-memory-server");
+      mongoServer = await MongoMemoryServer.create();
+      mongoUri = mongoServer.getUri();
+      console.log(`In-memory MongoDB server started at: ${mongoUri}`);
+    } catch (err) {
+      console.error("Failed to start in-memory MongoDB server:", err.message);
+      console.log("Falling back to local default MongoDB URI...");
+      mongoUri = "mongodb://127.0.0.1:27017/sports_management";
+    }
+  }
 
   try {
     const connection = await mongoose.connect(mongoUri, {

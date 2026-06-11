@@ -6,11 +6,14 @@ import {
   Share2,
   Video,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { LiveSportsPanel } from "@/components/live-sports-panel";
 
 const navLinks = [
-  { label: "Home", href: "#home" },
-  { label: "Sports", href: "#sports" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "/#home" },
+  { label: "Sports", href: "/#sports" },
+  { label: "About Us", href: "/about" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 type SportMarkProps = {
@@ -97,7 +100,8 @@ function Logo({ compact = false }: { compact?: boolean }) {
 
 export default function LandingPage() {
   return (
-    <div className="landing-page min-h-screen overflow-hidden bg-[#090a0c] text-white">
+    <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
+      <LiveSportsPanel />
       <header className="absolute inset-x-0 top-0 z-40">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
           <Link href="/" aria-label="Invicta home">
@@ -109,7 +113,7 @@ export default function LandingPage() {
               <a
                 key={link.label}
                 href={link.href}
-                className={`relative text-xs font-bold uppercase tracking-[0.24em] transition-colors hover:text-[#f4c35a] ${index === 0 ? "text-[#f4c35a]" : "text-white/80"}`}
+                className={`relative text-xs font-bold uppercase tracking-[0.24em] transition-colors hover:text-[#f4c35a] ${index === 0 ? "text-[#f4c35a]" : "text-foreground/80"}`}
               >
                 {link.label}
                 {index === 0 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
@@ -117,29 +121,32 @@ export default function LandingPage() {
             ))}
           </nav>
 
-          <a
-            href="#contact"
-            className="landing-slant hidden items-center gap-2 border border-[#f4c35a]/50 px-6 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-[#f4c35a] transition-colors hover:bg-[#f4c35a] hover:text-black md:inline-flex"
-          >
-            Get In Touch <ArrowRight size={14} />
-          </a>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <a
+              href="#contact"
+              className="landing-slant hidden items-center gap-2 border border-[#f4c35a]/50 px-6 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-[#f4c35a] transition-colors hover:bg-[#f4c35a] hover:text-black md:inline-flex"
+            >
+              Get In Touch <ArrowRight size={14} />
+            </a>
+          </div>
         </div>
       </header>
 
-      <aside className="fixed right-0 top-1/3 z-30 hidden flex-col items-center gap-4 rounded-l-md border border-r-0 border-white/10 bg-black/55 px-3 py-5 backdrop-blur lg:flex">
-        <span className="rotate-180 text-[9px] font-bold tracking-[0.35em] text-white/50 [writing-mode:vertical-rl]">
+      <aside className="fixed right-0 top-1/3 z-30 hidden flex-col items-center gap-4 rounded-l-md border border-r-0 border-border bg-landing-sidebar-bg px-3 py-5 backdrop-blur lg:flex">
+        <span className="rotate-180 text-[9px] font-bold tracking-[0.35em] text-foreground/50 [writing-mode:vertical-rl]">
           FOLLOW US
         </span>
-        <Share2 className="h-4 w-4 text-white/50 transition-colors hover:text-[#f4c35a]" />
-        <MessageCircle className="h-4 w-4 text-white/50 transition-colors hover:text-[#f4c35a]" />
-        <Video className="h-4 w-4 text-white/50 transition-colors hover:text-[#f4c35a]" />
+        <Share2 className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
+        <MessageCircle className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
+        <Video className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
       </aside>
 
       <main>
         <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-28">
-          <div className="absolute inset-0 bg-[url('/register-bg.png')] bg-cover bg-center" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,8,0.98)_0%,rgba(5,6,8,0.9)_36%,rgba(5,6,8,0.48)_68%,rgba(5,6,8,0.42)_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(0deg,#090a0c_0%,transparent_45%,rgba(0,0,0,0.4)_100%)]" />
+          <div className="absolute inset-0 bg-[url('/badminton-bg.png')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_36%,var(--landing-overlay-48)_68%,var(--landing-overlay-42)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
           <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
 
           <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
@@ -151,7 +158,7 @@ export default function LandingPage() {
                 <span className="block">BUILT FOR</span>
                 <span className="landing-gold-text block">CHAMPIONS</span>
               </h1>
-              <p className="mt-8 max-w-lg text-sm font-semibold uppercase leading-7 tracking-[0.2em] text-white/55 sm:text-base">
+              <p className="mt-8 max-w-lg text-sm font-semibold uppercase leading-7 tracking-[0.2em] text-foreground/60 sm:text-base">
                 Passion in every game.
                 <br />
                 Performance that defines you.
@@ -168,7 +175,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="sports" className="border-y border-white/10 bg-[#090a0c] px-5 py-20 sm:px-8">
+        <section id="sports" className="border-y border-border bg-background px-5 py-20 sm:px-8 transition-colors duration-300">
           <div className="mx-auto max-w-6xl">
             <p className="text-center text-[10px] font-black uppercase tracking-[0.4em] text-[#f4c35a]">Invicta Sports</p>
             <h2 className="landing-display mt-3 text-center text-3xl font-black uppercase tracking-[0.13em] sm:text-4xl">
@@ -178,12 +185,12 @@ export default function LandingPage() {
             <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
               {sports.map((sport) => (
                 <Link key={sport} href="/sports" className="group flex flex-col items-center gap-4">
-                  <div className="landing-sport-card landing-slant grid aspect-square w-full place-items-center border border-white/10 bg-gradient-to-br from-white/[0.08] to-transparent transition-all group-hover:border-[#f4c35a]/80 group-hover:bg-[#f4c35a]/10">
+                  <div className="landing-sport-card landing-slant grid aspect-square w-full place-items-center border border-landing-card-border bg-gradient-to-br from-landing-card-bg to-transparent transition-all group-hover:border-[#f4c35a]/80 group-hover:bg-[#f4c35a]/10">
                     <span className="h-14 w-14 text-[#e5ad3b] transition-transform duration-300 group-hover:scale-110">
                       <SportMark name={sport} />
                     </span>
                   </div>
-                  <span className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-white/50 transition-colors group-hover:text-[#f4c35a]">
+                  <span className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-foreground/50 transition-colors group-hover:text-[#f4c35a]">
                     {sport}
                   </span>
                 </Link>
@@ -193,35 +200,37 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer id="contact" className="bg-[#07080a] px-5 py-14 sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-12 md:grid-cols-3 md:items-start">
+      <footer id="contact" className="bg-landing-footer-bg border-t border-landing-footer-border px-5 py-14 sm:px-8 transition-colors duration-300">
+        <div className="mx-auto grid max-w-7xl gap-10 border-b border-landing-footer-border pb-12 md:grid-cols-3 md:items-start">
           <div>
             <Logo compact />
-            <p className="mt-4 max-w-sm text-sm leading-6 text-white/45">
+            <p className="mt-4 max-w-sm text-sm leading-6 text-foreground/50">
               The official public sports experience for MSU Invicta.
             </p>
           </div>
 
           <div>
-            <h3 className="text-xs font-black uppercase tracking-[0.24em] text-white">Quick Links</h3>
-            <div className="mt-5 flex flex-col gap-3 text-sm text-white/45">
+            <h3 className="text-xs font-black uppercase tracking-[0.24em] text-foreground">Quick Links</h3>
+            <div className="mt-5 flex flex-col gap-3 text-sm text-foreground/60">
               <Link href="/public-dashboard" className="hover:text-[#f4c35a]">Public Dashboard</Link>
               <Link href="/sports" className="hover:text-[#f4c35a]">Sports</Link>
               <Link href="/matches" className="hover:text-[#f4c35a]">Live Matches</Link>
+              <Link href="/about" className="hover:text-[#f4c35a]">About Us</Link>
             </div>
           </div>
 
           <div className="md:text-right">
-            <h3 className="text-xs font-black uppercase tracking-[0.24em] text-white">Contact</h3>
-            <Link href="/contact" className="mt-5 inline-flex items-center gap-2 text-sm text-white/45 hover:text-[#f4c35a]">
+            <h3 className="text-xs font-black uppercase tracking-[0.24em] text-foreground">Contact</h3>
+            <Link href="/contact" className="mt-5 inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-[#f4c35a]">
               <Mail size={15} />
               Contact the Invicta team
             </Link>
           </div>
         </div>
 
-        <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30 sm:flex-row">
+        <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35 sm:flex-row">
           <span>© 2026 Invicta. All rights reserved.</span>
+          <span className="text-accent/50 font-black">POWERED BY SoCSE</span>
           <span>Medhavi Skills University</span>
         </div>
       </footer>
