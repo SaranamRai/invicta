@@ -33,6 +33,18 @@ img, picture, video, canvas, svg {
   
   --font-heading: var(--font-outfit);
   --font-body: var(--font-inter);
+
+  --landing-overlay-98: rgba(255, 255, 255, 0.98);
+  --landing-overlay-90: rgba(255, 255, 255, 0.90);
+  --landing-overlay-48: rgba(255, 255, 255, 0.48);
+  --landing-overlay-42: rgba(255, 255, 255, 0.35);
+  --landing-overlay-bottom: #ffffff;
+  --landing-overlay-top: rgba(255, 255, 255, 0.2);
+  --landing-card-bg: rgba(0, 0, 0, 0.03);
+  --landing-card-border: rgba(0, 0, 0, 0.08);
+  --landing-footer-bg: #f8fafc;
+  --landing-footer-border: rgba(0, 0, 0, 0.08);
+  --landing-sidebar-bg: rgba(255, 255, 255, 0.75);
 }
 
 :root[data-theme="dark"] {
@@ -49,6 +61,18 @@ img, picture, video, canvas, svg {
   --card: #0f172a;
   --card-foreground: #f8fafc;
   --border: #1e293b;
+
+  --landing-overlay-98: rgba(5, 6, 8, 0.98);
+  --landing-overlay-90: rgba(5, 6, 8, 0.90);
+  --landing-overlay-48: rgba(5, 6, 8, 0.48);
+  --landing-overlay-42: rgba(5, 6, 8, 0.42);
+  --landing-overlay-bottom: #090a0c;
+  --landing-overlay-top: rgba(0, 0, 0, 0.4);
+  --landing-card-bg: rgba(255, 255, 255, 0.08);
+  --landing-card-border: rgba(255, 255, 255, 0.1);
+  --landing-footer-bg: #07080a;
+  --landing-footer-border: rgba(255, 255, 255, 0.1);
+  --landing-sidebar-bg: rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -65,6 +89,18 @@ img, picture, video, canvas, svg {
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
+
+  --color-landing-overlay-98: var(--landing-overlay-98);
+  --color-landing-overlay-90: var(--landing-overlay-90);
+  --color-landing-overlay-48: var(--landing-overlay-48);
+  --color-landing-overlay-42: var(--landing-overlay-42);
+  --color-landing-overlay-bottom: var(--landing-overlay-bottom);
+  --color-landing-overlay-top: var(--landing-overlay-top);
+  --color-landing-card-bg: var(--landing-card-bg);
+  --color-landing-card-border: var(--landing-card-border);
+  --color-landing-footer-bg: var(--landing-footer-bg);
+  --color-landing-footer-border: var(--landing-footer-border);
+  --color-landing-sidebar-bg: var(--landing-sidebar-bg);
   
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
@@ -267,7 +303,7 @@ a {
 }
 
 .landing-page {
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 .landing-display {
