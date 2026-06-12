@@ -7,6 +7,8 @@ const teamSchema = new mongoose.Schema(
     sport: { type: String, required: true, trim: true, lowercase: true },
     sportName: { type: String, trim: true },
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
+    tournamentName: { type: String, trim: true },
     category: { type: String, enum: ["Male", "Female"], default: "Male" },
     captainName: { type: String, trim: true },
     captainRegNo: { type: String, trim: true, uppercase: true },

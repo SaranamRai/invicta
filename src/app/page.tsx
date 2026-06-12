@@ -3,77 +3,13 @@ import { ArrowRight, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LiveSportsPanel } from "@/components/live-sports-panel";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
   { label: "About Us", href: "/about" },
   { label: "Contact", href: "/#contact" },
 ];
-
-type SportMarkProps = {
-  name: string;
-};
-
-function SportMark({ name }: SportMarkProps) {
-  const common = {
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.8,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  if (name === "Cricket") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M17 7l8 3-9 25-8-3zM25 10l4-3M13 38h21M29 29l8 8M34 27l4 4" {...common} />
-        <circle cx="37" cy="12" r="3" {...common} />
-      </svg>
-    );
-  }
-
-  if (name === "Badminton") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <ellipse cx="19" cy="17" rx="10" ry="13" transform="rotate(-35 19 17)" {...common} />
-        <path d="M25 27l14 14M12 11l15 12M10 17l12 10M18 6l10 12M31 8l4 8 4-8M33 16h4" {...common} />
-      </svg>
-    );
-  }
-
-  if (name === "Football") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="24" cy="24" r="17" {...common} />
-        <path d="M24 15l7 5-3 8h-8l-3-8zM24 15V7M31 20l8-3M28 28l5 8M20 28l-5 8M17 20l-8-3" {...common} />
-      </svg>
-    );
-  }
-
-  if (name === "Volleyball") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <circle cx="24" cy="24" r="17" {...common} />
-        <path d="M24 7c4 5 5 10 3 15M8 20c7-2 13 0 18 4M16 39c1-7 5-12 11-16M40 27c-7 1-12-1-16-6M32 10c-7 1-12 5-14 11M31 37c-1-7-4-12-10-16" {...common} />
-      </svg>
-    );
-  }
-
-  if (name === "Arm Wrestling") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M8 35h12l5-7 2-10 5 1 2 8 6 3v5H28l-5 6H8zM27 18l-4-5 3-5 5 4 2 7" {...common} />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M10 11h20v26H10zM30 11h8v26h-8M30 24h8M14 37l-3 5M26 37l3 5" {...common} />
-      <circle cx="38" cy="16" r="3" {...common} />
-    </svg>
-  );
-}
 
 const sports = [
   "Cricket",
@@ -90,8 +26,13 @@ export default function LandingPage() {
       <LiveSportsPanel />
       <header className="absolute inset-x-0 top-0 z-40">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
-          <Link href="/" aria-label="Invicta home">
-            <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
+          <Link href="/" aria-label="MSU Invicta home" className="flex items-center gap-4">
+            <img
+              src="/msu-logo-transparent.png"
+              alt="Medhavi Skills University"
+              className="h-14 w-36 object-contain brightness-125 contrast-125 sm:h-16 sm:w-44"
+            />
+            <InvictaLogo className="h-12 w-40 sm:h-14 sm:w-52" />
           </Link>
 
           <nav className="flex items-center gap-4 sm:gap-8">
@@ -114,13 +55,14 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-28">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_38%,rgba(229,173,59,0.18),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_52%,rgba(2,6,23,0.84)_100%)]" />
-          <div className="absolute inset-y-10 right-[-18%] w-[104%] opacity-45 saturate-90 sm:right-[-14%] sm:w-[78%] lg:right-[-8%] lg:w-[64%]">
+        <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-32 sm:pt-28">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_34%,rgba(229,173,59,0.18),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_48%,var(--landing-overlay-photo)_100%)]" />
+          <div className="landing-hero-photo absolute inset-y-6 right-[-30%] w-[128%] sm:inset-y-8 sm:right-[-18%] sm:w-[88%] lg:right-[-7%] lg:w-[68%]">
             <div className="h-full w-full bg-[url('/landingpage.jpeg')] bg-contain bg-center bg-no-repeat" />
-            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-[#020617] via-[#020617]/80 to-transparent" />
+            <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-[var(--landing-photo-fade-solid)] via-[var(--landing-photo-fade-mid)] to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[var(--landing-overlay-bottom)] to-transparent" />
           </div>
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_42%,rgba(2,6,23,0.55)_72%,rgba(2,6,23,0.72)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_38%,var(--landing-overlay-48)_68%,var(--landing-overlay-42)_100%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
           <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
 

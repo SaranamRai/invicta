@@ -199,6 +199,8 @@ export async function registerPublicTeam(req, res) {
     const department = normalizeText(req.body.department).toUpperCase();
     const teamName = normalizeText(req.body.teamName || req.body.name || department);
     const sportDoc = await resolveSport(req);
+    const tournamentId = req.body.tournamentId;
+    const tournamentName = normalizeText(req.body.tournamentName);
     const sportName = sportDoc.sportName || sportDoc.name;
     const sport = normalizeSport(sportName);
     const category = normalizeText(req.body.category || "Male");
@@ -267,6 +269,7 @@ export async function registerPublicTeam(req, res) {
     const duplicateTeam = await Team.findOne({
       department,
       sportId: sportDoc._id,
+      ...(tournamentId ? { tournamentId } : {}),
       category,
       status: { $in: ["pending", "approved"] },
     });
@@ -274,6 +277,7 @@ export async function registerPublicTeam(req, res) {
     const duplicateRegistration = await TeamRegistration.findOne({
       department,
       sportId: sportDoc._id,
+      ...(tournamentId ? { tournamentId } : {}),
       category,
       status: { $in: ["pending", "approved"] },
     });
@@ -289,6 +293,8 @@ export async function registerPublicTeam(req, res) {
       department,
       sportName,
       sportId: sportDoc._id,
+      tournamentId: tournamentId || undefined,
+      tournamentName,
       category,
       captainName,
       captainRegNo,
@@ -315,6 +321,8 @@ export async function registerPublicTeam(req, res) {
       sport,
       sportId: registration.sportId,
       sportName: registration.sportName,
+      tournamentId: registration.tournamentId,
+      tournamentName: registration.tournamentName,
       category: registration.category,
       members: registration.members || [],
       coachCaptain: registration.captainName || "",
@@ -389,6 +397,8 @@ export async function getSportDetailView(req, res) {
           registrationNo: extractMemberRegNo(m),
           department: team.department || "",
           teamName: team.teamName || "",
+          tournamentId: team.tournamentId?.toString?.() || "",
+          tournamentName: team.tournamentName || "",
           category,
           role: typeof m === "object" ? m?.role || m?.position || "" : "",
           position: typeof m === "object" ? m?.position || m?.role || "" : "",
@@ -408,10 +418,13 @@ export async function getSportDetailView(req, res) {
       return {
         _id: t._id,
         teamName: t.teamName || "",
+        tournamentId: t.tournamentId?.toString?.() || "",
+        tournamentName: t.tournamentName || "",
         department: t.department || "",
         category: t.category || "Male",
         captainName: t.captainName || "",
         membersCount: (t.members || []).length,
+        members: buildMemberList([t], t.category || "Male"),
         status: t.status || "approved",
       };
     }

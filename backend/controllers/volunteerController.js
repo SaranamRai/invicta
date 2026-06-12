@@ -79,6 +79,8 @@ function mapVolunteerTeam(team) {
     sport: team.sport || "",
     sportName: team.sportName || "",
     sportId: team.sportId ? team.sportId.toString() : "",
+    tournamentId: team.tournamentId ? team.tournamentId.toString() : "",
+    tournamentName: team.tournamentName || "",
     category: team.category || "Male",
     members: (team.members || []).map((m) => {
       if (typeof m === "string") return m;
@@ -137,6 +139,8 @@ export async function volunteerTeams(req, res) {
           sport: assignedSport,
           sportName: t.sportName,
           sportId: t.sportId,
+          tournamentId: t.tournamentId,
+          tournamentName: t.tournamentName,
           category: t.category,
           captainName: t.captainName,
           captainRegNo: t.captainRegNo,

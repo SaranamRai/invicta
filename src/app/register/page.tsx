@@ -50,8 +50,10 @@ function RegisterPageContent() {
   const [captainPhone, setCaptainPhone] = useState("");
   const [department, setDepartment] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [tournamentId, setTournamentId] = useState("");
   const [sportId, setSportId] = useState("");
   const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [tournamentOptions, setTournamentOptions] = useState<TournamentPayload[]>([]);
   const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [members, setMembers] = useState<MemberInput[]>([]);
   const [teamLogo, setTeamLogo] = useState<string>("");
@@ -64,6 +66,10 @@ function RegisterPageContent() {
   const selectedSport = useMemo(
     () => sportOptions.find((s) => s._id === sportId),
     [sportId, sportOptions]
+  );
+  const selectedTournament = useMemo(
+    () => tournamentOptions.find((tournament) => tournament._id === tournamentId),
+    [tournamentId, tournamentOptions]
   );
   const requiredPlayers = Math.max(1, Number(selectedSport?.minPlayers || 1));
   const maxPlayers = Math.max(requiredPlayers, Number(selectedSport?.maxPlayers || requiredPlayers));
@@ -91,8 +97,13 @@ function RegisterPageContent() {
       .filter((tournament) => tournament.startTime > nowTime)
       .sort((a, b) => a.startTime - b.startTime)[0] || null;
 
+    setTournamentOptions(validOpenTournaments);
     setRegistrationOpen(Boolean(activeTournament));
     setNextTournament(upcomingTournament);
+    setTournamentId((current) => {
+      if (current && validOpenTournaments.some((tournament) => tournament._id === current)) return current;
+      return activeTournament?._id || validOpenTournaments[0]?._id || "";
+    });
   };
 
   const formatDate = (value: string) => {
@@ -192,6 +203,7 @@ function RegisterPageContent() {
       .filter((member) => member.fullName || member.registrationNo);
 
     // Validation
+    if (!tournamentId) { setStatus("error"); setMessage("Please select a tournament."); return; }
     if (!sportId) { setStatus("error"); setMessage("Please select a sport."); return; }
     if (!category) { setStatus("error"); setMessage("Please select a category."); return; }
     if (!cleanDepartment) { setStatus("error"); setMessage("Department is required."); return; }
@@ -223,8 +235,11 @@ function RegisterPageContent() {
 
     try {
       const sportName = selectedSport?.sportName || selectedSport?.name || "";
+      const tournamentName = selectedTournament?.name || "";
 
       const payload: TeamRegistrationWritePayload = {
+        tournamentId,
+        tournamentName,
         sportId,
         sportName,
         category,
@@ -299,6 +314,13 @@ function RegisterPageContent() {
                 </Field>
                 <Field label="Team Name *">
                   <input value={teamName} onChange={(e) => setTeamName(e.target.value)} required className="input-light" placeholder="e.g. CSE Warriors" />
+                </Field>
+                <Field label="Tournament *">
+                  <select value={tournamentId} onChange={(e) => setTournamentId(e.target.value)} className="input-light" required>
+                    {tournamentOptions.map((item) => (
+                      <option key={item._id} value={item._id}>{item.name}</option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="Sport *">
                   <select value={sportId} onChange={(e) => { setSportId(e.target.value); setMembers([]); }} className="input-light" required>

@@ -5,6 +5,7 @@ import {
   createFixture,
   deleteFixture,
   deleteTeam,
+  generateFixtures,
   listFixtures,
   listTeams,
   replaceFixtures,
@@ -47,6 +48,7 @@ router.put("/teams/:id", superOnly, updateTeam);
 router.delete("/teams/:id", superOnly, deleteTeam);
 router.patch("/team-registrations/:id/review", superOnly, reviewTeamRegistration);
 router.get("/fixtures", adminOrSuper, listFixtures);
+router.post("/fixtures/generate", superOnly, generateFixtures);
 router.post("/fixtures", superOnly, createFixture);
 router.put("/fixtures", superOnly, replaceFixtures);
 router.put("/fixtures/:id", superOnly, updateFixture);

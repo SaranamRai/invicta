@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AdminOverview } from "@/components/admin/admin-overview";
-import { TeamManager } from "@/components/admin/team-manager";
-import { FixtureGenerator } from "@/components/admin/fixture-generator";
+import { AutomaticFixtureGenerator } from "@/components/admin/automatic-fixture-generator";
 import { FixtureViewer } from "@/components/admin/fixture-viewer";
 import { TournamentManager } from "@/components/admin/tournament-manager";
 import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
@@ -15,15 +14,10 @@ import { Download, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
-import { sports } from "@/lib/mock-data";
 import {
-  createAdminAnnouncement,
-  createAdminTeam,
   deleteAdminFixture,
-  deleteAdminTeam,
   getAdminFixtures,
   getAdminTeams,
-  replaceAdminFixtures,
   updateAdminFixture,
   updateAdminTeam,
   getTeamPendingRegistrations,
@@ -37,29 +31,13 @@ import {
 type AdminTab =
   | "dashboard"
   | "teams"
-  | "fixtures"
+  | "generate-fixtures"
   | "schedule"
   | "tournaments"
   | "leaderboard"
   | "rules"
   | "users"
   | "approvals";
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function getSportName(sportId: string) {
-  return sports.find((sport) => sport.id === sportId)?.name || sportId;
-}
-
-function getTeamName(teamId: string, teams: Team[]) {
-  return teams.find((team) => team.id === teamId)?.name || teamId;
-}
 
 function DownloadApprovedRegistrationsButton({ compact = false }: { compact?: boolean }) {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -255,71 +233,169 @@ function ApprovalsPanel() {
   );
 }
 
-function buildFixtureFlowchartDoc(fixtures: Fixture[], teams: Team[]) {
-  const groupedFixtures = [...fixtures].sort((a, b) => `${a.date}${a.time}${a.sport}`.localeCompare(`${b.date}${b.time}${b.sport}`));
-  const rows = groupedFixtures.map((fixture, index) => {
-    const teamA = escapeHtml(getTeamName(fixture.teamA, teams));
-    const teamB = escapeHtml(getTeamName(fixture.teamB, teams));
-    const sport = escapeHtml(getSportName(fixture.sport));
-    const venue = escapeHtml(fixture.venue);
-    const date = escapeHtml(fixture.date);
-    const time = escapeHtml(fixture.time);
+function formatDate(value?: string) {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
-    return `
-      <tr>
-        <td class="step">${index + 1}</td>
-        <td>
-          <div class="match-card">
-            <div class="meta">${date} at ${time} | ${venue}</div>
-            <div class="title">${teamA} vs ${teamB}</div>
-            <div class="sport">${sport}</div>
+function ApprovedTeamsPanel() {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [selectedTournament, setSelectedTournament] = useState("all");
+
+  useEffect(() => {
+    loadApprovedTeams();
+  }, []);
+
+  async function loadApprovedTeams() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const data = await getTeamApprovedRegistrations();
+      setRegistrations(data);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load approved teams.");
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tournamentOptions = Array.from(
+    new Map(
+      registrations
+        .filter((reg) => reg.tournamentId || reg.tournamentName)
+        .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"])
+    ).entries()
+  );
+  const visibleRegistrations = selectedTournament === "all"
+    ? registrations
+    : registrations.filter((reg) => reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Approved Teams</h2>
+          <p className="text-sm text-muted-foreground">Approved registrations appear here. Click a team to view its members and approval date.</p>
+        </div>
+        <button
+          onClick={loadApprovedTeams}
+          className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {tournamentOptions.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</p>
+            <p className="text-sm font-semibold text-muted-foreground">Select a tournament before viewing approved teams.</p>
           </div>
-          ${index < groupedFixtures.length - 1 ? '<div class="connector">then</div>' : ""}
-        </td>
-      </tr>
-    `;
-  }).join("");
+          <select
+            value={selectedTournament}
+            onChange={(event) => {
+              setSelectedTournament(event.target.value);
+              setExpandedTeamId(null);
+            }}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent sm:w-80"
+          >
+            <option value="all">All Tournaments</option>
+            {tournamentOptions.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
-  return `
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: Arial, sans-serif; color: #111827; }
-          h1 { color: #0f172a; margin-bottom: 4px; }
-          .subtitle { color: #64748b; margin-bottom: 24px; }
-          table { width: 100%; border-collapse: collapse; }
-          td { vertical-align: top; padding: 8px; }
-          .step {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: #facc15;
-            color: #0f172a;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-          }
-          .match-card {
-            border: 2px solid #e2e8f0;
-            border-left: 8px solid #facc15;
-            border-radius: 10px;
-            padding: 14px 16px;
-            background: #f8fafc;
-          }
-          .meta { font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; }
-          .title { margin-top: 6px; font-size: 18px; font-weight: bold; color: #020617; }
-          .sport { margin-top: 4px; font-size: 12px; font-weight: bold; color: #b45309; text-transform: uppercase; }
-          .connector { margin: 8px 0 0 18px; color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-        </style>
-      </head>
-      <body>
-        <h1>Invicta Fixture Flowchart</h1>
-        <div class="subtitle">Generated schedule. Teams from the same department are not scheduled at the same date and time.</div>
-        <table>${rows}</table>
-      </body>
-    </html>
-  `;
+      {message && (
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : visibleRegistrations.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for this tournament</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {visibleRegistrations.map((reg) => {
+            const isExpanded = expandedTeamId === reg._id;
+            return (
+              <button
+                key={reg._id}
+                type="button"
+                onClick={() => setExpandedTeamId(isExpanded ? null : reg._id)}
+                aria-expanded={isExpanded}
+                className="rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-accent hover:shadow-sm"
+              >
+                <div className="flex items-start gap-4">
+                  {reg.teamLogo ? (
+                    <img src={reg.teamLogo} alt="" className="h-14 w-14 rounded-xl border border-border bg-background object-contain" />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
+                      {reg.teamName.slice(0, 2)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-lg font-black text-foreground">{reg.teamName}</h3>
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-500">Approved</span>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      {reg.sportName} / {reg.category} / {reg.department}
+                    </p>
+                    {reg.tournamentName && (
+                      <p className="mt-1 text-xs font-semibold text-accent">{reg.tournamentName}</p>
+                    )}
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      Captain: {reg.captainName} ({reg.captainRegNo})
+                    </p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-accent">
+                      Approved Date: {formatDate(reg.reviewedAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-5 border-t border-border pt-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      Members ({reg.members?.length || 0})
+                    </p>
+                    {reg.members && reg.members.length > 0 ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {reg.members.map((member, index) => (
+                          <div key={`${reg._id}-${member.registrationNo}-${index}`} className="rounded-lg border border-border bg-secondary/60 px-3 py-2">
+                            <p className="text-sm font-black text-foreground">{member.fullName}</p>
+                            <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+                              {member.registrationNo} / {member.semester || "Semester N/A"} / {member.gender || reg.category}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm font-semibold text-muted-foreground">No members recorded for this team.</p>
+                    )}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
@@ -355,25 +431,6 @@ export default function AdminDashboard() {
       isMounted = false;
     };
   }, []);
-
-  // Add team handler
-  const handleAddTeam = async (team: Team) => {
-    const savedTeam = await createAdminTeam(team);
-    setTeams((currentTeams) => [savedTeam as Team, ...currentTeams]);
-  };
-
-  // Remove team handler
-  const handleRemoveTeam = async (teamId: string) => {
-    await deleteAdminTeam(teamId);
-    setTeams((currentTeams) => currentTeams.filter((team) => team.id !== teamId));
-    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.teamA !== teamId && fixture.teamB !== teamId));
-  };
-
-  // Update team handler
-  const handleUpdateTeam = async (updatedTeam: Team) => {
-    const savedTeam = await updateAdminTeam(updatedTeam);
-    setTeams((currentTeams) => currentTeams.map((team) => team.id === savedTeam.id ? savedTeam as Team : team));
-  };
 
   // Recalculate team standings (wins/losses) based on completed fixtures
   const recalculateStandings = (allFixtures = fixtures) => {
@@ -413,25 +470,9 @@ export default function AdminDashboard() {
     setTeams(updatedTeams);
   };
 
-  // Save fixtures to Firestore so user and volunteer dashboards update in real time.
-  const handleGenerateFixtures = async (newFixtures: Fixture[]) => {
-    const savedFixtures = await replaceAdminFixtures(newFixtures);
-    setFixtures(savedFixtures as Fixture[]);
-
-    if (newFixtures.length > 0) {
-      const scheduleDocumentHtml = buildFixtureFlowchartDoc(newFixtures, teams);
-
-      await createAdminAnnouncement({
-        title: "Fixtures Published",
-        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published. Download the flowchart schedule from Announcements.`,
-        visibleToPublic: true,
-        attachmentName: "invicta-fixture-flowchart.doc",
-        attachmentType: "application/msword",
-        attachmentHtml: scheduleDocumentHtml,
-      });
-    }
-    // Reset standings count
-    recalculateStandings(newFixtures);
+  const handleAutomaticFixturesGenerated = async () => {
+    const nextFixtures = await getAdminFixtures();
+    setFixtures(nextFixtures as Fixture[]);
   };
 
   // Delete single fixture
@@ -506,8 +547,8 @@ export default function AdminDashboard() {
               ? [
                   { id: "dashboard" as const, label: "Overview" },
                   { id: "tournaments" as const, label: "Sports Setup" },
-                  { id: "teams" as const, label: "Teams" },
-                  { id: "fixtures" as const, label: "Create Fixtures" },
+                  { id: "teams" as const, label: "Approved Teams" },
+                  { id: "generate-fixtures" as const, label: "Generate Fixtures" },
                   { id: "schedule" as const, label: "Match Schedule" },
                   { id: "leaderboard" as const, label: "League Tables" },
                   { id: "rules" as const, label: "Rules" },
@@ -550,7 +591,6 @@ export default function AdminDashboard() {
               teams={teams}
               fixtures={fixtures}
               setActiveTab={setActiveTab}
-              onUpdateTeam={handleUpdateTeam}
               canManageSetup={canManageSetup}
             />
           </>
@@ -561,18 +601,13 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "teams" && canManageSetup && (
-          <TeamManager
-            teams={teams}
-            onAddTeam={handleAddTeam}
-            onRemoveTeam={handleRemoveTeam}
-            onUpdateTeam={handleUpdateTeam}
-          />
+          <ApprovedTeamsPanel />
         )}
 
-        {activeTab === "fixtures" && canManageSetup && (
-          <FixtureGenerator
-            teams={teams}
-            onGenerateFixtures={handleGenerateFixtures}
+        {activeTab === "generate-fixtures" && canManageSetup && (
+          <AutomaticFixtureGenerator
+            fixtures={fixtures}
+            onGenerated={handleAutomaticFixturesGenerated}
           />
         )}
 

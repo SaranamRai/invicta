@@ -4,6 +4,8 @@ import Fixture from "../models/Fixture.js";
 import Sport from "../models/Sport.js";
 import Team from "../models/Team.js";
 import Player from "../models/Player.js";
+import Tournament from "../models/Tournament.js";
+import Venue from "../models/Venue.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -62,6 +64,8 @@ function mapTeam(team) {
     sport: team.sport,
     sportName: team.sportName,
     sportId: team.sportId?.toString?.() || "",
+    tournamentId: team.tournamentId?.toString?.() || "",
+    tournamentName: team.tournamentName || "",
     category: team.category || "Male",
     members: team.members || [],
     coachCaptain: team.captainName || "",
@@ -69,6 +73,7 @@ function mapTeam(team) {
     contactNumber: team.contactNumber || "",
     logo: team.logo || "",
     status: team.status,
+    reviewedAt: team.reviewedAt,
     wins: team.wins || 0,
     losses: team.losses || 0,
     draws: team.draws || 0,
@@ -81,6 +86,8 @@ function mapTeam(team) {
 function mapFixture(fixture) {
   return {
     id: fixture._id.toString(),
+    tournamentId: fixture.tournamentId?.toString?.() || "",
+    tournamentName: fixture.tournamentName || "",
     teamA: fixture.teamA?.toString?.() || "",
     teamB: fixture.teamB?.toString?.() || "",
     teamAName: fixture.teamAName || "",
@@ -98,6 +105,149 @@ function mapFixture(fixture) {
     scoreA: fixture.scoreA || 0,
     scoreB: fixture.scoreB || 0,
     endedAt: fixture.endedAt,
+  };
+}
+
+function parsePositiveMinutes(value, label) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    const error = new Error(`${label} must be greater than 0`);
+    error.status = 400;
+    throw error;
+  }
+  return Math.floor(minutes);
+}
+
+function parseTimeToMinutes(value, label) {
+  const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+  if (!match) {
+    const error = new Error(`${label} must use HH:MM format`);
+    error.status = 400;
+    throw error;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) {
+    const error = new Error(`${label} is invalid`);
+    error.status = 400;
+    throw error;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function formatMinutesAsTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function parseDateOnly(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    const error = new Error("Start date must use YYYY-MM-DD format");
+    error.status = 400;
+    throw error;
+  }
+
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) {
+    const error = new Error("Start date is invalid");
+    error.status = 400;
+    throw error;
+  }
+  return date;
+}
+
+function toDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function isWeekend(date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function getDateTime(date, minutes) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(minutes / 60), minutes % 60, 0, 0);
+}
+
+function hasFixtureClash(payload, existingFixtures) {
+  const { start, end } = getFixtureWindow(payload);
+  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
+  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
+  const venue = normalizeText(payload.venue).toLowerCase();
+  const assignedVolunteer = payload.assignedVolunteer ? String(payload.assignedVolunteer) : "";
+
+  return existingFixtures.some((fixture) => {
+    if (fixture.status === "cancelled") return false;
+    const fixtureStart = fixture.startTime
+      ? new Date(fixture.startTime)
+      : fixture.date && fixture.time
+        ? new Date(`${fixture.date}T${fixture.time}`)
+        : null;
+    const fixtureEnd = fixture.endTime
+      ? new Date(fixture.endTime)
+      : fixtureStart
+        ? new Date(fixtureStart.getTime() + 60 * 60 * 1000)
+        : null;
+    if (!fixtureStart || !fixtureEnd || fixtureStart >= end || fixtureEnd <= start) return false;
+
+    const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
+    if (teamIds.some((id) => existingTeamIds.includes(id))) return true;
+
+    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
+    if (departments.some((department) => existingDepartments.includes(department))) return true;
+
+    if (venue && normalizeText(fixture.venue).toLowerCase() === venue) return true;
+
+    if (assignedVolunteer && fixture.assignedVolunteer?.toString?.() === assignedVolunteer) return true;
+
+    return false;
+  });
+}
+
+function buildRoundRobinPairs(teams) {
+  const pairs = [];
+  for (let i = 0; i < teams.length; i += 1) {
+    for (let j = i + 1; j < teams.length; j += 1) {
+      pairs.push([teams[i], teams[j]]);
+    }
+  }
+  return pairs;
+}
+
+function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, category, date, startMinutes, durationMinutes, round, userId }) {
+  const endMinutes = startMinutes + durationMinutes;
+  const startTime = getDateTime(date, startMinutes);
+  const endTime = getDateTime(date, endMinutes);
+  const dateString = toDateInputValue(date);
+  const timeString = formatMinutesAsTime(startMinutes);
+  const sportName = sportDoc.sportName || sportDoc.name || "Sport";
+
+  return {
+    tournamentId: tournament._id,
+    tournamentName: tournament.name,
+    sport: normalizeSport(sportName),
+    sportName,
+    sportId: sportDoc._id,
+    category,
+    matchTitle: `${teamA.teamName} vs ${teamB.teamName}`,
+    teamA: teamA._id,
+    teamB: teamB._id,
+    teamAName: teamA.teamName,
+    teamBName: teamB.teamName,
+    departmentA: teamA.department,
+    departmentB: teamB.department,
+    venue: venueName,
+    date: dateString,
+    time: timeString,
+    startTime,
+    endTime,
+    round,
+    status: "upcoming",
+    createdBy: userId,
   };
 }
 
@@ -406,6 +556,129 @@ export async function createFixture(req, res) {
   const { start, end } = await assertFixtureNoClash(payload);
   const fixture = await Fixture.create({ ...payload, startTime: start, endTime: end });
   return res.status(201).json(mapFixture(fixture));
+}
+
+export async function generateFixtures(req, res) {
+  requireObjectId(req.body.tournamentId, "Tournament id");
+  requireObjectId(req.body.sportId, "Sport id");
+
+  const category = req.body.category === "Female" ? "Female" : req.body.category === "Male" ? "Male" : "";
+  if (!category) {
+    return res.status(400).json({ message: "Category must be Male or Female" });
+  }
+
+  const [tournament, sportDoc] = await Promise.all([
+    Tournament.findById(req.body.tournamentId),
+    Sport.findById(req.body.sportId),
+  ]);
+
+  if (!tournament) return res.status(400).json({ message: "Tournament not found" });
+  if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
+
+  const venueName = normalizeText(req.body.venue);
+  if (!venueName && !req.body.venueId) {
+    return res.status(400).json({ message: "Venue is required" });
+  }
+
+  let selectedVenueName = venueName;
+  if (req.body.venueId) {
+    requireObjectId(req.body.venueId, "Venue id");
+    const venueDoc = await Venue.findById(req.body.venueId).lean();
+    if (!venueDoc) return res.status(400).json({ message: "Venue not found" });
+    selectedVenueName = venueDoc.name;
+  }
+
+  const startDate = parseDateOnly(req.body.startDate);
+  const dayStartMinutes = parseTimeToMinutes(req.body.dayStartTime, "Day start time");
+  const dayEndMinutes = parseTimeToMinutes(req.body.dayEndTime, "Day end time");
+  const matchDurationMinutes = parsePositiveMinutes(req.body.matchDurationMinutes, "Match duration");
+  const rawGapMinutes = Number(req.body.gapMinutes || 0);
+  const gapMinutes = Number.isFinite(rawGapMinutes) && rawGapMinutes > 0 ? Math.floor(rawGapMinutes) : 0;
+
+  if (dayEndMinutes <= dayStartMinutes) {
+    return res.status(400).json({ message: "Day end time must be after day start time" });
+  }
+
+  if (dayStartMinutes + matchDurationMinutes > dayEndMinutes) {
+    return res.status(400).json({ message: "The match duration does not fit inside the selected day window" });
+  }
+
+  const sportName = sportDoc.sportName || sportDoc.name || "";
+  const sport = normalizeSport(sportName);
+  const teams = await Team.find({
+    status: "approved",
+    tournamentId: tournament._id,
+    category,
+    $or: [
+      { sportId: sportDoc._id },
+      { sport },
+    ],
+  }).sort({ teamName: 1 }).lean();
+
+  if (teams.length < 2) {
+    return res.status(400).json({ message: "At least two approved teams are required to generate fixtures" });
+  }
+
+  const pairs = buildRoundRobinPairs(teams);
+  const existingFixtures = await Fixture.find({ status: { $ne: "cancelled" } }).lean();
+  const scheduledFixtures = [];
+  let cursorDate = new Date(startDate);
+  let cursorMinutes = dayStartMinutes;
+
+  for (let pairIndex = 0; pairIndex < pairs.length; pairIndex += 1) {
+    const [teamA, teamB] = pairs[pairIndex];
+    let placed = false;
+
+    for (let dayOffset = 0; dayOffset < 365 && !placed; dayOffset += 1) {
+      while (!isWeekend(cursorDate)) {
+        cursorDate.setDate(cursorDate.getDate() + 1);
+        cursorMinutes = dayStartMinutes;
+      }
+
+      if (cursorMinutes + matchDurationMinutes > dayEndMinutes) {
+        cursorDate.setDate(cursorDate.getDate() + 1);
+        cursorMinutes = dayStartMinutes;
+        continue;
+      }
+
+      const payload = buildFixturePayload({
+        teamA,
+        teamB,
+        sportDoc,
+        tournament,
+        venueName: selectedVenueName,
+        category,
+        date: cursorDate,
+        startMinutes: cursorMinutes,
+        durationMinutes: matchDurationMinutes,
+        round: `Round ${pairIndex + 1}`,
+        userId: req.user?.id,
+      });
+
+      if (!hasFixtureClash(payload, [...existingFixtures, ...scheduledFixtures])) {
+        scheduledFixtures.push(payload);
+        cursorMinutes += matchDurationMinutes + gapMinutes;
+        placed = true;
+        break;
+      }
+
+      cursorMinutes += matchDurationMinutes + gapMinutes;
+    }
+
+    if (!placed) {
+      return res.status(400).json({
+        message: `Could not place ${teamA.teamName} vs ${teamB.teamName} without a clash inside the next 365 weekend days.`,
+      });
+    }
+  }
+
+  const createdFixtures = await Fixture.insertMany(scheduledFixtures);
+
+  return res.status(201).json({
+    message: `Generated ${createdFixtures.length} fixture${createdFixtures.length === 1 ? "" : "s"}.`,
+    totalMatches: createdFixtures.length,
+    fixtures: createdFixtures.map(mapFixture),
+  });
 }
 
 export async function updateFixture(req, res) {

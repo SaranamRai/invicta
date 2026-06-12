@@ -22,7 +22,15 @@ function CategorySection({ label, icon: Icon, children }: { label: string; icon:
   );
 }
 
-function TeamCard({ team }: { team: SportDetailResponse["teams"]["male"][number] }) {
+function TeamCard({
+  team,
+  expanded,
+  onToggle,
+}: {
+  team: SportDetailResponse["teams"]["male"][number];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   return (
     <Card className="p-5 border border-white/10 hover:border-accent/30 transition-all">
       <div className="flex items-start gap-4">
@@ -40,8 +48,40 @@ function TeamCard({ team }: { team: SportDetailResponse["teams"]["male"][number]
               <User size={12} /> {team.captainName || "N/A"}
             </span>
           </div>
+          {team.tournamentName && (
+            <p className="mt-2 text-[9px] font-black uppercase tracking-widest text-accent">{team.tournamentName}</p>
+          )}
         </div>
       </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="mt-4 h-10 w-full rounded-xl border border-white/10 bg-secondary/50 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
+      >
+        {expanded ? "Hide Players" : "View Players"}
+      </button>
+      {expanded && (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-background/60 p-3">
+          {team.members?.length ? (
+            <div className="grid gap-2">
+              {team.members.map((member, index) => (
+                <div key={`${member.registrationNo || member.fullName}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-card/60 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-foreground">{member.fullName || "Unnamed Player"}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.registrationNo || "Member ID N/A"}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-accent/15 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
+                    {member.position || member.role || "Player"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-4 text-center text-sm font-semibold text-muted-foreground">No players recorded for this team.</p>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
@@ -243,6 +283,9 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
   const params = React.use(paramsPromise);
   const [data, setData] = useState<SportDetailResponse | null>(null);
   const [activeTab, setActiveTab] = useState("Teams");
+  const [teamCategory, setTeamCategory] = useState<"Male" | "Female">("Male");
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchDetail = useCallback(async () => {
@@ -268,18 +311,36 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
 
   const { sport, stats, teams, members, fixtures } = data;
   const sportName = sport.sportName || sport.name || "";
-  const allMembers = [...members.male, ...members.female];
+  const tournamentOptions = Array.from(
+    new Map(
+      [...teams.male, ...teams.female, ...members.male, ...members.female]
+        .filter((item) => item.tournamentId || item.tournamentName)
+        .map((item) => [item.tournamentId || item.tournamentName || "unknown", {
+          id: item.tournamentId || item.tournamentName || "unknown",
+          name: item.tournamentName || "Tournament",
+        }])
+    ).values()
+  );
+  const activeTournamentId = selectedTournamentId || tournamentOptions[0]?.id || "";
+  const tournamentMatches = (item: { tournamentId?: string; tournamentName?: string }) =>
+    !activeTournamentId || item.tournamentId === activeTournamentId || (!item.tournamentId && item.tournamentName === activeTournamentId);
+  const filteredMaleTeams = teams.male.filter(tournamentMatches);
+  const filteredFemaleTeams = teams.female.filter(tournamentMatches);
+  const visibleTeams = teamCategory === "Male" ? filteredMaleTeams : filteredFemaleTeams;
+  const allMembers = [...members.male, ...members.female].filter(tournamentMatches);
+  const filteredMaleFixtures = fixtures.male.filter((fixture) => tournamentMatches(fixture as { tournamentId?: string; tournamentName?: string }));
+  const filteredFemaleFixtures = fixtures.female.filter((fixture) => tournamentMatches(fixture as { tournamentId?: string; tournamentName?: string }));
 
-  const hasMaleTeams = teams.male.length > 0;
-  const hasFemaleTeams = teams.female.length > 0;
+  const hasMaleTeams = filteredMaleTeams.length > 0;
+  const hasFemaleTeams = filteredFemaleTeams.length > 0;
   const hasAnyTeams = hasMaleTeams || hasFemaleTeams;
 
   const hasMaleMembers = members.male.length > 0;
   const hasFemaleMembers = members.female.length > 0;
   const hasAnyMembers = hasMaleMembers || hasFemaleMembers;
 
-  const hasMaleFixtures = fixtures.male.length > 0;
-  const hasFemaleFixtures = fixtures.female.length > 0;
+  const hasMaleFixtures = filteredMaleFixtures.length > 0;
+  const hasFemaleFixtures = filteredFemaleFixtures.length > 0;
   const hasAnyFixtures = hasMaleFixtures || hasFemaleFixtures;
 
   return (
@@ -312,6 +373,27 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
           ))}
         </div>
       </header>
+
+      {tournamentOptions.length > 0 && (
+        <section className="rounded-3xl border border-border bg-card/70 p-4 sm:flex sm:items-center sm:justify-between sm:gap-6">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
+            <h2 className="mt-1 text-xl font-black sport-heading text-foreground">Select Tournament</h2>
+          </div>
+          <select
+            value={activeTournamentId}
+            onChange={(event) => {
+              setSelectedTournamentId(event.target.value);
+              setExpandedTeamId(null);
+            }}
+            className="mt-4 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
+          >
+            {tournamentOptions.map((tournament) => (
+              <option key={tournament.id} value={tournament.id}>{tournament.name}</option>
+            ))}
+          </select>
+        </section>
+      )}
 
       {/* Stats Summary */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -398,32 +480,39 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
             </div>
           ) : (
             <>
-              {/* Male Teams */}
-              <CategorySection label="Male Teams" icon={Shield}>
-                {hasMaleTeams ? (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {teams.male.map((team) => (
-                      <TeamCard key={team._id} team={team} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
-                    No Male teams registered yet.
-                  </p>
-                )}
-              </CategorySection>
+              <div className="flex w-full max-w-sm gap-2 rounded-2xl border border-white/10 bg-secondary/50 p-1">
+                {(["Male", "Female"] as const).map((categoryItem) => (
+                  <button
+                    key={categoryItem}
+                    type="button"
+                    onClick={() => {
+                      setTeamCategory(categoryItem);
+                      setExpandedTeamId(null);
+                    }}
+                    className={`h-11 flex-1 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      teamCategory === categoryItem ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-primary"
+                    }`}
+                  >
+                    {categoryItem}
+                  </button>
+                ))}
+              </div>
 
-              {/* Female Teams */}
-              <CategorySection label="Female Teams" icon={ShieldOff}>
-                {hasFemaleTeams ? (
+              <CategorySection label={`${teamCategory} Teams`} icon={teamCategory === "Male" ? Shield : ShieldOff}>
+                {visibleTeams.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {teams.female.map((team) => (
-                      <TeamCard key={team._id} team={team} />
+                    {visibleTeams.map((team) => (
+                      <TeamCard
+                        key={team._id}
+                        team={team}
+                        expanded={expandedTeamId === team._id}
+                        onToggle={() => setExpandedTeamId((current) => current === team._id ? null : team._id)}
+                      />
                     ))}
                   </div>
                 ) : (
                   <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
-                    No Female teams registered yet.
+                    No {teamCategory} teams registered yet.
                   </p>
                 )}
               </CategorySection>
@@ -450,7 +539,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
               <CategorySection label="Male Fixtures" icon={Shield}>
                 {hasMaleFixtures ? (
                   <div className="space-y-3">
-                    {fixtures.male.map((fixture) => (
+                    {filteredMaleFixtures.map((fixture) => (
                       <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
                     ))}
                   </div>
@@ -465,7 +554,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
               <CategorySection label="Female Fixtures" icon={ShieldOff}>
                 {hasFemaleFixtures ? (
                   <div className="space-y-3">
-                    {fixtures.female.map((fixture) => (
+                    {filteredFemaleFixtures.map((fixture) => (
                       <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
                     ))}
                   </div>

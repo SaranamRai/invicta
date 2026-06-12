@@ -3,6 +3,8 @@ export interface Team {
   name: string;
   sport: string;
   sportName?: string;
+  tournamentId?: string;
+  tournamentName?: string;
   category?: string;
   members: string[];
   department?: string;

@@ -44,6 +44,8 @@ function CategorySection({ label, icon: Icon, children }: { label: string; icon:
 export default function VolunteerTeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedSport, setSelectedSport] = useState(allSportsLabel);
+  const [selectedTournament, setSelectedTournament] = useState("all");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"Teams" | "Members">("Teams");
   const [searchQuery, setSearchQuery] = useState("");
   const account = getRoleAccount();
@@ -79,6 +81,15 @@ export default function VolunteerTeamsPage() {
   }, [assignedSport, teams]);
 
   const effectiveSelectedSport = assignedSport || selectedSport;
+  const tournamentOptions = useMemo(() => {
+    return Array.from(
+      new Map(
+        teams
+          .filter((team) => team.tournamentId || team.tournamentName)
+          .map((team) => [team.tournamentId || team.tournamentName, team.tournamentName || "Tournament"])
+      ).entries()
+    );
+  }, [teams]);
 
   const teamCountBySport = useMemo(() => {
     return teams.reduce((counts, team) => {
@@ -90,6 +101,7 @@ export default function VolunteerTeamsPage() {
   const filteredTeams = teams.filter((team) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesSport = effectiveSelectedSport === allSportsLabel || team.sport === effectiveSelectedSport;
+    const matchesTournament = selectedTournament === "all" || team.tournamentId === selectedTournament || (!team.tournamentId && team.tournamentName === selectedTournament);
     const matchesSearch =
       !query ||
       team.name.toLowerCase().includes(query) ||
@@ -97,7 +109,7 @@ export default function VolunteerTeamsPage() {
       (team.coachCaptain || "").toLowerCase().includes(query) ||
       (team.members || []).some((member) => String(member).toLowerCase().includes(query));
 
-    return matchesSport && matchesSearch;
+    return matchesSport && matchesTournament && matchesSearch;
   });
 
   const maleTeams = filteredTeams.filter((t) => (t.category || "Male") === "Male");
@@ -252,6 +264,28 @@ export default function VolunteerTeamsPage() {
             className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-accent-foreground"
           />
         </div>
+
+        {tournamentOptions.length > 0 && (
+          <div className="relative w-full lg:w-72">
+            <select
+              value={selectedTournament}
+              onChange={(event) => {
+                setSelectedTournament(event.target.value);
+                setExpandedTeamId(null);
+              }}
+              className="h-11 w-full appearance-none rounded-xl border border-border bg-background px-4 pr-11 text-[10px] font-black uppercase tracking-widest text-foreground outline-none transition-all hover:border-accent focus:border-accent"
+            >
+              <option value="all">All Tournaments</option>
+              {tournamentOptions.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+            <ChevronDown
+              size={16}
+              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+        )}
       </div>
 
       {activeTab === "Teams" ? (
@@ -261,7 +295,12 @@ export default function VolunteerTeamsPage() {
               {maleTeams.length > 0 ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {maleTeams.map((team) => (
-                    <TeamCard key={team.id} team={team} />
+                    <TeamCard
+                      key={team.id}
+                      team={team}
+                      expanded={expandedTeamId === team.id}
+                      onToggle={() => setExpandedTeamId((current) => current === team.id ? null : team.id)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -275,7 +314,12 @@ export default function VolunteerTeamsPage() {
               {femaleTeams.length > 0 ? (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {femaleTeams.map((team) => (
-                    <TeamCard key={team.id} team={team} />
+                    <TeamCard
+                      key={team.id}
+                      team={team}
+                      expanded={expandedTeamId === team.id}
+                      onToggle={() => setExpandedTeamId((current) => current === team.id ? null : team.id)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -325,7 +369,7 @@ export default function VolunteerTeamsPage() {
   );
 }
 
-function TeamCard({ team }: { team: Team }) {
+function TeamCard({ team, expanded, onToggle }: { team: Team; expanded: boolean; onToggle: () => void }) {
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
@@ -339,6 +383,9 @@ function TeamCard({ team }: { team: Team }) {
               <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
               </p>
+              {team.tournamentName && (
+                <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">{team.tournamentName}</p>
+              )}
             </div>
             <span className="w-fit rounded-full bg-secondary px-3 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
               {team.members?.length || 0} members
@@ -358,18 +405,25 @@ function TeamCard({ team }: { team: Team }) {
           </div>
 
           {team.members?.length ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {team.members.slice(0, 6).map((member, index) => (
-                <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                  {String(member)}
-                </span>
-              ))}
-              {team.members.length > 6 && (
-                <span className="rounded-lg bg-accent/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-accent">
-                  +{team.members.length - 6} more
-                </span>
+            <>
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={expanded}
+                className="mt-4 h-10 w-full rounded-xl border border-border bg-secondary/60 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
+              >
+                {expanded ? "Hide Players" : "View Players"}
+              </button>
+              {expanded && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {team.members.map((member, index) => (
+                    <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground">
+                      {String(member)}
+                    </span>
+                  ))}
+                </div>
               )}
-            </div>
+            </>
           ) : null}
         </div>
       </div>

@@ -20,6 +20,8 @@ export interface MatchData {
   teamB: string;
   sport: string;
   sportName?: string;
+  tournamentId?: string;
+  tournamentName?: string;
   type: string;
   scoreA: number;
   scoreB: number;

@@ -8,13 +8,15 @@ import { cn } from "@/lib/utils";
 import { MatchData, LiveFeedPost } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
-import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
+import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, getPublicTournaments, mapMongoFixture, TournamentPayload } from "@/lib/api";
 
 const tabs = ["All Matches", "Live", "Upcoming", "Finished"];
 
 export default function MatchesPage() {
   const [activeTab, setActiveTab] = useState("All Matches");
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [liveFeeds, setLiveFeeds] = useState<LiveFeedPost[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -26,15 +28,18 @@ export default function MatchesPage() {
     let isMounted = true;
 
     async function loadMatches() {
-      const [fixtures, liveScores, feeds] = await Promise.all([
+      const [fixtures, liveScores, feeds, publicTournaments] = await Promise.all([
         getPublicFixtures(),
         getPublicLiveScores(),
         getPublicLiveFeeds(),
+        getPublicTournaments(),
       ]);
 
       if (!isMounted) return;
 
       const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setTournaments(publicTournaments);
+      setSelectedTournamentId((current) => current || publicTournaments[0]?._id || "");
       setMatchesData(
         fixtures
           .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
@@ -68,7 +73,11 @@ export default function MatchesPage() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const filteredMatches = matchesData.filter(match => {
+  const tournamentFilteredMatches = selectedTournamentId
+    ? matchesData.filter((match) => match.tournamentId === selectedTournamentId)
+    : matchesData;
+
+  const filteredMatches = tournamentFilteredMatches.filter(match => {
     if (activeTab === "All Matches") return true;
     return match.status === activeTab;
   });
@@ -201,6 +210,26 @@ export default function MatchesPage() {
           </AnimatePresence>
         </div>
       </header>
+
+      <section className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
+          <h2 className="mt-1 text-xl font-black sport-heading text-foreground">Select Tournament</h2>
+        </div>
+        <select
+          value={selectedTournamentId}
+          onChange={(event) => setSelectedTournamentId(event.target.value)}
+          className="mt-4 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
+        >
+          {tournaments.length === 0 ? (
+            <option value="">No tournaments available</option>
+          ) : (
+            tournaments.map((tournament) => (
+              <option key={tournament._id} value={tournament._id}>{tournament.name}</option>
+            ))
+          )}
+        </select>
+      </section>
 
       {/* Navigation Tabs */}
       <div className="flex gap-4 p-1 bg-secondary/50 rounded-2xl w-fit">

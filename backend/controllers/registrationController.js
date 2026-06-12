@@ -1,5 +1,7 @@
 import TeamRegistration from "../models/TeamRegistration.js";
 import Sport from "../models/Sport.js";
+import Team from "../models/Team.js";
+import Tournament from "../models/Tournament.js";
 
 const VALID_IMAGE_PREFIXES = [
   "data:image/jpeg;base64,",
@@ -32,6 +34,8 @@ export async function submitRegistration(req, res) {
   try {
     const {
       sportId,
+      tournamentId,
+      tournamentName: rawTournamentName,
       sportName: rawSportName,
       category,
       department,
@@ -53,6 +57,7 @@ export async function submitRegistration(req, res) {
 
     // Validate required fields
     if (!sportId) return res.status(400).json({ message: "Sport is required" });
+    if (!tournamentId) return res.status(400).json({ message: "Tournament is required" });
     if (!category || !["Male", "Female"].includes(category)) {
       return res.status(400).json({ message: "Category must be Male or Female" });
     }
@@ -64,8 +69,12 @@ export async function submitRegistration(req, res) {
     if (!trimmedCaptainPhone) return res.status(400).json({ message: "Captain phone is required" });
 
     // Validate sport exists
-    const sport = await Sport.findById(sportId).lean();
+    const [sport, tournament] = await Promise.all([
+      Sport.findById(sportId).lean(),
+      Tournament.findById(tournamentId).lean(),
+    ]);
     if (!sport) return res.status(400).json({ message: "Sport not found" });
+    if (!tournament) return res.status(400).json({ message: "Tournament not found" });
 
     // Validate categories
     const sportCategories = sport.categories || ["Male", "Female"];
@@ -74,6 +83,7 @@ export async function submitRegistration(req, res) {
     }
 
     const sportName = rawSportName || sport.sportName || sport.name || "";
+    const tournamentName = rawTournamentName || tournament.name || "";
     const members = Array.isArray(rawMembers) ? rawMembers : [];
 
     // Validate members
@@ -138,6 +148,8 @@ export async function submitRegistration(req, res) {
 
     const registration = await TeamRegistration.create({
       sportId,
+      tournamentId,
+      tournamentName,
       sportName,
       category,
       department: trimmedDept,
@@ -195,7 +207,7 @@ export async function listApprovedRegistrations(req, res) {
     }
 
     const registrations = await TeamRegistration.find(filter)
-      .sort({ submittedAt: -1 })
+      .sort({ reviewedAt: -1, submittedAt: -1 })
       .lean();
 
     return res.json(registrations);
@@ -207,19 +219,57 @@ export async function listApprovedRegistrations(req, res) {
 export async function approveRegistration(req, res) {
   try {
     const { id } = req.params;
+    const reviewedAt = new Date();
 
     const registration = await TeamRegistration.findByIdAndUpdate(
       id,
       {
         status: "approved",
         reviewedBy: req.user.id,
-        reviewedAt: new Date(),
+        reviewedAt,
         rejectionReason: "",
       },
       { new: true }
     );
 
     if (!registration) return res.status(404).json({ message: "Registration not found" });
+
+    const sportName = registration.sportName || "";
+    await Team.findOneAndUpdate(
+      {
+        sportId: registration.sportId,
+        tournamentId: registration.tournamentId,
+        category: registration.category,
+        department: registration.department,
+        teamName: registration.teamName,
+      },
+      {
+        teamName: registration.teamName,
+        department: registration.department,
+        sport: sportName.trim().toLowerCase().replace(/\s+/g, "-"),
+        sportName,
+        sportId: registration.sportId,
+        tournamentId: registration.tournamentId,
+        tournamentName: registration.tournamentName,
+        category: registration.category,
+        captainName: registration.captainName,
+        captainRegNo: registration.captainRegNo,
+        captainEmail: registration.captainEmail,
+        captainPhone: registration.captainPhone,
+        contactNumber: registration.captainPhone,
+        email: registration.captainEmail,
+        members: registration.members || [],
+        logo: registration.teamLogo || "",
+        status: "approved",
+        submittedAt: registration.submittedAt,
+        reviewedBy: req.user.id,
+        reviewedAt,
+        rejectionReason: "",
+        registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
     return res.json(registration);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -270,6 +320,7 @@ export async function exportApprovedExcel(req, res) {
     const rows = [];
     for (const reg of registrations) {
       const base = {
+        tournamentName: reg.tournamentName,
         sportName: reg.sportName,
         category: reg.category,
         department: reg.department,
@@ -304,6 +355,7 @@ export async function exportApprovedExcel(req, res) {
       const sheet = workbook.addWorksheet("Approved Registrations");
 
       sheet.columns = [
+        { header: "Tournament", key: "tournamentName", width: 24 },
         { header: "Sport Name", key: "sportName", width: 20 },
         { header: "Category", key: "category", width: 12 },
         { header: "Department", key: "department", width: 20 },

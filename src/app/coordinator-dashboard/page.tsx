@@ -773,6 +773,8 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
 function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
   const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTournament, setSelectedTournament] = useState("all");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -807,37 +809,75 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
     );
   }
 
-  const maleRegs = registrations.filter((r) => r.category === "Male");
-  const femaleRegs = registrations.filter((r) => r.category === "Female");
+  const tournamentOptions = Array.from(
+    new Map(
+      registrations
+        .filter((reg) => reg.tournamentId || reg.tournamentName)
+        .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"])
+    ).entries()
+  );
+  const visibleRegistrations = selectedTournament === "all"
+    ? registrations
+    : registrations.filter((reg) => reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+
+  const maleRegs = visibleRegistrations.filter((r) => r.category === "Male");
+  const femaleRegs = visibleRegistrations.filter((r) => r.category === "Female");
 
   function RegCard({ reg }: { reg: TeamRegistrationPayload }) {
+    const isExpanded = expandedTeamId === reg._id;
     return (
-      <div className="rounded-xl border border-border bg-secondary/30 p-4">
+      <button
+        type="button"
+        onClick={() => setExpandedTeamId(isExpanded ? null : reg._id)}
+        aria-expanded={isExpanded}
+        className="w-full rounded-xl border border-border bg-secondary/30 p-4 text-left transition-colors hover:border-accent"
+      >
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-black text-foreground">{reg.teamName}</h4>
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
           <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
         </div>
+        {reg.tournamentName && <p className="mt-1 text-xs font-bold text-accent">{reg.tournamentName}</p>}
         <p className="mt-1 text-xs font-semibold text-muted-foreground">{reg.department} &middot; Captain: {reg.captainName}</p>
-        {reg.members && reg.members.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {reg.members.slice(0, 5).map((m, i) => (
-              <span key={i} className="rounded-md bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{m.fullName}</span>
-            ))}
-            {reg.members.length > 5 && (
-              <span className="rounded-md bg-background px-2 py-0.5 text-[9px] font-bold text-muted-foreground">+{reg.members.length - 5}</span>
+        {isExpanded && (
+          <div className="mt-3 border-t border-border pt-3">
+            {reg.members && reg.members.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {reg.members.map((m, i) => (
+                  <span key={`${reg._id}-${m.registrationNo}-${i}`} className="rounded-md bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
+                    {m.fullName} {m.registrationNo ? `(${m.registrationNo})` : ""}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-muted-foreground">No members recorded for this team.</p>
             )}
           </div>
         )}
         {reg.teamLogo && (
           <img src={reg.teamLogo} alt="" className="mt-2 h-10 w-10 rounded-lg object-cover" />
         )}
-      </div>
+      </button>
     );
   }
 
   return (
     <div className="space-y-5 max-h-96 overflow-y-auto">
+      {tournamentOptions.length > 0 && (
+        <select
+          value={selectedTournament}
+          onChange={(event) => {
+            setSelectedTournament(event.target.value);
+            setExpandedTeamId(null);
+          }}
+          className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground outline-none focus:border-accent"
+        >
+          <option value="all">All Tournaments</option>
+          {tournamentOptions.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+      )}
       {maleRegs.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-1.5">

@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 const fixtureSchema = new mongoose.Schema(
   {
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport", required: true },
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
+    tournamentName: { type: String, trim: true },
     sport: { type: String, required: true, trim: true, lowercase: true },
     sportName: { type: String, trim: true },
     category: { type: String, enum: ["Male", "Female"], default: "Male" },

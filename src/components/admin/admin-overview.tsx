@@ -16,8 +16,7 @@ import { cn } from "@/lib/utils";
 interface AdminOverviewProps {
   teams: Team[];
   fixtures: Fixture[];
-  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule" | "tournaments" | "leaderboard" | "rules" | "users" | "approvals") => void;
-  onUpdateTeam: (team: Team) => void;
+  setActiveTab: (tab: "dashboard" | "teams" | "generate-fixtures" | "schedule" | "tournaments" | "leaderboard" | "rules" | "users" | "approvals") => void;
   canManageSetup?: boolean;
 }
 
@@ -50,7 +49,6 @@ export function AdminOverview({
   teams,
   fixtures,
   setActiveTab,
-  onUpdateTeam,
   canManageSetup = false,
 }: AdminOverviewProps) {
   const today = new Date();
@@ -98,7 +96,7 @@ export function AdminOverview({
         timestamp: "Tournament Setup"
       });
     } else {
-      notifList.push("No fixtures have been published yet. Open Create Fixtures to build the match schedule.");
+      notifList.push("No fixtures have been published yet. Open Generate Fixtures to build the match schedule.");
     }
 
     // Check completed matches
@@ -185,10 +183,10 @@ export function AdminOverview({
             <Plus size={14} /> Add Team
           </button>
           <button
-            onClick={() => setActiveTab("fixtures")}
+            onClick={() => setActiveTab("generate-fixtures")}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-white border border-white/20 text-slate-950 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
-            Create Fixtures <ArrowRight size={14} />
+            Generate Fixtures <ArrowRight size={14} />
           </button>
         </div>
       </div>

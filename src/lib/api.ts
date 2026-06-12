@@ -175,6 +175,8 @@ export interface TeamSyncPayload {
   sport: string;
   sportName?: string;
   sportId?: string;
+  tournamentId?: string;
+  tournamentName?: string;
   category?: string;
   members?: unknown[];
   coachCaptain?: string;
@@ -187,6 +189,7 @@ export interface TeamSyncPayload {
   contactNumber?: string;
   logo?: string;
   status?: string;
+  reviewedAt?: string;
   wins?: number;
   losses?: number;
   draws?: number;
@@ -235,12 +238,16 @@ export function deleteAdminTeam(teamId: string) {
 
 export interface AdminFixturePayload {
   id: string;
+  tournamentId?: string;
+  tournamentName?: string;
   teamA: string;
   teamB: string;
   teamAName?: string;
   teamBName?: string;
   sport: string;
   sportName?: string;
+  sportId?: string;
+  category?: "Male" | "Female";
   date: string;
   time: string;
   venue: string;
@@ -259,6 +266,32 @@ export function replaceAdminFixtures(fixtures: Omit<AdminFixturePayload, "id">[]
   return apiFetch<AdminFixturePayload[]>("/admin/fixtures", {
     method: "PUT",
     body: JSON.stringify({ fixtures }),
+  });
+}
+
+export interface GenerateFixturesPayload {
+  tournamentId: string;
+  sportId: string;
+  category: "Male" | "Female";
+  venueId?: string;
+  venue?: string;
+  startDate: string;
+  dayStartTime: string;
+  dayEndTime: string;
+  matchDurationMinutes: number;
+  gapMinutes: number;
+}
+
+export interface GenerateFixturesResponse {
+  message: string;
+  totalMatches: number;
+  fixtures: AdminFixturePayload[];
+}
+
+export function generateAdminFixtures(payload: GenerateFixturesPayload) {
+  return apiFetch<GenerateFixturesResponse>("/admin/fixtures/generate", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
@@ -299,6 +332,8 @@ export interface MongoRefName {
 
 export interface MongoFixture {
   _id: string;
+  tournamentId?: MongoRefName | string;
+  tournamentName?: string;
   sportId?: MongoRefName | string;
   sport?: string;
   sportName?: string;
@@ -353,6 +388,8 @@ export interface MongoLiveFeed {
 export interface MongoTeam {
   _id: string;
   teamName: string;
+  tournamentId?: MongoRefName | string;
+  tournamentName?: string;
   department?: string;
   sport?: string;
   sportName?: string;
@@ -372,6 +409,7 @@ export interface MongoTeam {
   registeredAt?: number;
   playerRegisteredAt?: number[];
   status?: "pending" | "approved" | "rejected";
+  reviewedAt?: string;
   createdAt?: string;
 }
 
@@ -390,10 +428,13 @@ export interface MongoSport {
 export interface SportDetailTeam {
   _id: string;
   teamName: string;
+  tournamentId?: string;
+  tournamentName?: string;
   department: string;
   category: string;
   captainName: string;
   membersCount: number;
+  members?: SportDetailMember[];
   status: string;
 }
 
@@ -402,6 +443,8 @@ export interface SportDetailMember {
   registrationNo: string;
   department: string;
   teamName: string;
+  tournamentId?: string;
+  tournamentName?: string;
   category: string;
   role?: string;
   position?: string;
@@ -477,6 +520,9 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     department: team.department,
     sport,
     sportName: team.sportName || getRefName(team.sportId, ""),
+    sportId: typeof team.sportId === "string" ? team.sportId : team.sportId?._id || team.sportId?.id || "",
+    tournamentId: typeof team.tournamentId === "string" ? team.tournamentId : team.tournamentId?._id || team.tournamentId?.id || "",
+    tournamentName: team.tournamentName || getRefName(team.tournamentId, ""),
     category: team.category,
     members: (team.members || []).map(getMemberName).filter(Boolean),
     coachCaptain: team.captainName || "",
@@ -486,6 +532,7 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     contactNumber: team.contactNumber || "",
     email: team.email || "",
     status: team.status,
+    reviewedAt: team.reviewedAt,
     wins: team.wins || 0,
     losses: team.losses || 0,
     draws: team.draws || 0,
@@ -510,6 +557,8 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     teamB: fixture.teamBName || liveScore?.teamBName || getRefName(fixture.teamB, "Team B"),
     sport: normalizePublicSport(sportName),
     sportName,
+    tournamentId: typeof fixture.tournamentId === "string" ? fixture.tournamentId : fixture.tournamentId?._id || fixture.tournamentId?.id || "",
+    tournamentName: fixture.tournamentName || getRefName(fixture.tournamentId, ""),
     type: fixture.round || sportName || "Match",
     scoreA: Number(liveScore?.teamAScore ?? fixture.scoreA ?? 0),
     scoreB: Number(liveScore?.teamBScore ?? fixture.scoreB ?? 0),
@@ -946,6 +995,8 @@ export interface TeamRegistrationMember {
 
 export interface TeamRegistrationPayload {
   _id: string;
+  tournamentId: string;
+  tournamentName: string;
   sportId: string;
   sportName: string;
   category: "Male" | "Female";

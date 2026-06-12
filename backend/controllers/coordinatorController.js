@@ -274,6 +274,20 @@ export async function assignFixtureVolunteer(req, res) {
     return res.status(403).json({ message: "Access denied: you are not assigned to this sport." });
   }
 
+  if (fixture.startTime && fixture.endTime) {
+    const volunteerClash = await Fixture.findOne({
+      _id: { $ne: fixture._id },
+      assignedVolunteer: volunteer._id,
+      status: { $ne: "cancelled" },
+      startTime: { $lt: fixture.endTime },
+      endTime: { $gt: fixture.startTime },
+    }).lean();
+
+    if (volunteerClash) {
+      return res.status(400).json({ message: "Volunteer clash detected: this volunteer is already assigned to another match at this time." });
+    }
+  }
+
   fixture.assignedVolunteer = volunteer._id;
   await fixture.save();
 

@@ -120,7 +120,11 @@ export function LiveSportsPanel() {
   const liveMatches = matches.filter((m) => m.status === "Live");
   const upcomingMatches = matches
     .filter((m) => m.status === "Upcoming")
-    .slice(0, 2); // Show top 2 next matches
+    .slice(0, 2);
+
+  if (liveMatches.length === 0) {
+    return null;
+  }
 
   return (
     <>
@@ -294,15 +298,14 @@ export function LiveSportsPanel() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={() => setIsExpanded(true)}
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card shadow-2xl hover:scale-105 active:scale-95 transition-transform relative"
+              className="relative flex h-12 w-12 items-center justify-center rounded-full border border-green-400/50 bg-card shadow-[0_0_28px_rgba(34,197,94,0.35)] transition-transform hover:scale-105 active:scale-95"
               aria-label="Expand Live Panel"
             >
-              <Activity className={cn("h-5 w-5 text-foreground", liveMatches.length > 0 ? "animate-pulse text-green-500" : "")} />
-              {liveMatches.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[8px] font-black text-white shadow-md animate-pulse">
-                  {liveMatches.length}
-                </span>
-              )}
+              <span className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" />
+              <Activity className="relative h-5 w-5 animate-pulse text-green-500" />
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[8px] font-black text-white shadow-md animate-pulse">
+                {liveMatches.length}
+              </span>
             </motion.button>
           )}
         </AnimatePresence>
