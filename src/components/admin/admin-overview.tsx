@@ -6,17 +6,17 @@ import {
   Users, Trophy, Calendar, Activity,
   Bell, Play, CheckCircle, Clock, Plus, Zap,
   ArrowRight, Sparkles, BarChart2, ShieldAlert,
-  MapPin, Radio, Timer, Shield, ShieldOff
+  MapPin, Radio, Timer
 } from "lucide-react";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPublicSports, MongoSport } from "@/lib/api";
+import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface AdminOverviewProps {
   teams: Team[];
   fixtures: Fixture[];
-  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule" | "users") => void;
+  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule" | "tournaments" | "leaderboard" | "rules" | "users" | "approvals") => void;
   onUpdateTeam: (team: Team) => void;
   canManageSetup?: boolean;
 }
@@ -51,7 +51,7 @@ export function AdminOverview({
   fixtures,
   setActiveTab,
   onUpdateTeam,
-  canManageSetup = true,
+  canManageSetup = false,
 }: AdminOverviewProps) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -61,16 +61,11 @@ export function AdminOverview({
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
-  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
-
-  useEffect(() => {
-    getPublicSports().then(setSportsList).catch(() => {});
-  }, []);
 
   // Calculate stats
   const totalTeams = teams.length;
   const totalPlayers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
-  const totalSports = sportsList.length || teams.reduce((acc, t) => { acc.add(t.sport); return acc; }, new Set<string>()).size;
+  const totalSports = sports.length;
 
   const upcomingMatches = fixtures.filter(f => f.status === "scheduled");
   const ongoingMatches = fixtures.filter(f => f.status === "live");
@@ -84,19 +79,12 @@ export function AdminOverview({
     const actList: ActivityItem[] = [];
     const notifList: string[] = [];
 
-    // Check for pending teams needing approval
-    const pendingTeams = teams.filter(t => t.status === "pending");
-    if (pendingTeams.length > 0) {
-      notifList.push(`${pendingTeams.length} team${pendingTeams.length === 1 ? "" : "s"} pending approval. Go to Teams to review and approve or reject.`);
-    }
-
     // Add recent activities based on teams
     teams.slice(-3).forEach(team => {
-      const sportName = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === team.sport)?.sportName || team.sport : team.sport;
       actList.push({
         id: `act-team-${team.id}`,
         type: "team",
-        message: `New team "${team.name}" was registered for ${sportName}.`,
+        message: `New team "${team.name}" was registered for ${sports.find(s => s.id === team.sport)?.name || team.sport}.`,
         timestamp: "Recently"
       });
     });
@@ -170,14 +158,10 @@ export function AdminOverview({
   };
 
   // Sports breakdown for stats graph
-  const matchesPerSport = (sportsList.length > 0 ? sportsList.map(s => ({ id: normalizeSportValue(s.sportName || s.name || ""), name: s.sportName || s.name || "" })) : []).map(sport => {
+  const matchesPerSport = sports.map(sport => {
     const count = fixtures.filter(f => f.sport === sport.id).length;
     return { name: sport.name, count };
   });
-
-  function normalizeSportValue(value: string) {
-    return value.trim().toLowerCase().replace(/\s+/g, "-");
-  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -186,38 +170,22 @@ export function AdminOverview({
         <div>
           <div className="admin-hero-accent flex items-center gap-2">
             <Sparkles size={18} />
-          <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">
-            {canManageSetup ? "Supercoordinator Overview" : "Admin Overview"}
-          </span>
-        </div>
-          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">
-            {canManageSetup ? "Start here to run the event" : "System visibility and permissions"}
-          </h2>
+            <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">Admin Overview</span>
+          </div>
+          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">Start here to run the event</h2>
           <p className="text-sm text-slate-300 max-w-xl mt-1">
-            {canManageSetup
-              ? "First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress."
-              : "Review supercoordinators, coordinators, volunteers, registered teams, and match activity without changing tournament setup."}
+            First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManageSetup ? (
-            <button
-              onClick={() => setActiveTab("teams")}
-              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
-            >
-              <Plus size={14} /> Add Team
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveTab("users")}
-              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
-            >
-              <Users size={14} /> View Users
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab("teams")}
+            className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
+          >
+            <Plus size={14} /> Add Team
+          </button>
           <button
             onClick={() => setActiveTab("fixtures")}
-            disabled={!canManageSetup}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-white border border-white/20 text-slate-950 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
             Create Fixtures <ArrowRight size={14} />
@@ -226,13 +194,11 @@ export function AdminOverview({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: "Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
-          { label: "Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
-          { label: "Sports", val: totalSports, icon: Activity, color: "text-sky-600 border-sky-200 bg-sky-50" },
-          { label: "Male Teams", val: teams.filter(t => (t.category || "Male") === "Male").length, icon: Shield, color: "text-blue-600 border-blue-200 bg-blue-50" },
-          { label: "Female Teams", val: teams.filter(t => (t.category || "Male") === "Female").length, icon: ShieldOff, color: "text-pink-600 border-pink-200 bg-pink-50" },
+          { label: "Total Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
+          { label: "Total Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
+          { label: "Total Sports", val: totalSports, icon: Activity, color: "text-sky-600 border-sky-200 bg-sky-50" },
           { label: "Upcoming", val: upcomingMatches.length, icon: Clock, color: "text-blue-600 border-blue-200 bg-blue-50" },
           { label: "Ongoing", val: ongoingMatches.length, icon: Play, color: "text-rose-600 border-rose-200 bg-rose-50" },
           { label: "Completed", val: completedMatches.length, icon: CheckCircle, color: "text-green-600 border-green-200 bg-green-50" }
@@ -240,13 +206,13 @@ export function AdminOverview({
           const Icon = stat.icon;
           return (
             <Card key={idx} className="bg-card border-border shadow-sm hover:border-slate-300 transition-all">
-              <CardContent className="p-3 sm:p-5 flex flex-col justify-between h-full">
-                <div className={`p-1.5 sm:p-2.5 rounded-xl border w-fit ${stat.color}`}>
-                  <Icon size={16} className="sm:size-[20px]" />
+              <CardContent className="p-5 flex flex-col justify-between h-full">
+                <div className={`p-2.5 rounded-xl border w-fit ${stat.color}`}>
+                  <Icon size={20} />
                 </div>
-                <div className="mt-2 sm:mt-4">
-                  <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider text-muted-foreground block">{stat.label}</span>
-                  <span className="text-xl sm:text-3xl font-black text-foreground block mt-0.5 sm:mt-1 scoreboard-number">{stat.val}</span>
+                <div className="mt-4">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">{stat.label}</span>
+                  <span className="text-3xl font-black text-foreground block mt-1 scoreboard-number">{stat.val}</span>
                 </div>
               </CardContent>
             </Card>
@@ -307,7 +273,7 @@ export function AdminOverview({
             {ongoingMatches.map((match) => {
               const teamAName = teams.find(t => t.id === match.teamA)?.name || match.teamA;
               const teamBName = teams.find(t => t.id === match.teamB)?.name || match.teamB;
-              const sportLabel = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport;
+              const sportLabel = sports.find(s => s.id === match.sport)?.name || match.sport;
               const scoreA = match.scoreA ?? "-";
               const scoreB = match.scoreB ?? "-";
               return (
@@ -585,7 +551,7 @@ export function AdminOverview({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-black uppercase tracking-wider text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded">
-                          {sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport}
+                          {sports.find(s => s.id === match.sport)?.name || match.sport}
                         </span>
                         <span className="text-xs text-slate-400 font-medium">{match.time} • {match.venue}</span>
                       </div>

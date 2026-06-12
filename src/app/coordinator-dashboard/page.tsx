@@ -8,6 +8,7 @@ import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Send, 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
+import { InvictaLogo } from "@/components/invicta-logo";
 import { Team } from "@/lib/fixture-generator";
 import {
   AdminFixturePayload,
@@ -248,9 +249,7 @@ function CoordinatorDashboardContent() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="dashboard-logo flex h-11 w-32 shrink-0 items-center overflow-hidden sm:h-14 sm:w-44">
-              <img src="/msu-logo-transparent.png" alt="Medhavi Skills University" className="h-auto w-full max-w-full object-contain" />
-            </div>
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-14 sm:w-52" />
             <div className="min-w-0">
               <h1 className="sport-heading text-lg font-black sm:text-2xl">Coordinator Dashboard</h1>
               <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">

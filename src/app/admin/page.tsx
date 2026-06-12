@@ -13,6 +13,7 @@ import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Download, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
 import {
@@ -471,13 +472,7 @@ export default function AdminDashboard() {
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <div className="dashboard-logo flex h-11 w-36 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
-              <img
-                src="/msu-logo-transparent.png"
-                alt="Medhavi Skills University"
-                className="h-auto w-full max-w-full object-contain"
-              />
-            </div>
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
             <div className="space-y-0.5 sm:space-y-1">
               <h1 className="sport-heading text-lg font-black sm:text-3xl">
                 {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}

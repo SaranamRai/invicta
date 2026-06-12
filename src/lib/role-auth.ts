@@ -16,9 +16,9 @@ export interface RoleAccount {
 }
 
 export const roleHomePath: Record<PortalRole, string> = {
-  admin: "/admin",
+  admin: "/admin-dashboard",
   supercoordinator: "/admin",
-  volunteer: "/volunteer",
+  volunteer: "/volunteer-dashboard",
   coordinator: "/coordinator-dashboard",
 };
 
@@ -47,9 +47,5 @@ export function clearPortalSession() {
 }
 
 export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
-  if (requiredRole === "admin") {
-    return accountRole === "admin" || accountRole === "supercoordinator";
-  }
-
-  return accountRole === requiredRole;
+  return accountRole === "admin" || accountRole === "supercoordinator" || accountRole === requiredRole;
 }

@@ -171,9 +171,17 @@ async function assertRegistrationNumberLimit(registrationNumbers, sportId) {
       ],
     }).select("sportId").lean();
 
+    const registrations = await TeamRegistration.find({
+      status: { $in: ["pending", "approved"] },
+      $or: [
+        { captainRegNo: registrationNumber },
+        { "members.registrationNo": registrationNumber },
+      ],
+    }).select("sportId").lean();
+
     const sports = new Set(
-      teams
-        .map((team) => team.sportId?.toString?.())
+      [...teams, ...registrations]
+        .map((entry) => entry.sportId?.toString?.())
         .filter(Boolean)
     );
     sports.add(sportId.toString());
@@ -231,10 +239,11 @@ export async function registerPublicTeam(req, res) {
     }
 
     const memberRegNos = members.map((member) => member.registrationNumber).filter(Boolean);
-    const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
-    if (registrationNumbers.length !== [captainRegNo, ...memberRegNos].length) {
+    const memberRegNoSet = new Set(memberRegNos);
+    if (memberRegNoSet.size !== memberRegNos.length) {
       return res.status(400).json({ message: "Same registration number should not be added twice in the same team." });
     }
+    const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
 
     if (!memberRegNos.includes(captainRegNo)) {
       members.unshift({
@@ -262,16 +271,22 @@ export async function registerPublicTeam(req, res) {
       status: { $in: ["pending", "approved"] },
     });
 
-    if (duplicateTeam) {
+    const duplicateRegistration = await TeamRegistration.findOne({
+      department,
+      sportId: sportDoc._id,
+      category,
+      status: { $in: ["pending", "approved"] },
+    });
+
+    if (duplicateTeam || duplicateRegistration) {
       return res.status(400).json({
         message: "This department already submitted a team for this sport and category."
       });
     }
 
-    const team = await Team.create({
+    const registration = await TeamRegistration.create({
       teamName,
       department,
-      sport,
       sportName,
       sportId: sportDoc._id,
       category,
@@ -279,39 +294,39 @@ export async function registerPublicTeam(req, res) {
       captainRegNo,
       captainEmail: email,
       captainPhone: phone,
-      contactNumber: phone,
-      email,
-      members,
+      members: members.map((member) => ({
+        fullName: member.fullName,
+        registrationNo: member.registrationNumber,
+        department: member.department || department,
+        semester: member.semester || "",
+        gender: member.gender || category,
+        email: member.email || "",
+        phone: member.phone || "",
+      })),
       status: "pending",
       submittedAt: new Date(),
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      points: 0,
-      registeredAt: Date.now(),
-      playerRegisteredAt: members.map(() => Date.now()),
     });
 
     // map team response (matching the API client structure)
     return res.status(201).json({
-      id: team._id.toString(),
-      name: team.teamName,
-      department: team.department,
-      sport: team.sport,
-      sportId: team.sportId,
-      sportName: team.sportName,
-      category: team.category,
-      members: team.members || [],
-      coachCaptain: team.captainName || "",
-      captainRegNo: team.captainRegNo || "",
-      contactNumber: team.contactNumber || "",
-      email: team.email || "",
-      status: team.status,
-      wins: team.wins || 0,
-      losses: team.losses || 0,
-      draws: team.draws || 0,
-      points: team.points || 0,
-      registeredAt: team.registeredAt,
+      id: registration._id.toString(),
+      name: registration.teamName,
+      department: registration.department,
+      sport,
+      sportId: registration.sportId,
+      sportName: registration.sportName,
+      category: registration.category,
+      members: registration.members || [],
+      coachCaptain: registration.captainName || "",
+      captainRegNo: registration.captainRegNo || "",
+      contactNumber: registration.captainPhone || "",
+      email: registration.captainEmail || "",
+      status: registration.status,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
     });
   } catch (error) {
     console.error("Public team registration failed:", error);
@@ -375,6 +390,9 @@ export async function getSportDetailView(req, res) {
           department: team.department || "",
           teamName: team.teamName || "",
           category,
+          role: typeof m === "object" ? m?.role || m?.position || "" : "",
+          position: typeof m === "object" ? m?.position || m?.role || "" : "",
+          profilePhoto: typeof m === "object" ? m?.profilePhoto || m?.photo || m?.image || "" : "",
         }))
       );
     }

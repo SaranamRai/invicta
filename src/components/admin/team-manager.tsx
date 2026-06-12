@@ -31,6 +31,24 @@ interface ExtendedTeam extends Team {
   memberRegNos?: string[];
 }
 
+type TeamMemberValue =
+  | string
+  | TeamMemberObject;
+
+type TeamMemberObject = {
+  fullName?: string;
+  name?: string;
+  registrationNumber?: string;
+  registrationNo?: string;
+  regNo?: string;
+  department?: string;
+  semester?: string;
+  gender?: string;
+  email?: string;
+  phone?: string;
+  isCaptain?: boolean;
+};
+
 interface TeamManagerProps {
   teams: Team[];
   onAddTeam: (team: Team) => void;
@@ -43,6 +61,28 @@ const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 const normalizeRegNo = (value: string) => value.trim().replace(/\s+/g, "").toUpperCase();
 const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(0, 10);
+
+function getMemberDisplay(member: unknown, fallbackRegNo = "") {
+  if (typeof member === "string") {
+    return {
+      fullName: member,
+      registrationNo: fallbackRegNo,
+    };
+  }
+
+  if (member && typeof member === "object") {
+    const value = member as TeamMemberObject;
+    return {
+      fullName: value.fullName || value.name || value.registrationNumber || value.registrationNo || value.regNo || "Unnamed player",
+      registrationNo: value.registrationNo || value.registrationNumber || value.regNo || fallbackRegNo,
+    };
+  }
+
+  return {
+    fullName: "",
+    registrationNo: fallbackRegNo,
+  };
+}
 
 export function TeamManager({
   teams,
@@ -175,10 +215,7 @@ export function TeamManager({
     setWins(team.wins || 0);
     setLosses(team.losses || 0);
     setMembersList(
-      (team.members || []).map((name, i) => ({
-        fullName: name,
-        registrationNo: team.memberRegNos?.[i] || "",
-      }))
+      (team.members || []).map((member, i) => getMemberDisplay(member, team.memberRegNos?.[i] || "")).filter((member) => member.fullName)
     );
     setRegisteredAt(team.registeredAt);
     setPlayerRegisteredAt(team.playerRegisteredAt || []);
@@ -556,11 +593,11 @@ export function TeamManager({
                       </div>
                       {team.members && team.members.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {team.members.slice(0, 4).map((name, mIdx) => {
-                            const regNo = team.memberRegNos?.[mIdx] || "";
+                          {team.members.slice(0, 4).map((member, mIdx) => {
+                            const displayMember = getMemberDisplay(member, team.memberRegNos?.[mIdx] || "");
                             return (
                               <span key={mIdx} className="text-[9px] font-medium px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-white/5">
-                                {name}{regNo ? ` (${regNo})` : ""}
+                                {displayMember.fullName}{displayMember.registrationNo ? ` (${displayMember.registrationNo})` : ""}
                               </span>
                             );
                           })}

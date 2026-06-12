@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { BookOpen, Calendar, HelpCircle, Images, LayoutDashboard, LogIn, Megaphone, Target, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Home", href: "/public-dashboard" },
@@ -28,12 +29,7 @@ export function Sidebar() {
       <aside className="sticky top-0 z-40 border-b border-border bg-background/95 px-2 py-2 text-foreground backdrop-blur-xl lg:hidden">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <Link href="/public-dashboard" className="flex min-w-0 shrink items-center gap-2">
-            <img
-              src="/msu-logo-flat.png"
-              alt="Medhavi Skills University"
-              className="h-7 w-20 max-w-full object-contain sm:h-9 sm:w-24"
-            />
-            <span className="sport-heading text-sm font-black text-primary sm:text-base">Invicta</span>
+            <MedhaviLogo className="h-10 w-40 sm:h-12 sm:w-48" />
           </Link>
           <div className="flex shrink-0 items-center gap-1.5">
             <ThemeToggle />
@@ -72,13 +68,8 @@ export function Sidebar() {
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-[#020617] text-white lg:block">
         <div className="no-scrollbar flex h-full flex-col overflow-y-auto px-5 py-6">
           <Link href="/public-dashboard" className="mb-7 block">
-            <img
-              src="/msu-logo-flat.png"
-              alt="Medhavi Skills University"
-              className="mb-4 h-auto w-full object-contain"
-            />
+            <MedhaviLogo className="mx-auto mb-4 h-16 w-full" />
             <div className="border-t border-white/10 pt-4">
-              <p className="sport-heading text-xl font-black tracking-tight text-white">Invicta</p>
               <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">Sports Hub</p>
             </div>
           </Link>

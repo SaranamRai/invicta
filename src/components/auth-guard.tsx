@@ -11,6 +11,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const isLandingPage = pathname === "/";
+  const isAboutPage = pathname === "/about";
   const isAuthPage = pathname === "/login";
   const isTeamRegistrationPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
@@ -19,7 +20,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminPage = pathname.startsWith("/admin") || pathname.startsWith("/admin-dashboard");
   const isCoordinatorPage = pathname.startsWith("/coordinator-dashboard");
 
-  if (isLandingPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
+  if (isLandingPage || isAboutPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
     return <>{children}</>;
   }
 

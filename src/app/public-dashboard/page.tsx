@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Calendar,
   ClipboardList,
+  Home,
   LogIn,
   Radio,
   Trophy,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { InvictaLogo } from "@/components/invicta-logo";
 import { Team } from "@/lib/fixture-generator";
 import {
   getPublicFixtures,
@@ -146,9 +148,12 @@ export default function PublicDashboard() {
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
             </div>
-            <h1 className="sport-heading text-4xl font-black text-white sm:text-5xl lg:text-6xl">
-              MSU <span className="text-accent italic">INVICTA.</span>
-            </h1>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+              <span className="sport-heading text-5xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
+                MSU
+              </span>
+              <InvictaLogo className="h-16 w-56 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
+            </div>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
             </p>
@@ -161,6 +166,10 @@ export default function PublicDashboard() {
             </Link>
             <Link href="/matches" className="flex h-12 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-14">
               View Live Matches
+            </Link>
+            <Link href="/" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white">
+              <Home size={14} className="text-accent" />
+              Landing Page
             </Link>
           </div>
         </div>
@@ -229,6 +238,131 @@ export default function PublicDashboard() {
             </div>
           </Link>
         ))}
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
+        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-1.5 rounded-full bg-primary" />
+              <h2 className="sport-heading text-2xl font-black">League Tables</h2>
+            </div>
+            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
+          </div>
+
+          <Card className="overflow-hidden border-2 p-0">
+            {standings.length > 0 ? (
+              <table className="w-full text-left text-sm">
+                <thead className="bg-secondary text-secondary-foreground">
+                  <tr>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Rank</th>
+                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">DEPARTMENT</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Played</th>
+                    <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Points</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {standings.map((team) => (
+                    <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
+                      <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
+                      <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
+                      <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
+                      <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-10 text-center">
+                <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
+                <p className="text-sm font-semibold text-slate-500">League tables will appear after teams are registered and matches are completed.</p>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div className="min-w-0 space-y-5 lg:space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-1.5 rounded-full bg-accent" />
+              <h2 className="sport-heading text-xl font-black sm:text-2xl lg:text-xl">Live Scores</h2>
+            </div>
+            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary transition-colors hover:text-accent">
+              All Matches <ArrowUpRight size={16} className="ml-1" />
+            </Link>
+          </div>
+
+          <div className="grid gap-4">
+            {matchesData.length > 0 ? matchesData.map((match, i) => (
+              <motion.div
+                key={match.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + i * 0.1 }}
+              >
+                <Card variant={match.status === "Live" ? "scoreboard" : "default"} className="group relative overflow-hidden border-2 p-4">
+                  {match.status === "Live" && (
+                    <div className="absolute left-0 top-0 h-full w-1.5 bg-accent shadow-[0_0_15px_rgba(252,191,77,0.5)]" />
+                  )}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-105">
+                        <img
+                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"}
+                          alt={match.sport}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="sport-heading text-[9px] font-black uppercase tracking-[0.18em] text-accent">{match.type}</span>
+                          {match.status === "Live" && (
+                            <span className="flex animate-pulse items-center gap-1.5 rounded-full border border-accent/30 bg-accent/20 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-accent">
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                              On Air {getMatchClockText(match, now)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="sport-heading truncate text-base font-black tracking-wide">
+                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamA}</span>
+                          <span className="mx-2 text-accent italic">VS</span>
+                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamB}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-3 rounded-xl border border-white/5 bg-black/40 p-3 shadow-xl">
+                      <span className="scoreboard-number text-3xl font-black leading-none tracking-tighter">{(match.scoreA ?? 0).toString().padStart(2, "0")}</span>
+                      <div className="h-8 w-0.5 bg-white/20" />
+                      <span className="scoreboard-number text-3xl font-black leading-none tracking-tighter">{(match.scoreB ?? 0).toString().padStart(2, "0")}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-slate-300">
+                      {getMatchPeriod(match)}
+                    </span>
+                    <span className="rounded-full bg-white/10 px-2.5 py-1 font-mono text-[11px] font-black text-accent">
+                      {getMatchClockText(match, now)}
+                    </span>
+                    {match.scoreEvents?.[0] && (
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                        Last point: {match.scoreEvents[0].teamName} at {match.scoreEvents[0].matchTime}
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            )) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
+                  <Activity size={32} className="text-slate-600" />
+                </div>
+                <h3 className="sport-heading text-xl font-black text-white">No Matches Published Yet</h3>
+                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">When the organizing team publishes fixtures, match cards and live scores will appear here.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
@@ -308,130 +442,6 @@ export default function PublicDashboard() {
         </div>
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 rounded-full bg-accent" />
-              <h2 className="sport-heading text-2xl font-black">Live Scores</h2>
-            </div>
-            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary transition-colors hover:text-accent">
-              All Matches <ArrowUpRight size={16} className="ml-1" />
-            </Link>
-          </div>
-
-          <div className="grid gap-6">
-            {matchesData.length > 0 ? matchesData.map((match, i) => (
-              <motion.div
-                key={match.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + i * 0.1 }}
-              >
-                <Card variant={match.status === "Live" ? "scoreboard" : "default"} className="group relative overflow-hidden border-2">
-                  {match.status === "Live" && (
-                    <div className="absolute left-0 top-0 h-full w-2 bg-accent shadow-[0_0_15px_rgba(252,191,77,0.5)]" />
-                  )}
-                  <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-4 sm:gap-6">
-                      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-110">
-                        <img
-                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"}
-                          alt={match.sport}
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                      <div>
-                        <div className="mb-2 flex items-center gap-3">
-                          <span className="sport-heading text-[10px] font-black uppercase tracking-[0.2em] text-accent">{match.type}</span>
-                          {match.status === "Live" && (
-                            <span className="flex animate-pulse items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
-                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                              On Air {getMatchClockText(match, now)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="sport-heading text-lg font-black tracking-wide sm:text-2xl">
-                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamA}</span>
-                          <span className="mx-3 text-accent italic">VS</span>
-                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamB}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex min-w-full items-center justify-center gap-4 rounded-2xl border border-white/5 bg-black/40 p-4 shadow-2xl sm:min-w-[180px] sm:p-5">
-                      <span className="scoreboard-number text-4xl font-black leading-none tracking-tighter sm:text-5xl">{(match.scoreA ?? 0).toString().padStart(2, "0")}</span>
-                      <div className="h-10 w-0.5 bg-white/20" />
-                      <span className="scoreboard-number text-4xl font-black leading-none tracking-tighter sm:text-5xl">{(match.scoreB ?? 0).toString().padStart(2, "0")}</span>
-                    </div>
-                  </div>
-                  <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-300">
-                      {getMatchPeriod(match)}
-                    </span>
-                    <span className="rounded-full bg-white/10 px-3 py-1 font-mono text-xs font-black text-accent">
-                      {getMatchClockText(match, now)}
-                    </span>
-                    {match.scoreEvents?.[0] && (
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                        Last point: {match.scoreEvents[0].teamName} at {match.scoreEvents[0].matchTime}
-                      </span>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            )) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center sm:rounded-[2.5rem] sm:p-20">
-                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white/5">
-                  <Activity size={40} className="text-slate-600" />
-                </div>
-                <h3 className="sport-heading text-2xl font-black text-white">No Matches Published Yet</h3>
-                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">When the organizing team publishes fixtures, match cards and live scores will appear here.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="min-w-0 space-y-5 lg:space-y-8">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 rounded-full bg-primary" />
-              <h2 className="sport-heading text-2xl font-black">League Tables</h2>
-            </div>
-            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
-          </div>
-
-          <Card className="overflow-hidden border-2 p-0">
-            {standings.length > 0 ? (
-              <table className="w-full text-left text-sm">
-                <thead className="bg-secondary text-secondary-foreground">
-                  <tr>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Rank</th>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">DEPARTMENT</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Played</th>
-                    <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Points</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {standings.map((team) => (
-                    <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
-                      <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
-                      <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
-                      <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
-                      <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-10 text-center">
-                <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
-                <p className="text-sm font-semibold text-slate-500">League tables will appear after teams are registered and matches are completed.</p>
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

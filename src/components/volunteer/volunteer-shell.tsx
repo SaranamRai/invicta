@@ -7,6 +7,7 @@ import { clearPortalSession } from "@/lib/role-auth";
 import { Calendar, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
 
 const navigation = [
   { name: "Match Dashboard", href: "/volunteer", icon: LayoutDashboard },
@@ -23,14 +24,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
       <div className="flex w-full flex-col border-b border-border bg-card md:w-72 md:border-b-0 md:border-r">
         <div className="border-b border-border p-3 sm:p-6">
           <div className="flex items-center gap-3 md:block md:space-y-4">
-            <div className="dashboard-logo flex h-10 w-28 max-w-full shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
-              <img
-                src="/msu-logo-transparent.png"
-                alt="Medhavi Skills University"
-                className="h-auto w-full max-w-full object-contain"
-              />
-            </div>
-            <span className="block text-sm font-bold uppercase tracking-[0.2em] text-foreground font-serif italic sm:text-[20px] sm:tracking-[0.4em]">Invicta</span>
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
           </div>
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-accent mt-1.5 sm:text-[10px] sm:tracking-[0.2em] sm:mt-2">Volunteer Match Tools</p>
         </div>

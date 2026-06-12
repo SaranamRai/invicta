@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { Users, User, ArrowLeft, Trophy, Loader2, Shield, ShieldOff, Calendar } from "lucide-react";
+import { Users, User, ArrowLeft, Trophy, Loader2, Shield, ShieldOff, Calendar, Search, ChevronLeft, ChevronRight, Hash } from "lucide-react";
 import Link from "next/link";
 import { getPublicSportDetail, SportDetailResponse } from "@/lib/api";
+
+const MEMBERS_PER_PAGE = 12;
 
 function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
@@ -44,21 +46,170 @@ function TeamCard({ team }: { team: SportDetailResponse["teams"]["male"][number]
   );
 }
 
-function MemberCard({ member }: { member: SportDetailResponse["members"]["male"][number] }) {
+type PublicMember = SportDetailResponse["members"]["male"][number];
+
+function MemberCard({ member }: { member: PublicMember }) {
+  const displayRole = member.position || member.role || "Player";
+  const photo = member.profilePhoto;
+  const initials = member.fullName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <Card className="p-4 border border-white/5 hover:border-white/20 transition-all">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
-          <User size={18} />
+    <Card className="group p-4 border border-white/5 bg-card/70 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5">
+      <div className="flex items-start gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-accent/20 bg-secondary text-primary">
+          {photo ? (
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+          ) : initials ? (
+            <span className="text-sm font-black uppercase tracking-wide">{initials}</span>
+          ) : (
+            <User size={18} />
+          )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{member.fullName}</p>
-          <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {member.registrationNo} &middot; {member.department} &middot; {member.teamName}
-          </p>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <p className="truncate text-sm font-black text-foreground">{member.fullName || "Unnamed Member"}</p>
+            <p className="mt-0.5 text-[10px] font-black uppercase tracking-widest text-accent">{displayRole}</p>
+          </div>
+
+          <div className="grid gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Hash size={11} className="shrink-0 text-slate-500" />
+              <span className="truncate">{member.registrationNo || "Member ID N/A"}</span>
+            </span>
+            <span className="truncate">{member.teamName || member.department || "Team/Club N/A"}</span>
+            <span className="rounded-full border border-white/10 bg-secondary/50 px-2 py-0.5 text-[9px] w-fit">
+              {member.category || "Sport Category"}
+            </span>
+          </div>
         </div>
       </div>
     </Card>
+  );
+}
+
+function MembersListView({
+  members,
+  sportName,
+}: {
+  members: PublicMember[];
+  sportName: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filteredMembers = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    if (!value) return members;
+
+    return members.filter((member) =>
+      [
+        member.fullName,
+        member.registrationNo,
+        member.teamName,
+        member.department,
+        member.category,
+        member.position,
+        member.role,
+      ]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(value))
+    );
+  }, [members, query]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, members.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * MEMBERS_PER_PAGE;
+  const visibleMembers = filteredMembers.slice(pageStart, pageStart + MEMBERS_PER_PAGE);
+
+  if (members.length === 0) {
+    return (
+      <div className="min-h-[300px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-8 sm:p-16">
+        <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
+          <User size={40} className="text-slate-500" />
+        </div>
+        <h3 className="text-2xl font-black sport-heading text-foreground uppercase">No Members Registered</h3>
+        <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
+          No members are currently registered for this sport.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-card/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-black text-foreground">Members</h2>
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
+            View-only list of registered {sportName} participants.
+          </p>
+        </div>
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search members by name"
+            className="h-11 w-full rounded-xl border border-white/10 bg-background/80 pl-10 pr-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-accent"
+          />
+        </div>
+      </div>
+
+      {filteredMembers.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center">
+          <p className="text-sm font-semibold text-muted-foreground">No members match your search.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visibleMembers.map((member, index) => (
+              <MemberCard key={`${member.category}-${member.registrationNo || member.fullName}-${pageStart + index}`} member={member} />
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-card/30 p-4 text-xs font-bold text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Showing {pageStart + 1}-{Math.min(pageStart + visibleMembers.length, filteredMembers.length)} of {filteredMembers.length} member{filteredMembers.length === 1 ? "" : "s"}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={safePage === 1}
+                  className="inline-flex h-9 items-center gap-1 rounded-xl border border-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={14} />
+                  Prev
+                </button>
+                <span className="px-2 text-[10px] font-black uppercase tracking-widest">
+                  {safePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={safePage === totalPages}
+                  className="inline-flex h-9 items-center gap-1 rounded-xl border border-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -117,6 +268,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
 
   const { sport, stats, teams, members, fixtures } = data;
   const sportName = sport.sportName || sport.name || "";
+  const allMembers = [...members.male, ...members.female];
 
   const hasMaleTeams = teams.male.length > 0;
   const hasFemaleTeams = teams.female.length > 0;
@@ -279,51 +431,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
           )}
         </div>
       ) : activeTab === "Members" ? (
-        <div className="space-y-10">
-          {!hasAnyMembers ? (
-            <div className="min-h-[300px] rounded-[2.5rem] bg-card/30 border-2 border-dashed border-border flex flex-col items-center justify-center text-center p-16">
-              <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
-                <User size={40} className="text-slate-500" />
-              </div>
-              <h3 className="text-2xl font-black sport-heading text-foreground uppercase">No Members Registered</h3>
-              <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-muted-foreground">
-                Registered {sportName} members will appear here automatically.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Male Members */}
-              <CategorySection label="Male Members" icon={Shield}>
-                {hasMaleMembers ? (
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {members.male.map((member, i) => (
-                      <MemberCard key={`male-${member.registrationNo || member.fullName}-${i}`} member={member} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
-                    No Male members registered yet.
-                  </p>
-                )}
-              </CategorySection>
-
-              {/* Female Members */}
-              <CategorySection label="Female Members" icon={ShieldOff}>
-                {hasFemaleMembers ? (
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {members.female.map((member, i) => (
-                      <MemberCard key={`female-${member.registrationNo || member.fullName}-${i}`} member={member} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold text-muted-foreground italic py-6 text-center border border-dashed border-white/10 rounded-xl">
-                    No Female members registered yet.
-                  </p>
-                )}
-              </CategorySection>
-            </>
-          )}
-        </div>
+        <MembersListView members={allMembers} sportName={sportName} />
       ) : (
         <div className="space-y-10">
           {!hasAnyFixtures ? (

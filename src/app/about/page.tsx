@@ -1,27 +1,56 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Mail, MessageCircle, Share2, Video } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Mail, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LiveSportsPanel } from "@/components/live-sports-panel";
+import { InvictaLogo } from "@/components/invicta-logo";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "Sports", href: "/#sports" },
   { label: "About Us", href: "/about" },
   { label: "Contact", href: "/#contact" },
 ];
 
-function Logo({ compact = false }: { compact?: boolean }) {
-  return (
-    <span className={`landing-display font-black italic tracking-tight ${compact ? "text-2xl" : "text-3xl"}`}>
-      IN<span className="landing-gold-text">VICTA</span>
-    </span>
-  );
-}
+const teamMembers = [
+  {
+    name: "Rinchen Sherpa",
+    role: "UI/UX Designer",
+    image: "/rinn.png",
+    imageClassName: "object-[center_44%]",
+    skills: ["Visual Identity", "UI Layouts", "User Experience"],
+    details:
+      "Designed the visual identity, user interface layouts, and user experience flow of the application. Focused on creating a clean, modern, and accessible design that enhances usability across devices.",
+  },
+  {
+    name: "Saranam Rai",
+    role: "Backend Developer",
+    image: "/saru.png",
+    imageClassName: "object-[center_42%]",
+    skills: ["Backend Architecture", "Database", "Authentication"],
+    details:
+      "Developed and managed the server-side architecture, database connectivity, authentication systems, and core application logic. Ensured secure and efficient data processing throughout the platform.",
+  },
+  {
+    name: "Angel Thami",
+    role: "Frontend Developer",
+    image: "/angel%20stamp.jpeg",
+    skills: ["Frontend Components", "Responsive UI", "User Interaction"],
+    details:
+      "Responsible for designing and developing the user-facing components of INVICTA. Focused on creating an intuitive, responsive, and engaging user experience while ensuring seamless interaction between users and the platform.",
+  },
+  {
+    name: "Sachin Kumar Sharma",
+    role: "Mentor",
+    image: "/sachin%20sir%20stamp.jpeg",
+    skills: ["Mentorship", "Project Guidance", "Product Direction"],
+    details:
+      "Mentored and guided us throughout the development of the INVICTA project, helping us transform our ideas into a practical sports management platform.",
+  },
+];
 
-function MemberAvatar({ src, name }: { src?: string; name: string }) {
+function MemberAvatar({ src, name, imageClassName = "object-center" }: { src?: string; name: string; imageClassName?: string }) {
   const [hasError, setHasError] = useState(false);
   const initials = name
     .split(" ")
@@ -36,7 +65,7 @@ function MemberAvatar({ src, name }: { src?: string; name: string }) {
       <img
         src={src}
         alt={name}
-        className="h-full w-full object-cover"
+        className={`h-full w-full object-cover ${imageClassName}`}
         onError={() => setHasError(true)}
       />
     );
@@ -50,51 +79,64 @@ function MemberAvatar({ src, name }: { src?: string; name: string }) {
 }
 
 export default function AboutPage() {
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const profileRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedMemberData = teamMembers.find((member) => member.name === selectedMember) || null;
+
+  const openMember = (name: string) => {
+    setSelectedMember(name);
+  };
+
+  const closeProfile = () => {
+    const previouslySelected = selectedMember;
+    setSelectedMember(null);
+    window.setTimeout(() => {
+      if (previouslySelected) cardRefs.current[previouslySelected]?.focus();
+    }, 80);
+  };
+
+  useEffect(() => {
+    if (!selectedMember) return;
+
+    profileRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeProfile();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedMember]);
+
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
-      <LiveSportsPanel />
-      
       {/* Header */}
       <header className="absolute inset-x-0 top-0 z-40">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
           <Link href="/" aria-label="Invicta home">
-            <Logo />
+            <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
           </Link>
 
-          <nav className="hidden items-center gap-9 md:flex">
+          <nav className="flex items-center gap-4 sm:gap-8">
             {navLinks.map((link, index) => (
               <a
                 key={link.label}
                 href={link.href}
-                className={`relative text-xs font-bold uppercase tracking-[0.24em] transition-colors hover:text-[#f4c35a] ${index === 2 ? "text-[#f4c35a]" : "text-foreground/80"}`}
+                className={`relative whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:text-[#f4c35a] sm:text-xs sm:tracking-[0.24em] ${index === 1 ? "text-[#f4c35a]" : "text-foreground/80"}`}
               >
                 {link.label}
-                {index === 2 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
+                {index === 1 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
               </a>
             ))}
           </nav>
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <a
-              href="/#contact"
-              className="landing-slant hidden items-center gap-2 border border-[#f4c35a]/50 px-6 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-[#f4c35a] transition-colors hover:bg-[#f4c35a] hover:text-black md:inline-flex"
-            >
-              Get In Touch <ArrowRight size={14} />
-            </a>
           </div>
         </div>
       </header>
-
-      {/* Sidebar Social Links */}
-      <aside className="fixed right-0 top-1/3 z-30 hidden flex-col items-center gap-4 rounded-l-md border border-r-0 border-border bg-landing-sidebar-bg px-3 py-5 backdrop-blur lg:flex">
-        <span className="rotate-180 text-[9px] font-bold tracking-[0.35em] text-foreground/50 [writing-mode:vertical-rl]">
-          FOLLOW US
-        </span>
-        <Share2 className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
-        <MessageCircle className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
-        <Video className="h-4 w-4 text-foreground/50 transition-colors hover:text-[#f4c35a]" />
-      </aside>
 
       <main className="pt-28 pb-16">
         <section id="about" className="px-5 py-16 sm:px-8">
@@ -115,64 +157,129 @@ export default function AboutPage() {
             </div>
 
             {/* Team Members Grid */}
-            <div className="mt-20">
+            <div className="relative mt-20">
               <h3 className="text-center text-xs font-black uppercase tracking-[0.3em] text-[#f4c35a] mb-12">Meet Our Team</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {/* Angel Thami */}
-                <div className="group rounded-2xl border border-border bg-card/60 p-6 flex flex-col items-center text-center transition-all duration-300 hover:border-accent hover:shadow-xl hover:scale-[1.02]">
-                  <div className="h-32 w-32 rounded-full overflow-hidden border-4 border-border/80 group-hover:border-accent transition-colors shadow-lg">
-                    <MemberAvatar src="/angel%20atamp.jpeg" name="Angel Thami" />
-                  </div>
-                  <h4 className="sport-heading mt-6 text-xl font-black text-foreground">Angel Thami</h4>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#f4c35a] mt-1.5">Frontend Developer</p>
-                  <p className="mt-4 text-xs font-semibold leading-relaxed text-foreground/60">
-                    Responsible for designing and developing the user-facing components of INVICTA. Focused on creating an intuitive, responsive, and engaging user experience while ensuring seamless interaction between users and the platform.
-                  </p>
-                </div>
+                {teamMembers.map((member) => {
+                  const isSelected = selectedMember === member.name;
+                  const hasSelection = selectedMember !== null;
 
-                {/* Saranam Rai */}
-                <div className="group rounded-2xl border border-border bg-card/60 p-6 flex flex-col items-center text-center transition-all duration-300 hover:border-accent hover:shadow-xl hover:scale-[1.02]">
-                  <div className="h-32 w-32 rounded-full overflow-hidden border-4 border-border/80 group-hover:border-accent transition-colors shadow-lg">
-                    <MemberAvatar src="/saranam%20stamp.jpeg" name="Saranam Rai" />
-                  </div>
-                  <h4 className="sport-heading mt-6 text-xl font-black text-foreground">Saranam Rai</h4>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#f4c35a] mt-1.5">Backend Developer</p>
-                  <p className="mt-4 text-xs font-semibold leading-relaxed text-foreground/60">
-                    Developed and managed the server-side architecture, database connectivity, authentication systems, and core application logic. Ensured secure and efficient data processing throughout the platform.
-                  </p>
-                </div>
-
-                {/* Rinchen Sherpa */}
-                <div className="group rounded-2xl border border-border bg-card/60 p-6 flex flex-col items-center text-center transition-all duration-300 hover:border-accent hover:shadow-xl hover:scale-[1.02]">
-                  <div className="h-32 w-32 rounded-full overflow-hidden border-4 border-border/80 group-hover:border-accent transition-colors shadow-lg">
-                    <MemberAvatar src="/rinchen%20stamp.jpeg" name="Rinchen Sherpa" />
-                  </div>
-                  <h4 className="sport-heading mt-6 text-xl font-black text-foreground">Rinchen Sherpa</h4>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#f4c35a] mt-1.5">UI/UX Designer</p>
-                  <p className="mt-4 text-xs font-semibold leading-relaxed text-foreground/60">
-                    Designed the visual identity, user interface layouts, and user experience flow of the application. Focused on creating a clean, modern, and accessible design that enhances usability across devices.
-                  </p>
-                </div>
-
-                {/* Sachin Kumar Sharma */}
-                <div className="group rounded-2xl border border-border bg-card/60 p-6 flex flex-col items-center text-center transition-all duration-300 hover:border-accent hover:shadow-xl hover:scale-[1.02]">
-                  <div className="h-32 w-32 rounded-full overflow-hidden border-4 border-border/80 group-hover:border-accent transition-colors shadow-lg">
-                    <MemberAvatar name="Sachin Kumar Sharma" />
-                  </div>
-                  <h4 className="sport-heading mt-6 text-xl font-black text-foreground">Sachin Kumar Sharma</h4>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-[#f4c35a] mt-1.5">Full Stack Developer</p>
-                  <p className="mt-4 text-xs font-semibold leading-relaxed text-foreground/60">
-                    Developed API integrations, database schemas, and administrative control flows. Focused on bridging frontend interactive state with backend services to build a cohesive and highly performant platform.
-                  </p>
-                </div>
+                  return (
+                    <motion.button
+                      key={member.name}
+                      ref={(node) => {
+                        cardRefs.current[member.name] = node;
+                      }}
+                      type="button"
+                      layoutId={`member-card-${member.name}`}
+                      aria-expanded={isSelected}
+                      aria-label={`Open profile for ${member.name}`}
+                      disabled={hasSelection && !isSelected}
+                      onClick={() => openMember(member.name)}
+                      whileHover={hasSelection ? undefined : { y: -6, scale: 1.02 }}
+                      whileTap={hasSelection ? undefined : { scale: 0.98 }}
+                      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                      className={`group relative flex min-h-[17rem] cursor-pointer flex-col items-center rounded-2xl border bg-card/60 p-6 text-center outline-none transition-[filter,opacity,border-color,box-shadow] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-[#f4c35a] ${
+                        isSelected ? "border-accent shadow-2xl shadow-[#f4c35a]/15" : "border-border hover:border-accent hover:shadow-xl"
+                      } ${hasSelection && !isSelected ? "pointer-events-none opacity-50 blur-[2px]" : "opacity-100 blur-0"}`}
+                    >
+                      <motion.div
+                        layoutId={`member-photo-${member.name}`}
+                        className="h-28 w-28 overflow-hidden rounded-full border-4 border-border/80 shadow-lg transition-colors duration-500 group-hover:border-accent sm:h-32 sm:w-32"
+                      >
+                        <MemberAvatar src={member.image} name={member.name} imageClassName={member.imageClassName} />
+                      </motion.div>
+                      <h4 className="mt-5 text-xl font-black text-foreground">{member.name}</h4>
+                      <p className="mt-1.5 text-[9px] font-black uppercase tracking-widest text-[#f4c35a]">{member.role}</p>
+                    </motion.button>
+                  );
+                })}
               </div>
+
+              <AnimatePresence>
+                {selectedMemberData && (
+                  <motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-background/45 px-4 py-8 backdrop-blur-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    onClick={closeProfile}
+                  >
+                    <motion.div
+                      ref={profileRef}
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="team-profile-name"
+                      tabIndex={-1}
+                      layoutId={`member-card-${selectedMemberData.name}`}
+                      initial={{ opacity: 0, scale: 0.92, y: 24 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                      onClick={(event) => event.stopPropagation()}
+                      className="relative max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-white/15 bg-card/85 p-5 text-left shadow-2xl shadow-black/30 outline-none backdrop-blur-xl sm:p-7"
+                    >
+                      <button
+                        type="button"
+                        aria-label={`Close profile for ${selectedMemberData.name}`}
+                        onClick={closeProfile}
+                        className="absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+                      >
+                        <X size={17} />
+                      </button>
+
+                      <div className="grid gap-6 md:grid-cols-[15rem_1fr] md:items-center">
+                        <motion.div
+                          layoutId={`member-photo-${selectedMemberData.name}`}
+                          className="mx-auto h-56 w-56 overflow-hidden rounded-3xl border-4 border-accent/70 bg-background shadow-2xl shadow-[#f4c35a]/10 md:mx-0"
+                        >
+                          <MemberAvatar
+                            src={selectedMemberData.image}
+                            name={selectedMemberData.name}
+                            imageClassName={selectedMemberData.imageClassName}
+                          />
+                        </motion.div>
+
+                        <div className="min-w-0 pr-0 sm:pr-8">
+                          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#f4c35a]">
+                            {selectedMemberData.role}
+                          </p>
+                          <h4 id="team-profile-name" className="mt-2 text-3xl font-black text-foreground sm:text-4xl">
+                            {selectedMemberData.name}
+                          </h4>
+                          <p className="mt-4 text-sm font-semibold leading-relaxed text-foreground/70 sm:text-base">
+                            {selectedMemberData.details}
+                          </p>
+
+                          <div className="mt-6">
+                            <p className="text-[9px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                              Contributions
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {selectedMemberData.skills.map((skill) => (
+                                <span
+                                  key={skill}
+                                  className="rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-accent"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Our Contribution */}
             <div className="mt-24 border-t border-border pt-16 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#f4c35a]">Our Contribution</p>
-                <h3 className="landing-display mt-3 text-2xl font-black uppercase tracking-wide text-foreground">
+                <h3 className="landing-display mt-3 text-2xl font-black tracking-wide text-foreground">
                   SoCSE Collaboration
                 </h3>
                 <p className="mt-5 text-sm font-semibold leading-relaxed text-foreground/60">
@@ -199,7 +306,7 @@ export default function AboutPage() {
       <footer id="contact" className="bg-landing-footer-bg border-t border-landing-footer-border px-5 py-14 sm:px-8 transition-colors duration-300">
         <div className="mx-auto grid max-w-7xl gap-10 border-b border-landing-footer-border pb-12 md:grid-cols-3 md:items-start">
           <div>
-            <Logo compact />
+            <InvictaLogo className="h-14 w-52" />
             <p className="mt-4 max-w-sm text-sm leading-6 text-foreground/50">
               The official public sports experience for MSU Invicta.
             </p>
@@ -226,7 +333,7 @@ export default function AboutPage() {
 
         <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35 sm:flex-row">
           <span>© 2026 Invicta. All rights reserved.</span>
-          <span className="text-accent/50 font-black">POWERED BY SoCSE</span>
+          <span className="text-accent/50 font-black normal-case">Managed & Powered by SoCSE</span>
           <span>Medhavi Skills University</span>
         </div>
       </footer>
