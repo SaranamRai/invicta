@@ -115,8 +115,12 @@ export default function LandingPage() {
 
       <main>
         <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-28">
-          <div className="absolute inset-0 bg-[url('/badminton-bg.png')] bg-cover bg-center" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_36%,var(--landing-overlay-48)_68%,var(--landing-overlay-42)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_38%,rgba(229,173,59,0.18),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_52%,rgba(2,6,23,0.84)_100%)]" />
+          <div className="absolute inset-y-10 right-[-18%] w-[104%] opacity-45 saturate-90 sm:right-[-14%] sm:w-[78%] lg:right-[-8%] lg:w-[64%]">
+            <div className="h-full w-full bg-[url('/landingpage.jpeg')] bg-contain bg-center bg-no-repeat" />
+            <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-[#020617] via-[#020617]/80 to-transparent" />
+          </div>
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_42%,rgba(2,6,23,0.55)_72%,rgba(2,6,23,0.72)_100%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
           <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
 

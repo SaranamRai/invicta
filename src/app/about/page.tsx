@@ -18,7 +18,7 @@ const teamMembers = [
     name: "Rinchen Sherpa",
     role: "UI/UX Designer",
     image: "/rinn.png",
-    imageClassName: "object-[center_68%]",
+    imageClassName: "object-[center_44%]",
     skills: ["Visual Identity", "UI Layouts", "User Experience"],
     details:
       "Designed the visual identity, user interface layouts, and user experience flow of the application. Focused on creating a clean, modern, and accessible design that enhances usability across devices.",
@@ -27,7 +27,7 @@ const teamMembers = [
     name: "Saranam Rai",
     role: "Backend Developer",
     image: "/saru.png",
-    imageClassName: "object-[center_64%]",
+    imageClassName: "object-[center_42%]",
     skills: ["Backend Architecture", "Database", "Authentication"],
     details:
       "Developed and managed the server-side architecture, database connectivity, authentication systems, and core application logic. Ensured secure and efficient data processing throughout the platform.",
@@ -35,7 +35,7 @@ const teamMembers = [
   {
     name: "Angel Thami",
     role: "Frontend Developer",
-    image: "/angel%20atamp.jpeg",
+    image: "/angel%20stamp.jpeg",
     skills: ["Frontend Components", "Responsive UI", "User Interaction"],
     details:
       "Responsible for designing and developing the user-facing components of INVICTA. Focused on creating an intuitive, responsive, and engaging user experience while ensuring seamless interaction between users and the platform.",
