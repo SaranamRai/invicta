@@ -17,6 +17,16 @@ function normalizePublicSport(value?: string) {
   return String(value || "general").trim().toLowerCase().replace(/\s+/g, "-");
 }
 
+function withQuery(path: string, params?: Record<string, string | undefined>) {
+  if (!params) return path;
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
+  const queryString = query.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
 function getMemberName(member: unknown) {
   if (typeof member === "string") return member;
   if (!member || typeof member !== "object") return "";
@@ -247,11 +257,11 @@ export interface AdminFixturePayload {
   sport: string;
   sportName?: string;
   sportId?: string;
-  category?: "Male" | "Female";
+  category?: string;
   date: string;
   time: string;
   venue: string;
-  status: "scheduled" | "live" | "completed";
+  status: "scheduled" | "live" | "paused" | "completed";
   scoreA?: number;
   scoreB?: number;
   endedAt?: string;
@@ -326,6 +336,7 @@ export interface MongoRefName {
   _id?: string;
   id?: string;
   name?: string;
+  sportName?: string;
   teamName?: string;
   department?: string;
 }
@@ -349,7 +360,7 @@ export interface MongoFixture {
   scoreB?: number;
   endedAt?: string;
   round?: string;
-  status?: "upcoming" | "live" | "half-time" | "completed" | "delayed" | "cancelled";
+  status?: "upcoming" | "live" | "paused" | "half-time" | "completed" | "delayed" | "cancelled";
   assignedVolunteer?: MongoRefName | string;
   createdAt?: string;
 }
@@ -357,6 +368,9 @@ export interface MongoFixture {
 export interface MongoLiveScore {
   _id: string;
   fixtureId: string;
+  tournamentId?: string;
+  sportId?: string;
+  category?: string;
   teamAName?: string;
   teamBName?: string;
   teamAScore?: number;
@@ -367,6 +381,9 @@ export interface MongoLiveScore {
   startedAt?: number;
   endedAt?: number;
   timerStartedAt?: number;
+  timerPausedAt?: number;
+  totalPausedMs?: number;
+  pausePeriods?: { reason: string; pausedAt: number; resumedAt?: number; elapsedSeconds?: number }[];
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
   clockRunning?: boolean;
@@ -494,6 +511,9 @@ export interface MongoRule {
   description?: string;
   sport?: string;
   sportName?: string;
+  tournamentId?: MongoRefName | string;
+  tournamentName?: string;
+  category?: string;
   attachmentData?: string;
   attachmentName?: string;
   attachmentType?: string;
@@ -546,6 +566,8 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
   const rawStatus = liveScore?.currentStatus || fixture.status || "upcoming";
   const status = rawStatus === "completed"
     ? "Finished"
+    : rawStatus === "paused"
+      ? "Paused"
     : rawStatus === "live" || rawStatus === "half-time"
       ? "Live"
       : "Upcoming";
@@ -570,6 +592,9 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     startedAt: liveScore?.startedAt,
     endedAt: liveScore?.endedAt ?? (fixture.endedAt ? toTimestamp(fixture.endedAt) : undefined),
     timerStartedAt: liveScore?.timerStartedAt,
+    timerPausedAt: liveScore?.timerPausedAt,
+    totalPausedMs: liveScore?.totalPausedMs,
+    pausePeriods: liveScore?.pausePeriods || [],
     elapsedSeconds: liveScore?.elapsedSeconds,
     fullMatchSeconds: liveScore?.fullMatchSeconds,
     clockRunning: liveScore?.clockRunning,
@@ -614,24 +639,24 @@ export function mapMongoRule(rule: MongoRule) {
   };
 }
 
-export function getPublicFixtures() {
-  return publicApiFetch<MongoFixture>("/public/fixtures");
+export function getPublicFixtures(params?: Record<string, string | undefined>) {
+  return publicApiFetch<MongoFixture>(withQuery("/public/fixtures", params));
 }
 
-export function getVolunteerAssignedFixtures() {
-  return apiFetch<MongoFixture[]>("/volunteer/assigned-matches");
+export function getVolunteerAssignedFixtures(params?: Record<string, string | undefined>) {
+  return apiFetch<MongoFixture[]>(withQuery("/volunteer/assigned-matches", params));
 }
 
-export function getPublicLiveScores() {
-  return publicApiFetch<MongoLiveScore>("/public/live-scores");
+export function getPublicLiveScores(params?: Record<string, string | undefined>) {
+  return publicApiFetch<MongoLiveScore>(withQuery("/public/live-scores", params));
 }
 
-export function getPublicLiveFeeds() {
-  return publicApiFetch<MongoLiveFeed>("/public/live-feeds");
+export function getPublicLiveFeeds(params?: Record<string, string | undefined>) {
+  return publicApiFetch<MongoLiveFeed>(withQuery("/public/live-feeds", params));
 }
 
-export function getPublicTeams() {
-  return publicApiFetch<MongoTeam>("/public/teams");
+export function getPublicTeams(params?: Record<string, string | undefined>) {
+  return publicApiFetch<MongoTeam>(withQuery("/public/teams", params));
 }
 
 export function getCoordinatorTeams() {
@@ -664,8 +689,8 @@ export function getPublicAnnouncements() {
   return publicApiFetch<MongoAnnouncement>("/public/announcements");
 }
 
-export function getPublicRules() {
-  return publicApiFetch<MongoRule>("/public/rules");
+export function getPublicRules(params?: Record<string, string | undefined>) {
+  return publicApiFetch<MongoRule>(withQuery("/public/rules", params));
 }
 
 export function getPublicGallery() {
@@ -673,8 +698,11 @@ export function getPublicGallery() {
 }
 
 export function createCoordinatorRule(payload: {
+  tournamentId?: string;
+  tournamentName?: string;
   sport: string;
   sportName: string;
+  category?: string;
   title: string;
   description: string;
   attachmentData?: string;
@@ -859,8 +887,8 @@ export function updateCoordinatorVolunteer(volunteerId: string, payload: {
   });
 }
 
-export function getCoordinatorFixtures() {
-  return apiFetch<AdminFixturePayload[]>("/coordinator/fixtures");
+export function getCoordinatorFixtures(params?: Record<string, string | undefined>) {
+  return apiFetch<AdminFixturePayload[]>(withQuery("/coordinator/fixtures", params));
 }
 
 export function getCoordinatorPointsTable() {
@@ -871,10 +899,10 @@ export function getCoordinatorAnnouncements() {
   return apiFetch<MongoAnnouncement[]>("/coordinator/announcements");
 }
 
-export function assignCoordinatorFixtureVolunteer(fixtureId: string, volunteerId: string) {
+export function assignCoordinatorFixtureVolunteer(fixtureId: string, volunteerId: string, tournamentId?: string) {
   return apiFetch<{ id: string; assignedVolunteer: string }>(`/coordinator/fixtures/${encodeURIComponent(fixtureId)}/volunteer`, {
     method: "PATCH",
-    body: JSON.stringify({ volunteerId }),
+    body: JSON.stringify({ volunteerId, tournamentId }),
   });
 }
 
@@ -893,6 +921,10 @@ export function deleteAdminTournament(tournamentId: string) {
   return apiFetch(`/admin/tournaments/${encodeURIComponent(tournamentId)}`, {
     method: "DELETE",
   });
+}
+
+export function getAdminTournamentReport(tournamentId: string) {
+  return apiFetch<Record<string, unknown>>(`/admin/tournaments/${encodeURIComponent(tournamentId)}/report`);
 }
 
 export function updateAdminAnnouncement(id: string, payload: {
@@ -916,16 +948,19 @@ export function deleteAdminAnnouncement(id: string) {
 export interface VenuePayload {
   _id?: string;
   id?: string;
+  venueName?: string;
   name: string;
   location?: string;
   sportType?: string;
+  capacity?: number;
+  status?: string;
 }
 
 export function getAdminVenues() {
   return apiFetch<VenuePayload[]>("/admin/venues");
 }
 
-export function createAdminVenue(payload: { name: string; location?: string; sportType?: string }) {
+export function createAdminVenue(payload: { venueName?: string; name: string; location?: string; sportType?: string; capacity?: number; status?: string }) {
   return apiFetch<VenuePayload>("/admin/venues", {
     method: "POST",
     body: JSON.stringify(payload),

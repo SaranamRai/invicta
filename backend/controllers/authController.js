@@ -5,8 +5,6 @@ import Admin from "../models/Admin.js";
 import Volunteer from "../models/Volunteer.js";
 import Coordinator from "../models/Coordinator.js";
 import SuperCoordinator from "../models/SuperCoordinator.js";
-import Sport from "../models/Sport.js";
-import { sendAccountCreatedEmail } from "../utils/emailService.js";
 
 const roleModels = [
   { role: "admin", model: Admin },
@@ -19,65 +17,66 @@ function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function normalizeText(value) {
-  return String(value || "").trim().replace(/\s+/g, " ");
-}
-
-async function resolveAssignedSport(rest) {
-  const sportId = rest.assignedSportId || rest.sportId;
-  const sportText = normalizeText(rest.assignedSportName || rest.assignedSport || rest.sport);
-  let sport = null;
-
-  if (sportId) {
-    sport = await Sport.findById(sportId);
-    if (!sport) {
-      const error = new Error("Assigned sport was not found");
-      error.status = 400;
-      throw error;
-    }
-  } else if (sportText) {
-    sport = await Sport.findOne({
-      $or: [
-        { sportName: new RegExp(`^${sportText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-        { name: new RegExp(`^${sportText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-        { sport: normalizeSport(sportText) },
-      ],
-    });
-
-    if (!sport) {
-      const sports = await Sport.find({ status: "active" }).lean();
-      sport = sports.find((item) =>
-        normalizeSport(item.sportName || item.name) === normalizeSport(sportText)
-      );
-    }
-  }
-
-  if (!sport) return {};
-
-  const assignedSportName = sport.sportName || sport.name;
-  return {
-    assignedSportId: sport._id,
-    assignedSportName,
-    assignedSport: normalizeSport(assignedSportName),
-  };
-}
-
 function signToken(account, role) {
   return jwt.sign(
     {
-      userId: account._id.toString(),
       id: account._id.toString(),
       role,
       name: account.name,
       email: account.email,
       department: account.department || "",
       assignedSport: account.assignedSport?.toString?.() || "",
-      assignedSportId: account.assignedSportId?.toString?.() || "",
-      assignedSportName: account.assignedSportName || "",
     },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
+}
+
+async function sendRoleAccountEmail({ account, role, password }) {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || smtpUser;
+  const loginLink = process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:3000/login";
+
+  if (!smtpHost || !smtpUser || !smtpPass || !from) {
+    return { sent: false, skipped: true };
+  }
+
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.default.createTransport({
+      host: smtpHost,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: String(process.env.SMTP_SECURE || "false") === "true",
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+    const roleLabel = role === "coordinator" ? "Coordinator" : role === "volunteer" ? "Volunteer" : role;
+    const assignedSport = account.assignedSport || "your assigned sport";
+
+    await transporter.sendMail({
+      from,
+      to: account.email,
+      subject: `INVlCTA ${roleLabel} Account`,
+      text: [
+        `Hello ${account.name},`,
+        "",
+        `You have been selected as ${roleLabel} for ${assignedSport} in INVlCTA Sports Management System.`,
+        "",
+        `Name: ${account.name}`,
+        `Email/Username: ${account.email}`,
+        `Role: ${roleLabel}`,
+        `Assigned sport: ${assignedSport}`,
+        `Password: ${password}`,
+        `Login link: ${loginLink}`,
+      ].join("\n"),
+    });
+
+    return { sent: true };
+  } catch (error) {
+    console.error(`Failed to send ${role} account email:`, error);
+    return { sent: false, error };
+  }
 }
 
 export async function login(req, res) {
@@ -106,8 +105,6 @@ export async function login(req, res) {
       email: account.email,
       department: account.department || "",
       assignedSport: account.assignedSport?.toString?.() || "",
-      assignedSportId: account.assignedSportId?.toString?.() || "",
-      assignedSportName: account.assignedSportName || "",
     });
   }
 
@@ -115,103 +112,48 @@ export async function login(req, res) {
 }
 
 export async function createRoleAccount(model, role, req, res) {
-  const { name, email, password, registrationNo, phone, ...rest } = req.body;
+  const { name, email, password, ...rest } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ message: "Name, email, and password are required" });
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(String(email))) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-
   const normalizedEmail = String(email).trim().toLowerCase();
-  const existingAccounts = await Promise.all(
-    roleModels.map(({ model: roleModel }) => roleModel.findOne({ email: normalizedEmail }).lean())
-  );
-  const exists = existingAccounts.some(Boolean);
+  const exists = await Promise.any(
+    roleModels.map(({ model: roleModel }) => roleModel.findOne({ email: normalizedEmail }))
+  ).catch(() => null);
 
   if (exists) {
     return res.status(409).json({ message: "An account with this email already exists" });
   }
 
-  // Validate assignedSportId exists in MongoDB if provided
-  const sportId = rest.assignedSportId || rest.sportId;
-  if (sportId) {
-    const sportExists = await Sport.findById(sportId);
-    if (!sportExists) {
-      return res.status(400).json({ message: "Assigned sport was not found" });
-    }
-  }
-
   const hashedPassword = await bcrypt.hash(password, 12);
-  let assignedSportFields = {};
-  try {
-    assignedSportFields = await resolveAssignedSport(rest);
-  } catch (error) {
-    return res.status(error.status || 400).json({ message: error.message });
-  }
+  const assignedSport = normalizeSport(rest.assignedSport || rest.sport);
+  const account = await model.create({
+    ...rest,
+    ...(assignedSport ? { assignedSport } : {}),
+    name,
+    email: normalizedEmail,
+    password: hashedPassword,
+    role,
+    createdBy: req.user?.id,
+    createdByRole: req.user?.role,
+  });
 
-  const isCoordinator = role === "coordinator";
+  const emailResult = role === "coordinator" || role === "volunteer"
+    ? await sendRoleAccountEmail({ account, role, password })
+    : { sent: false, skipped: true };
 
-  let account;
-  try {
-    account = await model.create({
-      ...rest,
-      ...assignedSportFields,
-      name,
-      registrationNo: registrationNo || undefined,
-      email: normalizedEmail,
-      password: hashedPassword,
-      role,
-      phone: phone || undefined,
-      createdBy: req.user?.id,
-      createdByRole: req.user?.role,
-      mustChangePassword: isCoordinator ? true : undefined,
-    });
-  } catch (error) {
-    if (error?.code === 11000 && error?.keyPattern?.email) {
-      return res.status(409).json({ message: "An account with this email already exists" });
-    }
-    throw error;
-  }
-
-  // Attempt to send email
-  let emailSent = false;
-  try {
-    await sendAccountCreatedEmail({
-      name: account.name,
-      email: account.email,
-      role,
-      assignedSport: account.assignedSportName || account.assignedSport || "",
-      password,
-      registrationNo: account.registrationNo,
-    });
-    emailSent = true;
-  } catch (emailError) {
-    console.error("[EMAIL] Failed to send account creation email:", emailError);
-  }
-
-  const response = {
+  return res.status(201).json({
     id: account._id,
     name: account.name,
     email: account.email,
     role,
-    registrationNo: account.registrationNo || "",
-    phone: account.phone || "",
     assignedSport: account.assignedSport || "",
-    assignedSportId: account.assignedSportId?.toString?.() || "",
-    assignedSportName: account.assignedSportName || "",
-    mustChangePassword: account.mustChangePassword || false,
-    emailSent,
-  };
-
-  if (emailSent) {
-    response.message = "Account created successfully";
-    return res.status(201).json(response);
-  }
-
-  response.message = "Coordinator created, but email could not be sent.";
-  return res.status(201).json(response);
+    registrationNumber: account.registrationNumber || "",
+    phone: account.phone || "",
+    message: emailResult.sent || emailResult.skipped
+      ? "Account created successfully."
+      : "Account created, but email could not be sent.",
+  });
 }

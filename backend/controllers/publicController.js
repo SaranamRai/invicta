@@ -27,14 +27,25 @@ const publicModels = {
   teams: Team,
 };
 
+function addQueryFilters(resource, req, filter) {
+  const { tournamentId, sportId, category, teamId, fixtureId } = req.query || {};
+  if (tournamentId) filter.tournamentId = tournamentId;
+  if (sportId) filter.sportId = sportId;
+  if (category) filter.category = String(category);
+  if (fixtureId && (resource === "live-scores" || resource === "live-feeds")) filter.fixtureId = fixtureId;
+  if (teamId && resource === "fixtures") filter.$or = [{ teamA: teamId }, { teamB: teamId }];
+  if (teamId && resource === "teams") filter._id = teamId;
+  return filter;
+}
+
 export function listPublic(resource) {
-  return async (_req, res) => {
+  return async (req, res) => {
     const model = publicModels[resource];
-    const filter = resource === "announcements"
+    const filter = addQueryFilters(resource, req, resource === "announcements"
       ? { visibleToPublic: true }
       : resource === "teams"
       ? { status: "approved" }
-      : {};
+      : {});
 
     let query = model.find(filter);
     

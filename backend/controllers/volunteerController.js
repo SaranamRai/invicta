@@ -17,6 +17,13 @@ function sportAccessDenied() {
   return error;
 }
 
+function toFixtureStatus(status) {
+  if (status === "completed" || status === "Finished") return "completed";
+  if (status === "paused" || status === "Paused") return "paused";
+  if (status === "live" || status === "Live") return "live";
+  return "upcoming";
+}
+
 async function requireVolunteerFixture(req, fixtureId) {
   const assignedSport = normalizeSport(req.user.assignedSport);
   const assignedSportId = req.user.assignedSportId?.toString?.() || "";
@@ -172,19 +179,46 @@ export async function volunteerTeams(req, res) {
 
 export async function updateLiveScore(req, res) {
   const fixture = await requireVolunteerFixture(req, req.params.fixtureId);
+  const nextStatus = req.body.currentStatus || req.body.status
+    ? toFixtureStatus(req.body.currentStatus || req.body.status)
+    : fixture.status;
+
+  if (fixture.status === "completed" || fixture.isCompleted) {
+    return res.status(409).json({ message: "This match is already completed and cannot be started again." });
+  }
+
   const score = await LiveScore.findOneAndUpdate(
     { fixtureId: req.params.fixtureId },
     {
       ...req.body,
       fixtureId: req.params.fixtureId,
+      tournamentId: fixture.tournamentId,
       sportId: fixture.sportId,
       sportName: fixture.sportName,
       category: fixture.category,
+      currentStatus: nextStatus,
       updatedBy: req.user.id,
       updatedAt: new Date(),
     },
     { upsert: true, new: true }
   );
+
+  const fixturePatch = {
+    status: nextStatus,
+    scoreA: Number(req.body.teamAScore ?? req.body.scoreA ?? fixture.scoreA ?? 0),
+    scoreB: Number(req.body.teamBScore ?? req.body.scoreB ?? fixture.scoreB ?? 0),
+    timerStartedAt: req.body.timerStartedAt,
+    timerPausedAt: req.body.timerPausedAt,
+    totalPausedMs: req.body.totalPausedMs,
+    pausePeriods: req.body.pausePeriods,
+    endedAt: nextStatus === "completed" ? new Date().toISOString() : fixture.endedAt,
+    completedAt: nextStatus === "completed" ? Date.now() : fixture.completedAt,
+    isCompleted: nextStatus === "completed",
+  };
+
+  Object.keys(fixturePatch).forEach((key) => fixturePatch[key] === undefined && delete fixturePatch[key]);
+  await Fixture.findByIdAndUpdate(req.params.fixtureId, fixturePatch);
+
   return res.json(score);
 }
 

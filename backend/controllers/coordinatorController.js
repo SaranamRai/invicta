@@ -3,21 +3,13 @@ import Player from "../models/Player.js";
 import Fixture from "../models/Fixture.js";
 import Issue from "../models/Issue.js";
 import Announcement from "../models/Announcement.js";
-import PointsTable from "../models/PointsTable.js";
 import Rule from "../models/Rule.js";
 import Sport from "../models/Sport.js";
 import Volunteer from "../models/Volunteer.js";
 import { createRoleAccount } from "./authController.js";
-import bcrypt from "bcryptjs";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
-}
-
-function sportAccessDenied() {
-  const error = new Error("Access denied: you are not assigned to this sport.");
-  error.status = 403;
-  return error;
 }
 
 function requireCoordinatorSport(req, sport) {
@@ -25,65 +17,10 @@ function requireCoordinatorSport(req, sport) {
   const requestedSport = normalizeSport(sport);
 
   if (assignedSport && requestedSport !== assignedSport) {
-    throw sportAccessDenied();
+    const error = new Error(`This coordinator can only manage ${assignedSport}`);
+    error.status = 403;
+    throw error;
   }
-}
-
-function requireCoordinatorSportId(req, sportId) {
-  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
-  if (assignedSportId && sportId?.toString?.() !== assignedSportId) {
-    throw sportAccessDenied();
-  }
-}
-
-function getAssignedSportQuery(req) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
-
-  if (assignedSportId && assignedSport) return { $or: [{ sportId: assignedSportId }, { sport: assignedSport }] };
-  if (assignedSportId) return { sportId: assignedSportId };
-  if (assignedSport) return { sport: assignedSport };
-  return {};
-}
-
-function getAssignedVolunteerQuery(req) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
-
-  if (assignedSportId && assignedSport) return { $or: [{ assignedSportId }, { assignedSport }] };
-  if (assignedSportId) return { assignedSportId };
-  if (assignedSport) return { assignedSport };
-  return {};
-}
-
-function mapCoordinatorVolunteer(volunteer) {
-  return {
-    id: volunteer._id.toString(),
-    name: volunteer.name || volunteer.email,
-    email: volunteer.email,
-    assignedSport: volunteer.assignedSport || "",
-    assignedSportId: volunteer.assignedSportId?.toString?.() || "",
-    assignedSportName: volunteer.assignedSportName || "",
-    registrationNumber: volunteer.registrationNumber || "",
-    phone: volunteer.phone || "",
-    createdAt: volunteer.createdAt,
-  };
-}
-
-function assertVolunteerBelongsToCoordinator(req, volunteer) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
-  const volunteerSport = normalizeSport(volunteer.assignedSport);
-  const volunteerSportId = volunteer.assignedSportId?.toString?.() || "";
-
-  if (
-    (assignedSportId && volunteerSportId && volunteerSportId === assignedSportId) ||
-    (assignedSport && volunteerSport && volunteerSport === assignedSport)
-  ) {
-    return;
-  }
-
-  throw sportAccessDenied();
 }
 
 export async function myDepartment(req, res) {
@@ -94,8 +31,7 @@ export async function myDepartment(req, res) {
 }
 
 export async function createTeam(req, res) {
-  if (req.body.sportId) requireCoordinatorSportId(req, req.body.sportId);
-  if (req.body.sport) requireCoordinatorSport(req, req.body.sport);
+  requireCoordinatorSport(req, req.body.sport);
   const team = await Team.create({ ...req.body, createdBy: req.user.id, status: "pending" });
 
   // Also create Player documents for members if provided
@@ -123,7 +59,6 @@ export async function createTeam(req, res) {
 export async function updateTeam(req, res) {
   const existingTeam = await Team.findById(req.params.id);
   if (!existingTeam) return res.status(404).json({ message: "Team not found" });
-  requireCoordinatorSportId(req, req.body.sportId || existingTeam.sportId);
   requireCoordinatorSport(req, req.body.sport || existingTeam.sport);
   const team = await Team.findByIdAndUpdate(req.params.id, req.body, { new: true });
   if (!team) return res.status(404).json({ message: "Team not found" });
@@ -142,7 +77,10 @@ export async function updatePlayer(req, res) {
 }
 
 export async function coordinatorFixtures(req, res) {
-  const query = getAssignedSportQuery(req);
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const query = assignedSport ? { sport: assignedSport } : {};
+  if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
+  if (req.query.category) query.category = String(req.query.category);
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
 
   return res.json(fixtures.map((fixture) => ({
@@ -153,8 +91,9 @@ export async function coordinatorFixtures(req, res) {
     teamBName: fixture.teamBName || "",
     sport: fixture.sport,
     sportName: fixture.sportName || "",
-    sportId: fixture.sportId?.toString?.() || "",
-    category: fixture.category || "Male",
+    tournamentId: fixture.tournamentId?.toString?.() || "",
+    tournamentName: fixture.tournamentName || "",
+    category: fixture.category || "",
     date: fixture.date || "",
     time: fixture.time || "",
     venue: fixture.venue || "",
@@ -166,78 +105,18 @@ export async function coordinatorFixtures(req, res) {
 }
 
 export async function coordinatorVolunteers(req, res) {
-  const query = getAssignedVolunteerQuery(req);
-  if (!Object.keys(query).length) query.createdBy = req.user.id;
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const query = assignedSport ? { assignedSport } : { createdBy: req.user.id };
   const volunteers = await Volunteer.find(query).sort({ createdAt: -1 }).lean();
 
-  return res.json(volunteers.map(mapCoordinatorVolunteer));
-}
-
-export async function updateCoordinatorVolunteer(req, res) {
-  const volunteer = await Volunteer.findById(req.params.id);
-  if (!volunteer) return res.status(404).json({ message: "Volunteer not found" });
-
-  assertVolunteerBelongsToCoordinator(req, volunteer);
-
-  const name = normalizeText(req.body.name || volunteer.name);
-  const email = normalizeText(req.body.email || volunteer.email).toLowerCase();
-  const registrationNumber = normalizeText(req.body.registrationNumber || volunteer.registrationNumber);
-  const phone = normalizeText(req.body.phone || req.body.mobileNo || req.body.mobileNumber || volunteer.phone);
-  const password = normalizeText(req.body.password);
-
-  if (!name || !email || !registrationNumber || !phone) {
-    return res.status(400).json({ message: "Name, email, registration number, and mobile number are required" });
-  }
-
-  if (email !== volunteer.email) {
-    const duplicate = await Volunteer.findOne({ email, _id: { $ne: volunteer._id } }).lean();
-    if (duplicate) return res.status(409).json({ message: "An account with this email already exists" });
-  }
-
-  volunteer.name = name;
-  volunteer.email = email;
-  volunteer.registrationNumber = registrationNumber;
-  volunteer.phone = phone;
-  if (password) volunteer.password = await bcrypt.hash(password, 12);
-
-  await volunteer.save();
-  return res.json(mapCoordinatorVolunteer(volunteer));
-}
-
-export async function coordinatorPointsTable(req, res) {
-  const query = getAssignedSportQuery(req);
-  const entries = await PointsTable.find(query)
-    .populate("sportId", "sportName name")
-    .sort({ points: -1, wins: -1, department: 1 })
-    .lean();
-
-  return res.json(entries.map((entry, index) => ({
-    id: entry._id.toString(),
-    rank: index + 1,
-    department: entry.department,
-    sportId: entry.sportId?._id?.toString?.() || entry.sportId?.toString?.() || "",
-    sportName: entry.sportId?.sportName || entry.sportId?.name || req.user.assignedSportName || req.user.assignedSport || "",
-    matchesPlayed: entry.matchesPlayed || 0,
-    wins: entry.wins || 0,
-    losses: entry.losses || 0,
-    draws: entry.draws || 0,
-    points: entry.points || 0,
-    updatedAt: entry.updatedAt,
-  })));
-}
-
-export async function coordinatorAnnouncements(req, res) {
-  const announcements = await Announcement.find({ visibleToPublic: true }).sort({ createdAt: -1 }).limit(20).lean();
-  return res.json(announcements.map((announcement) => ({
-    _id: announcement._id.toString(),
-    title: announcement.title,
-    message: announcement.message,
-    priority: announcement.priority || "normal",
-    visibleToPublic: announcement.visibleToPublic,
-    attachmentName: announcement.attachmentName || "",
-    attachmentType: announcement.attachmentType || "",
-    attachmentHtml: announcement.attachmentHtml || "",
-    createdAt: announcement.createdAt,
+  return res.json(volunteers.map((volunteer) => ({
+    id: volunteer._id.toString(),
+    name: volunteer.name || volunteer.email,
+    email: volunteer.email,
+    assignedSport: volunteer.assignedSport || "",
+    registrationNumber: volunteer.registrationNumber || "",
+    phone: volunteer.phone || "",
+    createdAt: volunteer.createdAt,
   })));
 }
 
@@ -262,16 +141,14 @@ export async function assignFixtureVolunteer(req, res) {
   if (!fixture) return res.status(404).json({ message: "Fixture not found" });
   if (!volunteer) return res.status(404).json({ message: "Volunteer not found" });
 
-  requireCoordinatorSportId(req, fixture.sportId);
   requireCoordinatorSport(req, fixture.sport);
 
-  const volunteerSportId = volunteer.assignedSportId?.toString?.() || "";
-  const volunteerSport = normalizeSport(volunteer.assignedSport);
-  const sameSportId = Boolean(req.user.assignedSportId && volunteerSportId && volunteerSportId === req.user.assignedSportId);
-  const sameSportName = Boolean(assignedSport && volunteerSport && volunteerSport === assignedSport);
+  if (req.body.tournamentId && fixture.tournamentId?.toString?.() !== req.body.tournamentId) {
+    return res.status(400).json({ message: "Selected fixture does not belong to this tournament" });
+  }
 
-  if (!sameSportId && !sameSportName) {
-    return res.status(403).json({ message: "Access denied: you are not assigned to this sport." });
+  if (assignedSport && normalizeSport(volunteer.assignedSport) !== assignedSport) {
+    return res.status(403).json({ message: `Volunteer must belong to ${assignedSport}` });
   }
 
   if (fixture.startTime && fixture.endTime) {
@@ -306,9 +183,12 @@ export async function publishRule(req, res) {
   const description = normalizeText(req.body.description || req.body.rules);
   const sport = normalizeText(req.body.sport).toLowerCase();
   const sportName = normalizeText(req.body.sportName || sport);
+  const tournamentId = normalizeText(req.body.tournamentId);
+  const tournamentName = normalizeText(req.body.tournamentName);
+  const category = normalizeText(req.body.category);
 
-  if (!title || !description || !sport) {
-    return res.status(400).json({ message: "Sport, title, and rules are required" });
+  if (!title || !description || !sport || !tournamentId) {
+    return res.status(400).json({ message: "Tournament, sport, title, and rules are required" });
   }
 
   requireCoordinatorSport(req, sport);
@@ -332,6 +212,9 @@ export async function publishRule(req, res) {
     sport,
     sportName,
     sportId: sportDoc._id,
+    tournamentId,
+    tournamentName,
+    category,
     title,
     rules: description,
     description,
@@ -365,7 +248,7 @@ export async function createCoordinatorVolunteer(req, res) {
   }
 
   if (requestedSport !== assignedSport) {
-    return res.status(403).json({ message: "Access denied: you are not assigned to this sport." });
+    return res.status(403).json({ message: `This coordinator can only add volunteers for ${assignedSport}` });
   }
 
   if (!registrationNumber || !phone) {
@@ -373,8 +256,6 @@ export async function createCoordinatorVolunteer(req, res) {
   }
 
   req.body.assignedSport = assignedSport;
-  if (req.user.assignedSportId) req.body.assignedSportId = req.user.assignedSportId;
-  if (req.user.assignedSportName) req.body.assignedSportName = req.user.assignedSportName;
   req.body.registrationNumber = registrationNumber;
   req.body.phone = phone;
   return createRoleAccount(Volunteer, "volunteer", req, res);

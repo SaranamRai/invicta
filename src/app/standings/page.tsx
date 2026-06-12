@@ -7,7 +7,7 @@ import { Download, Trophy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Team } from "@/lib/fixture-generator";
 import { MatchData } from "@/lib/types";
-import { getPublicFixtures, getPublicLiveScores, getPublicTeams, mapMongoFixture, mapMongoTeam } from "@/lib/api";
+import { getPublicFixtures, getPublicLiveScores, getPublicTeams, getPublicTournaments, mapMongoFixture, mapMongoTeam, TournamentPayload } from "@/lib/api";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { cn } from "@/lib/utils";
 
@@ -16,17 +16,38 @@ const categories = ["Inter-Department"];
 export default function StandingsPage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [activeSport, setActiveSport] = useState("");
   const [activeCategory, setActiveCategory] = useState(categories[0] || "");
 
   useEffect(() => {
     let isMounted = true;
 
+    void getPublicTournaments().then((data) => {
+      if (isMounted) setTournaments(data);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
     async function loadStandingsData() {
+      if (!selectedTournamentId) {
+        setMatches([]);
+        setTeams([]);
+        return;
+      }
+
+      const params = { tournamentId: selectedTournamentId };
       const [fixtures, liveScores, publicTeams] = await Promise.all([
-        getPublicFixtures(),
-        getPublicLiveScores(),
-        getPublicTeams(),
+        getPublicFixtures(params),
+        getPublicLiveScores(params),
+        getPublicTeams(params),
       ]);
 
       if (!isMounted) return;
@@ -43,7 +64,7 @@ export default function StandingsPage() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [selectedTournamentId]);
 
   const sports = useMemo(() => getAvailableSports(teams, matches), [teams, matches]);
 
@@ -84,6 +105,29 @@ export default function StandingsPage() {
           <Download size={18} /> Download Stats
         </button>
       </header>
+
+      <div className="max-w-md space-y-2">
+        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tournament</label>
+        <select
+          value={selectedTournamentId}
+          onChange={(event) => setSelectedTournamentId(event.target.value)}
+          className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground outline-none focus:border-accent"
+        >
+          <option value="">Select tournament</option>
+          {tournaments.map((tournament) => (
+            <option key={tournament._id || tournament.id} value={tournament._id || tournament.id}>
+              {tournament.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!selectedTournamentId ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card/40 p-10 text-center text-sm font-semibold text-muted-foreground">
+          Please select a tournament.
+        </div>
+      ) : (
+        <>
 
       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-3">
@@ -184,6 +228,8 @@ export default function StandingsPage() {
           </div>
         </Card>
       </motion.div>
+        </>
+      )}
     </div>
   );
 }

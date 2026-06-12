@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { adminHandlers, listIssues, listRoleAccounts, listTournaments, reviewTeamRegistration, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
+import { adminHandlers, listIssues, listRoleAccounts, listTournaments, reviewTeamRegistration, tournamentReport, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
 import {
   createTeam,
   createFixture,
@@ -73,6 +73,7 @@ router.put("/role-accounts/:id", superOnly, updateRoleAccount);
 router.delete("/role-accounts/:id", superOnly, deleteRoleAccount);
 router.get("/tournaments", adminOrSuper, listTournaments);
 router.post("/tournaments", superOnly, adminHandlers.createTournament);
+router.get("/tournaments/:id/report", adminOrSuper, tournamentReport);
 router.put("/tournaments/:id", superOnly, adminHandlers.updateTournament);
 router.patch("/tournaments/:id/registration", superOnly, adminHandlers.toggleTournamentRegistration);
 router.delete("/tournaments/:id", superOnly, adminHandlers.deleteTournament);

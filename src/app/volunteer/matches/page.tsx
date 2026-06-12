@@ -8,27 +8,12 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAssignedMatches } from "@/lib/services/mongo-service";
 import { getRoleAccount } from "@/lib/role-auth";
-import { sports as sportCatalog } from "@/lib/mock-data";
-
-function normalizeSportValue(value?: string) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
-}
-
-function getSportDisplayName(sportId?: string, sportName?: string) {
-  const name = sportName?.trim();
-  if (name) return name;
-
-  const normalizedSport = normalizeSportValue(sportId);
-  const sport = sportCatalog.find((item) => item.id === normalizedSport || normalizeSportValue(item.name) === normalizedSport);
-  return sport?.name || sportId || "Assigned sport";
-}
 
 export default function MatchesSelectionPage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"All" | "Live" | "Upcoming" | "Finished">("All");
-  const account = getRoleAccount();
-  const assignedSport = normalizeSportValue(account?.assignedSport);
+  const [filter, setFilter] = useState<"All" | "Live" | "Paused" | "Upcoming" | "Finished">("All");
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
     let isMounted = true;
@@ -66,7 +51,7 @@ export default function MatchesSelectionPage() {
         </div>
 
         <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-1">
-          {(["All", "Live", "Upcoming", "Finished"] as const).map(f => (
+          {(["All", "Live", "Paused", "Upcoming", "Finished"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -105,15 +90,14 @@ export default function MatchesSelectionPage() {
                 <span className={cn(
                   "text-[10px] font-black uppercase tracking-widest flex items-center gap-2",
                   match.status === "Live" ? "text-accent" :
+                  match.status === "Paused" ? "text-amber-400" :
                   match.status === "Upcoming" ? "text-blue-500" :
                   "text-slate-500"
                 )}>
                   {match.status === "Live" && <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />}
                   {match.status}
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {getSportDisplayName(match.sport, match.sportName || account?.assignedSportName)}
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{match.sport}</span>
               </div>
 
               <div className="space-y-4">

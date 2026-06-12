@@ -12,6 +12,7 @@ import Result from "../models/Result.js";
 import Issue from "../models/Issue.js";
 import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
+import LiveScore from "../models/LiveScore.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
 import bcrypt from "bcryptjs";
@@ -268,6 +269,60 @@ export async function listRoleAccounts(_req, res) {
 export async function listTournaments(_req, res) {
   const tournaments = await Tournament.find().sort({ createdAt: -1 }).lean();
   return res.json(tournaments);
+}
+
+export async function tournamentReport(req, res) {
+  const tournament = await Tournament.findById(req.params.id).lean();
+  if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+  const [teams, fixtures, liveScores] = await Promise.all([
+    Team.find({ tournamentId: req.params.id }).populate("sportId", "sportName name").lean(),
+    Fixture.find({ tournamentId: req.params.id }).populate("sportId", "sportName name").lean(),
+    LiveScore.find({ tournamentId: req.params.id }).lean(),
+  ]);
+
+  const sports = [...new Set(teams.map((team) => team.sportName || team.sport || team.sportId?.sportName || team.sportId?.name).filter(Boolean))];
+  const categories = [...new Set(teams.map((team) => team.category).filter(Boolean))];
+  const completed = fixtures.filter((fixture) => fixture.status === "completed" || fixture.isCompleted);
+  const pending = fixtures.filter((fixture) => fixture.status !== "completed" && !fixture.isCompleted);
+  const totalPlayers = teams.reduce((sum, team) => sum + (Array.isArray(team.members) ? team.members.length : 0), 0);
+
+  const winners = completed
+    .map((fixture) => {
+      const score = liveScores.find((item) => item.fixtureId?.toString?.() === fixture._id.toString());
+      const scoreA = Number(score?.teamAScore ?? fixture.scoreA ?? 0);
+      const scoreB = Number(score?.teamBScore ?? fixture.scoreB ?? 0);
+      if (scoreA === scoreB) return null;
+      return {
+        fixtureId: fixture._id,
+        matchTitle: fixture.matchTitle,
+        winnerTeam: scoreA > scoreB ? fixture.teamAName : fixture.teamBName,
+        finalScore: `${scoreA}-${scoreB}`,
+      };
+    })
+    .filter(Boolean);
+
+  return res.json({
+    tournament,
+    sports,
+    categories,
+    totalRegisteredTeams: teams.length,
+    totalPlayers,
+    fixtures,
+    completedMatches: completed.length,
+    pendingMatches: pending.length,
+    results: liveScores,
+    points: teams.map((team) => ({
+      teamName: team.teamName,
+      sport: team.sportName || team.sport,
+      category: team.category || "",
+      wins: team.wins || 0,
+      losses: team.losses || 0,
+      draws: team.draws || 0,
+      points: team.points || 0,
+    })),
+    winners,
+  });
 }
 
 export async function toggleTournamentRegistration(req, res) {
