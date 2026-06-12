@@ -1,5 +1,4 @@
 import Fixture from "../models/Fixture.js";
-import Team from "../models/Team.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Gallery from "../models/Gallery.js";
@@ -10,15 +9,15 @@ function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function sportAccessDenied() {
-  const error = new Error("Access denied: you are not assigned to this sport.");
-  error.status = 403;
-  return error;
+function toFixtureStatus(status) {
+  if (status === "completed" || status === "Finished") return "completed";
+  if (status === "paused" || status === "Paused") return "paused";
+  if (status === "live" || status === "Live") return "live";
+  return "upcoming";
 }
 
 async function requireVolunteerFixture(req, fixtureId) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
 
   const fixture = await Fixture.findById(fixtureId).lean();
   if (!fixture) {
@@ -27,18 +26,13 @@ async function requireVolunteerFixture(req, fixtureId) {
     throw error;
   }
 
-  if (
-    (assignedSportId && fixture.sportId?.toString?.() !== assignedSportId) ||
-    (!assignedSportId && assignedSport && normalizeSport(fixture.sport) !== assignedSport)
-  ) {
-    throw sportAccessDenied();
+  if (normalizeSport(fixture.sport) !== assignedSport) {
+    const error = new Error(`This volunteer can only manage ${assignedSport} matches`);
+    error.status = 403;
+    throw error;
   }
 
-  const assignedMatches = Array.isArray(req.user.assignedMatches) ? req.user.assignedMatches.map(String) : [];
-  const fixtureVolunteerId = fixture.assignedVolunteer?.toString?.() || "";
-  const isAssignedToThisVolunteer = fixtureVolunteerId === req.user.id || assignedMatches.includes(fixture._id.toString());
-
-  if (fixtureVolunteerId && !isAssignedToThisVolunteer) {
+  if (fixture.assignedVolunteer?.toString?.() !== req.user.id) {
     const error = new Error("This match is not assigned to this volunteer");
     error.status = 403;
     throw error;
@@ -49,55 +43,56 @@ async function requireVolunteerFixture(req, fixtureId) {
 
 export async function assignedMatches(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  const sportQuery = req.user.assignedSportId && assignedSport
-    ? { $or: [{ sportId: req.user.assignedSportId }, { sport: assignedSport }] }
-    : req.user.assignedSportId
-      ? { sportId: req.user.assignedSportId }
-      : assignedSport
-        ? { sport: assignedSport }
-        : {};
-  const assignmentQuery = {
-    $or: [
-      { assignedVolunteer: req.user.id },
-      { assignedVolunteer: { $exists: false } },
-      { assignedVolunteer: null },
-    ],
-  };
-  const query = Object.keys(sportQuery).length
-    ? { $and: [sportQuery, assignmentQuery] }
-    : assignmentQuery;
+  const query = { assignedVolunteer: req.user.id, ...(assignedSport ? { sport: assignedSport } : {}) };
+  if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
+  if (req.query.category) query.category = String(req.query.category);
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
   return res.json(fixtures);
 }
 
-export async function volunteerTeams(req, res) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const sportQuery = req.user.assignedSportId && assignedSport
-    ? { $or: [{ sportId: req.user.assignedSportId }, { sport: assignedSport }] }
-    : req.user.assignedSportId
-      ? { sportId: req.user.assignedSportId }
-      : assignedSport
-        ? { sport: assignedSport }
-        : {};
-  const teams = await Team.find(sportQuery).sort({ sport: 1, teamName: 1 }).lean();
-  return res.json(teams);
-}
-
 export async function updateLiveScore(req, res) {
   const fixture = await requireVolunteerFixture(req, req.params.fixtureId);
+  const nextStatus = req.body.currentStatus || req.body.status
+    ? toFixtureStatus(req.body.currentStatus || req.body.status)
+    : fixture.status;
+
+  if (fixture.status === "completed" || fixture.isCompleted) {
+    return res.status(409).json({ message: "This match is already completed and cannot be started again." });
+  }
+
+  const scorePatch = {
+    ...req.body,
+    fixtureId: req.params.fixtureId,
+    tournamentId: fixture.tournamentId,
+    sportId: fixture.sportId,
+    category: fixture.category,
+    currentStatus: nextStatus,
+    updatedBy: req.user.id,
+    updatedAt: new Date(),
+  };
+
   const score = await LiveScore.findOneAndUpdate(
     { fixtureId: req.params.fixtureId },
-    {
-      ...req.body,
-      fixtureId: req.params.fixtureId,
-      sportId: fixture.sportId,
-      sportName: fixture.sportName,
-      category: fixture.category,
-      updatedBy: req.user.id,
-      updatedAt: new Date(),
-    },
+    scorePatch,
     { upsert: true, new: true }
   );
+
+  const fixturePatch = {
+    status: nextStatus,
+    scoreA: Number(req.body.teamAScore ?? req.body.scoreA ?? fixture.scoreA ?? 0),
+    scoreB: Number(req.body.teamBScore ?? req.body.scoreB ?? fixture.scoreB ?? 0),
+    timerStartedAt: req.body.timerStartedAt,
+    timerPausedAt: req.body.timerPausedAt,
+    totalPausedMs: req.body.totalPausedMs,
+    pausePeriods: req.body.pausePeriods,
+    endedAt: nextStatus === "completed" ? new Date().toISOString() : fixture.endedAt,
+    completedAt: nextStatus === "completed" ? Date.now() : fixture.completedAt,
+    isCompleted: nextStatus === "completed",
+  };
+
+  Object.keys(fixturePatch).forEach((key) => fixturePatch[key] === undefined && delete fixturePatch[key]);
+  await Fixture.findByIdAndUpdate(req.params.fixtureId, fixturePatch);
+
   return res.json(score);
 }
 

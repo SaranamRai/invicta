@@ -12,7 +12,6 @@ import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { LogOut } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
 import { sports } from "@/lib/mock-data";
 import {
@@ -290,7 +289,6 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <ThemeToggle />
             <button
               onClick={handleLogout}
               className="group relative flex items-center gap-2 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:px-6"

@@ -10,7 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
 
-const tabs = ["All Matches", "Live", "Upcoming", "Finished"];
+const tabs = ["All Matches", "Live", "Paused", "Upcoming", "Finished"];
 
 export default function MatchesPage() {
   const [activeTab, setActiveTab] = useState("All Matches");
@@ -55,7 +55,7 @@ export default function MatchesPage() {
     }
 
     void loadMatches();
-    const interval = window.setInterval(loadMatches, 15000);
+    const interval = window.setInterval(loadMatches, 1000);
 
     return () => {
       isMounted = false;
@@ -249,6 +249,7 @@ export default function MatchesPage() {
                         <div className={cn(
                           "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-widest",
                           match.status === "Live" ? "bg-accent/20 text-accent" :
+                          match.status === "Paused" ? "bg-amber-500/10 text-amber-400" :
                           match.status === "Upcoming" ? "bg-blue-500/10 text-blue-500" :
                           "bg-slate-500/10 text-slate-500"
                         )}>
@@ -291,7 +292,7 @@ export default function MatchesPage() {
                         <div className="order-2 flex w-full shrink-0 flex-col items-center gap-2">
                           <div className={cn(
                             "flex items-center gap-4 rounded-2xl border-2 px-6 py-4 shadow-2xl transition-all",
-                            match.status === "Live" ? "bg-black/60 border-accent/40" : "bg-secondary border-border"
+                            match.status === "Live" || match.status === "Paused" ? "bg-black/60 border-accent/40" : "bg-secondary border-border"
                           )}>
                             <span className={cn("scoreboard-number text-4xl font-black leading-none sm:text-5xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
                               {match.status === "Upcoming" ? "00" : (match.scoreA ?? 0).toString().padStart(2, "0")}

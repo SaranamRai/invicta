@@ -9,6 +9,7 @@ import { MatchData } from "@/lib/types";
 
 function toMongoStatus(status?: MatchData["status"]) {
   if (status === "Finished") return "completed";
+  if (status === "Paused") return "paused";
   if (status === "Live") return "live";
   return "upcoming";
 }

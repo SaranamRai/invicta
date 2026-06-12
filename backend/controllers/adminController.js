@@ -2,23 +2,23 @@ import Admin from "../models/Admin.js";
 import SuperCoordinator from "../models/SuperCoordinator.js";
 import Volunteer from "../models/Volunteer.js";
 import Coordinator from "../models/Coordinator.js";
+import bcrypt from "bcryptjs";
 import Sport from "../models/Sport.js";
 import Department from "../models/Department.js";
 import Fixture from "../models/Fixture.js";
 import Announcement from "../models/Announcement.js";
-import Team from "../models/Team.js";
 import Rule from "../models/Rule.js";
 import Result from "../models/Result.js";
 import Issue from "../models/Issue.js";
 import Tournament from "../models/Tournament.js";
+import Team from "../models/Team.js";
+import LiveScore from "../models/LiveScore.js";
 import Venue from "../models/Venue.js";
 import { createRoleAccount } from "./authController.js";
-import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
-import bcrypt from "bcryptjs";
 
 export function createDoc(model) {
   return async (req, res) => {
-    const doc = await model.create({ ...req.body, createdBy: req.user?.id });
+    const doc = await model.create(req.body);
     return res.status(201).json(doc);
   };
 }
@@ -55,20 +55,15 @@ export async function listIssues(_req, res) {
 }
 
 export async function createAnnouncement(req, res) {
-  const { title, message, priority = "normal", visibleToPublic = true, attachmentName, attachmentType, attachmentHtml } = req.body;
+  const { title, message, visibleToPublic = true, attachmentName, attachmentType, attachmentHtml } = req.body;
 
   if (!title || !message) {
     return res.status(400).json({ message: "Title and message are required" });
   }
 
-  if (!["normal", "important", "urgent"].includes(priority)) {
-    return res.status(400).json({ message: "Priority must be normal, important, or urgent" });
-  }
-
   const announcement = await Announcement.create({
     title,
     message,
-    priority,
     visibleToPublic,
     attachmentName,
     attachmentType,
@@ -78,153 +73,6 @@ export async function createAnnouncement(req, res) {
   });
 
   return res.status(201).json(announcement);
-}
-
-export async function updateAnnouncement(req, res) {
-  const { id } = req.params;
-  const { title, message, priority, visibleToPublic } = req.body;
-
-  const announcement = await Announcement.findById(id);
-  if (!announcement) {
-    return res.status(404).json({ message: "Announcement not found" });
-  }
-
-  if (title !== undefined) announcement.title = title;
-  if (message !== undefined) announcement.message = message;
-  if (priority !== undefined) {
-    if (!["normal", "important", "urgent"].includes(priority)) {
-      return res.status(400).json({ message: "Priority must be normal, important, or urgent" });
-    }
-    announcement.priority = priority;
-  }
-  if (visibleToPublic !== undefined) announcement.visibleToPublic = visibleToPublic;
-
-  await announcement.save();
-  return res.json(announcement);
-}
-
-export async function deleteAnnouncement(req, res) {
-  const { id } = req.params;
-  const announcement = await Announcement.findByIdAndDelete(id);
-  if (!announcement) {
-    return res.status(404).json({ message: "Announcement not found" });
-  }
-  return res.json({ message: "Announcement deleted successfully" });
-}
-
-export async function listVenues(_req, res) {
-  const venues = await Venue.find().sort({ name: 1 }).lean();
-  return res.json(venues);
-}
-
-export async function createVenue(req, res) {
-  const { name, location, sportType } = req.body;
-  if (!name) {
-    return res.status(400).json({ message: "Venue name is required" });
-  }
-  const venue = await Venue.create({ name, location: location || "", sportType: sportType || "" });
-  return res.status(201).json(venue);
-}
-
-export async function updateVenue(req, res) {
-  const venue = await Venue.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!venue) return res.status(404).json({ message: "Venue not found" });
-  return res.json(venue);
-}
-
-export async function deleteVenue(req, res) {
-  const venue = await Venue.findByIdAndDelete(req.params.id);
-  if (!venue) return res.status(404).json({ message: "Venue not found" });
-  return res.json({ message: "Venue deleted successfully" });
-}
-
-export async function listSports(_req, res) {
-  const sports = await Sport.find().sort({ sportName: 1, name: 1 }).lean();
-  return res.json(sports);
-}
-
-export async function listPendingRegistrations(_req, res) {
-  const teams = await Team.find({ status: "pending" })
-    .populate("sportId", "sportName name")
-    .sort({ submittedAt: -1 })
-    .lean();
-  return res.json(teams);
-}
-
-function normalizeSportPayload(body) {
-  const sportName = String(body.sportName || body.name || "").trim().replace(/\s+/g, " ");
-  const categories = Array.isArray(body.categories) && body.categories.length
-    ? body.categories.filter((category) => ["Male", "Female"].includes(category))
-    : ["Male", "Female"];
-
-  return applyRecommendedPlayerCounts({
-    ...body,
-    sportName,
-    name: sportName,
-    categories: categories.length ? categories : ["Male", "Female"],
-    type: body.type === "indoor" ? "indoor" : "outdoor",
-    status: body.status === "inactive" ? "inactive" : "active",
-  });
-}
-
-export async function createSport(req, res) {
-  const payload = normalizeSportPayload(req.body);
-  if (!payload.sportName) {
-    return res.status(400).json({ message: "Sport name is required" });
-  }
-  if (payload.maxPlayers < payload.minPlayers) {
-    return res.status(400).json({ message: "Maximum players cannot be less than minimum players" });
-  }
-
-  const exists = await Sport.findOne({
-    $or: [
-      { sportName: new RegExp(`^${payload.sportName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-      { name: new RegExp(`^${payload.sportName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-    ],
-  });
-  if (exists) return res.status(409).json({ message: "Sport already exists" });
-
-  const sport = await Sport.create({ ...payload, createdBy: req.user?.id });
-  return res.status(201).json(sport);
-}
-
-export async function updateSport(req, res) {
-  const payload = normalizeSportPayload(req.body);
-  if (!payload.sportName) {
-    return res.status(400).json({ message: "Sport name is required" });
-  }
-  if (payload.maxPlayers < payload.minPlayers) {
-    return res.status(400).json({ message: "Maximum players cannot be less than minimum players" });
-  }
-
-  const sport = await Sport.findByIdAndUpdate(req.params.id, payload, { new: true });
-  if (!sport) return res.status(404).json({ message: "Sport not found" });
-  return res.json(sport);
-}
-
-export async function reviewTeamRegistration(req, res) {
-  const { status, rejectionReason = "" } = req.body;
-  if (!["approved", "rejected"].includes(status)) {
-    return res.status(400).json({ message: "Registration status must be approved or rejected" });
-  }
-
-  if (status === "rejected" && !String(rejectionReason).trim()) {
-    return res.status(400).json({ message: "Rejection reason is required" });
-  }
-
-  const team = await Team.findByIdAndUpdate(
-    req.params.id,
-    {
-      status,
-      reviewedBy: req.user.id,
-      reviewedAt: new Date(),
-      rejectionReason: status === "rejected" ? String(rejectionReason).trim() : "",
-    },
-    { new: true }
-  );
-
-  if (!team) return res.status(404).json({ message: "Registration not found" });
-  return res.json(team);
 }
 
 export async function listRoleAccounts(_req, res) {
@@ -243,6 +91,7 @@ export async function listRoleAccounts(_req, res) {
     assignedSport: account.assignedSport || "",
     assignedSportId: account.assignedSportId?.toString?.() || "",
     assignedSportName: account.assignedSportName || "",
+    status: account.status || "active",
     createdBy: account.createdBy?.toString?.() || "",
     createdByRole: account.createdByRole || "",
     role,
@@ -257,9 +106,132 @@ export async function listRoleAccounts(_req, res) {
   ]);
 }
 
+function getRoleModel(role) {
+  if (role === "admin") return Admin;
+  if (role === "supercoordinator") return SuperCoordinator;
+  if (role === "coordinator") return Coordinator;
+  if (role === "volunteer") return Volunteer;
+  return null;
+}
+
+export async function updateRoleAccount(req, res) {
+  const role = String(req.body.role || "").trim().toLowerCase();
+  const model = getRoleModel(role);
+  if (!model) return res.status(400).json({ message: "Valid role is required" });
+
+  const patch = {};
+  if (req.body.name) patch.name = String(req.body.name).trim();
+  if (req.body.email) patch.email = String(req.body.email).trim().toLowerCase();
+  if (req.body.assignedSport !== undefined) patch.assignedSport = String(req.body.assignedSport || "").trim().toLowerCase();
+  if (req.body.assignedSportId !== undefined) patch.assignedSportId = req.body.assignedSportId || undefined;
+  if (req.body.assignedSportName !== undefined) patch.assignedSportName = String(req.body.assignedSportName || "").trim();
+  if (req.body.status !== undefined) patch.status = String(req.body.status || "active").trim().toLowerCase();
+  if (req.body.password) patch.password = await bcrypt.hash(String(req.body.password), 12);
+
+  const account = await model.findByIdAndUpdate(req.params.id, patch, { new: true });
+  if (!account) return res.status(404).json({ message: "Account not found" });
+
+  return res.json({
+    id: account._id.toString(),
+    fullName: account.name || account.email,
+    email: account.email,
+    deptName: account.department || account.assignedSport || account.status || "Not assigned",
+    assignedSport: account.assignedSport || "",
+    assignedSportId: account.assignedSportId?.toString?.() || "",
+    assignedSportName: account.assignedSportName || "",
+    role,
+    status: account.status || "active",
+  });
+}
+
+export async function deleteRoleAccount(req, res) {
+  const role = String(req.body.role || req.query.role || "").trim().toLowerCase();
+  const model = getRoleModel(role);
+  if (!model) return res.status(400).json({ message: "Valid role is required" });
+
+  const account = await model.findByIdAndUpdate(req.params.id, { status: "inactive" }, { new: true });
+  if (!account) return res.status(404).json({ message: "Account not found" });
+  return res.json({ message: "Account deactivated successfully" });
+}
+
 export async function listTournaments(_req, res) {
   const tournaments = await Tournament.find().sort({ createdAt: -1 }).lean();
   return res.json(tournaments);
+}
+
+export async function listVenues(_req, res) {
+  const venues = await Venue.find().sort({ createdAt: -1 }).lean();
+  return res.json(venues);
+}
+
+export async function createVenue(req, res) {
+  const venueName = String(req.body.venueName || req.body.name || "").trim();
+  if (!venueName) return res.status(400).json({ message: "Venue name is required" });
+
+  const venue = await Venue.create({
+    venueName,
+    name: venueName,
+    location: String(req.body.location || "").trim(),
+    sportType: String(req.body.sportType || "both").trim().toLowerCase(),
+    capacity: req.body.capacity ? Number(req.body.capacity) : undefined,
+    status: String(req.body.status || "active").trim().toLowerCase(),
+  });
+
+  return res.status(201).json(venue);
+}
+
+export async function tournamentReport(req, res) {
+  const tournamentId = req.params.id;
+  const tournament = await Tournament.findById(tournamentId).lean();
+  if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+  const [teams, fixtures, liveScores] = await Promise.all([
+    Team.find({ tournamentId }).populate("sportId", "name").lean(),
+    Fixture.find({ tournamentId }).populate("sportId", "name").lean(),
+    LiveScore.find({ tournamentId }).lean(),
+  ]);
+
+  const sports = [...new Set(teams.map((team) => team.sportName || team.sport || team.sportId?.name).filter(Boolean))];
+  const categories = [...new Set(teams.map((team) => team.category).filter(Boolean))];
+  const completedMatches = fixtures.filter((fixture) => fixture.status === "completed" || fixture.isCompleted);
+  const pendingMatches = fixtures.filter((fixture) => fixture.status !== "completed" && !fixture.isCompleted);
+  const totalPlayers = teams.reduce((sum, team) => sum + (Array.isArray(team.members) ? team.members.length : 0), 0);
+  const winners = completedMatches
+    .map((fixture) => {
+      const score = liveScores.find((item) => item.fixtureId?.toString?.() === fixture._id.toString());
+      const scoreA = Number(score?.teamAScore ?? fixture.scoreA ?? 0);
+      const scoreB = Number(score?.teamBScore ?? fixture.scoreB ?? 0);
+      if (scoreA === scoreB) return null;
+      return {
+        fixtureId: fixture._id,
+        matchTitle: fixture.matchTitle,
+        winnerTeam: scoreA > scoreB ? fixture.teamAName : fixture.teamBName,
+        finalScore: `${scoreA}-${scoreB}`,
+      };
+    })
+    .filter(Boolean);
+
+  return res.json({
+    tournament,
+    sports,
+    categories,
+    totalRegisteredTeams: teams.length,
+    totalPlayers,
+    fixtures,
+    completedMatches: completedMatches.length,
+    pendingMatches: pendingMatches.length,
+    results: liveScores,
+    points: teams.map((team) => ({
+      teamName: team.teamName,
+      sport: team.sportName || team.sport,
+      category: team.category || "",
+      wins: team.wins || 0,
+      losses: team.losses || 0,
+      draws: team.draws || 0,
+      points: team.points || 0,
+    })),
+    winners,
+  });
 }
 
 export async function toggleTournamentRegistration(req, res) {
@@ -284,83 +256,9 @@ export async function toggleTournamentRegistration(req, res) {
   return res.json(tournament);
 }
 
-function getRoleModel(role) {
-  const map = {
-    admin: Admin,
-    supercoordinator: SuperCoordinator,
-    coordinator: Coordinator,
-    volunteer: Volunteer,
-  };
-  const model = map[role];
-  if (!model) throw Object.assign(new Error("Invalid role"), { status: 400 });
-  return model;
-}
-
-export async function updateRoleAccount(req, res) {
-  const { id } = req.params;
-  const { role, name, email, password, assignedSport, assignedSportId, assignedSportName, status, phone } = req.body;
-
-  if (!role) return res.status(400).json({ message: "Role is required" });
-
-  let model;
-  try { model = getRoleModel(role); } catch (e) { return res.status(e.status).json({ message: e.message }); }
-
-  const account = await model.findById(id);
-  if (!account) return res.status(404).json({ message: "Account not found" });
-
-  if (name !== undefined) account.name = String(name).trim();
-  if (email !== undefined) {
-    const normalizedEmail = String(email).trim().toLowerCase();
-    if (normalizedEmail !== account.email) {
-      for (const [, m] of Object.entries({ admin: Admin, supercoordinator: SuperCoordinator, coordinator: Coordinator, volunteer: Volunteer })) {
-        const dup = await m.findOne({ email: normalizedEmail, _id: { $ne: account._id } }).lean();
-        if (dup) return res.status(409).json({ message: "An account with this email already exists" });
-      }
-      account.email = normalizedEmail;
-    }
-  }
-  if (password) account.password = await bcrypt.hash(password, 12);
-  if (assignedSport !== undefined) account.assignedSport = String(assignedSport).trim().toLowerCase().replace(/\s+/g, "-");
-  if (assignedSportId !== undefined) account.assignedSportId = assignedSportId;
-  if (assignedSportName !== undefined) account.assignedSportName = String(assignedSportName).trim();
-  if (status !== undefined) account.status = status;
-  if (phone !== undefined) account.phone = String(phone).trim();
-
-  await account.save();
-
-  return res.json({
-    id: account._id.toString(),
-    fullName: account.name,
-    email: account.email,
-    role,
-    assignedSport: account.assignedSport || "",
-    assignedSportId: account.assignedSportId?.toString() || "",
-    assignedSportName: account.assignedSportName || "",
-    status: account.status,
-    phone: account.phone || "",
-    createdAt: account.createdAt,
-  });
-}
-
-export async function deleteRoleAccount(req, res) {
-  const { id } = req.params;
-  const { role } = req.body;
-
-  if (!role) return res.status(400).json({ message: "Role is required" });
-
-  let model;
-  try { model = getRoleModel(role); } catch (e) { return res.status(e.status).json({ message: e.message }); }
-
-  const account = await model.findByIdAndDelete(id);
-  if (!account) return res.status(404).json({ message: "Account not found" });
-
-  return res.json({ message: "Account deleted successfully" });
-}
-
 export const adminHandlers = {
-  listSports,
-  createSport,
-  updateSport,
+  createSport: createDoc(Sport),
+  updateSport: updateDoc(Sport),
   deleteSport: deleteDoc(Sport),
   createDepartment: createDoc(Department),
   updateDepartment: updateDoc(Department),
@@ -369,11 +267,10 @@ export const adminHandlers = {
   updateFixture: updateDoc(Fixture),
   deleteFixture: deleteDoc(Fixture),
   createAnnouncement,
-  updateAnnouncement,
-  deleteAnnouncement,
   createRule: createDoc(Rule),
   createResult: createDoc(Result),
   createTournament: createDoc(Tournament),
+  createVenue,
   updateTournament: updateDoc(Tournament),
   toggleTournamentRegistration,
   deleteTournament: deleteDoc(Tournament),
@@ -381,9 +278,4 @@ export const adminHandlers = {
   createSuperCoordinator: (req, res) => createRoleAccount(SuperCoordinator, "supercoordinator", req, res),
   createVolunteer: (req, res) => createRoleAccount(Volunteer, "volunteer", req, res),
   createCoordinator: (req, res) => createRoleAccount(Coordinator, "coordinator", req, res),
-  listVenues,
-  createVenue,
-  updateVenue,
-  deleteVenue,
-  listPendingRegistrations,
 };

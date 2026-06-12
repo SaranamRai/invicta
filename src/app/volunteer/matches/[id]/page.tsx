@@ -37,7 +37,9 @@ export default function LiveMatchEditPanel() {
   const [timer, setTimer] = useState("");
   const [fullMatchTimer, setFullMatchTimer] = useState("90:00");
   const [announcement, setAnnouncement] = useState("");
+  const [pauseReason, setPauseReason] = useState("Timeout");
   const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
+  const pauseReasons = ["Fault", "Player exchange", "Injury", "Timeout", "Referee issue", "Technical delay"];
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -167,10 +169,87 @@ export default function LiveMatchEditPanel() {
     }
   };
 
-  const handleStartClock = () => persistClockState("First Half", true, "Live", 0);
+  const handleStartClock = () => {
+    if (match?.status === "Finished") {
+      showMessage("This match is already completed and cannot be started again.", "error");
+      return;
+    }
+    return persistClockState("First Half", true, "Live", 0);
+  };
   const handleHalfTime = () => persistClockState("Half Time", false, "Live");
   const handleSecondHalf = () => persistClockState("Second Half", true, "Live");
   const handleEndMatch = () => persistClockState("Full Time", false, "Finished");
+
+  const handlePauseMatch = async () => {
+    if (!match || match.status !== "Live" || !match.clockRunning) return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer@gmail.com";
+      const currentNow = Date.now();
+      const elapsedSeconds = getMatchElapsedSeconds(match, now || currentNow);
+      const timer = formatMatchClock(elapsedSeconds);
+      const pauseEvent = {
+        reason: pauseReason,
+        pausedAt: currentNow,
+        elapsedSeconds,
+      };
+
+      await updateMatchDetails(matchId, {
+        status: "Paused",
+        clockRunning: false,
+        timerStartedAt: 0,
+        timerPausedAt: currentNow,
+        elapsedSeconds,
+        timer,
+        pausePeriods: [pauseEvent, ...(match.pausePeriods || [])],
+      });
+      await logActivity(matchId, `Match paused: ${pauseReason}`, email);
+      setStatus("Paused");
+      setTimer(timer);
+      showMessage("Match paused and saved.", "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to pause match.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResumeMatch = async () => {
+    if (!match || match.status !== "Paused") return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer@gmail.com";
+      const currentNow = Date.now();
+      const elapsedSeconds = getMatchElapsedSeconds(match, now || currentNow);
+      const timer = formatMatchClock(elapsedSeconds);
+      const pausePeriods = [...(match.pausePeriods || [])];
+      if (pausePeriods[0] && !pausePeriods[0].resumedAt) {
+        pausePeriods[0] = { ...pausePeriods[0], resumedAt: currentNow };
+      }
+
+      await updateMatchDetails(matchId, {
+        status: "Live",
+        clockRunning: true,
+        timerStartedAt: currentNow,
+        timerPausedAt: 0,
+        elapsedSeconds,
+        timer,
+        pausePeriods,
+      });
+      await logActivity(matchId, "Match resumed", email);
+      setStatus("Live");
+      setTimer(timer);
+      showMessage("Match resumed.", "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to resume match.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const recordScore = async (team: "A" | "B", points: number) => {
     if (!match || match.status === "Finished") return;
@@ -339,9 +418,14 @@ export default function LiveMatchEditPanel() {
                       Running
                     </span>
                   )}
+                  {match.status === "Paused" && (
+                    <span className="mb-2 rounded-full bg-amber-500/20 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-amber-300">
+                      Paused
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[520px]">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-[640px]">
                 <button
                   onClick={handleStartClock}
                   disabled={saving || match.clockRunning || match.status === "Finished"}
@@ -350,11 +434,18 @@ export default function LiveMatchEditPanel() {
                   <Play size={16} /> Start Match
                 </button>
                 <button
-                  onClick={handleHalfTime}
+                  onClick={handlePauseMatch}
                   disabled={saving || match.status !== "Live" || !match.clockRunning}
                   className="flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50"
                 >
-                  <Pause size={16} /> Half Time
+                  <Pause size={16} /> Pause
+                </button>
+                <button
+                  onClick={handleResumeMatch}
+                  disabled={saving || match.status !== "Paused"}
+                  className="flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50"
+                >
+                  <Play size={16} /> Resume
                 </button>
                 <button
                   onClick={handleSecondHalf}
@@ -370,6 +461,22 @@ export default function LiveMatchEditPanel() {
                 >
                   <Square size={16} /> End Match
                 </button>
+                <button
+                  onClick={handleHalfTime}
+                  disabled={saving || match.status !== "Live" || !match.clockRunning}
+                  className="flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50"
+                >
+                  <Pause size={16} /> Half Time
+                </button>
+                <select
+                  value={pauseReason}
+                  onChange={(event) => setPauseReason(event.target.value)}
+                  className="col-span-2 h-12 rounded-xl border border-white/10 bg-black/40 px-3 text-[10px] font-black uppercase tracking-widest text-white outline-none focus:border-accent sm:col-span-2"
+                >
+                  {pauseReasons.map((reason) => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </Card>

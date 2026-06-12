@@ -28,7 +28,7 @@ export function FixtureViewer({
   const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
   const [scoreA, setScoreA] = useState<number>(0);
   const [scoreB, setScoreB] = useState<number>(0);
-  const [status, setStatus] = useState<"scheduled" | "live" | "completed">("scheduled");
+  const [status, setStatus] = useState<"scheduled" | "live" | "paused" | "completed">("scheduled");
   const [date, setDate] = useState<string>("");
   const [time, setTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
@@ -194,6 +194,7 @@ export function FixtureViewer({
                     >
                       <option value="scheduled" className="bg-slate-950 text-white">Scheduled</option>
                       <option value="live" className="bg-slate-950 text-red-400">Live</option>
+                      <option value="paused" className="bg-slate-950 text-amber-400">Paused</option>
                       <option value="completed" className="bg-slate-950 text-green-400">Completed</option>
                     </select>
                   </div>
@@ -361,6 +362,8 @@ export function FixtureViewer({
                                 ? "bg-blue-500/20 text-blue-400"
                                 : fixture.status === "live"
                                   ? "bg-red-500/20 text-red-400 animate-pulse"
+                                  : fixture.status === "paused"
+                                    ? "bg-amber-500/20 text-amber-300"
                                   : "bg-green-500/20 text-green-400"
                             )}
                           >

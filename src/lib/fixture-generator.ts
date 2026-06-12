@@ -3,6 +3,9 @@ export interface Team {
   name: string;
   sport: string;
   sportName?: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  category?: string;
   members: string[];
   department?: string;
   coachCaptain?: string;
@@ -22,12 +25,15 @@ export interface Fixture {
   teamA: string;
   teamB: string;
   sport: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  category?: string;
   date: string;
   time: string;       // match start time (HH:MM)
   endTime?: string;   // match end time (HH:MM) — set manually by admin
   endedAt?: string;   // ISO timestamp of when admin clicked "End Match"
   venue: string;
-  status: "scheduled" | "live" | "completed";
+  status: "scheduled" | "live" | "paused" | "completed";
   scoreA?: number;
   scoreB?: number;
 }

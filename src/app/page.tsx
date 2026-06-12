@@ -10,6 +10,7 @@ import {
   ClipboardList,
   LogIn,
   Radio,
+  Crown,
   Trophy,
   Users,
 } from "lucide-react";
@@ -135,6 +136,16 @@ export default function Home() {
     { label: "Teams", text: "Register only when the tournament registration window is open.", href: registrationOpen ? (isLoggedIn ? "/register" : "/public-register") : "/", icon: ClipboardList },
     { label: "Staff", text: "Use role login for supercoordinator, coordinator, volunteer, or admin dashboards.", href: "/login", icon: LogIn },
   ];
+
+  const getSportIcon = (sport?: string) => {
+    const normalized = String(sport || "").toLowerCase().replace(/\s+/g, "-");
+    if (normalized.includes("chess")) return <Crown size={28} className="text-slate-900" />;
+    if (normalized.includes("table-tennis")) return <span className="text-2xl" aria-hidden="true">TT</span>;
+    if (normalized.includes("cricket")) return <span className="text-2xl" aria-hidden="true">CR</span>;
+    if (normalized.includes("volleyball")) return <span className="text-2xl" aria-hidden="true">VB</span>;
+    if (normalized.includes("badminton")) return <span className="text-2xl" aria-hidden="true">BD</span>;
+    return <Trophy size={28} className="text-slate-900" />;
+  };
 
   return (
     <div className="space-y-10">
@@ -335,11 +346,7 @@ export default function Home() {
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex min-w-0 items-center gap-4 sm:gap-6">
                       <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-110">
-                        <img
-                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"}
-                          alt={match.sport}
-                          className="h-full w-full object-contain"
-                        />
+                        {getSportIcon(match.sport)}
                       </div>
                       <div>
                         <div className="mb-2 flex items-center gap-3">

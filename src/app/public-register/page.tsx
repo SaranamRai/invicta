@@ -169,6 +169,7 @@ export default function PublicRegisterPage() {
         name: cleanDepartment,
         teamName: cleanDepartment,
         department: cleanDepartment,
+        sport: (selectedSport?.sportName || selectedSport?.name || sportId).trim().toLowerCase().replace(/\s+/g, "-"),
         sportId,
         sportName: selectedSport?.sportName || selectedSport?.name,
         category,

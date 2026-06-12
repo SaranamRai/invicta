@@ -25,6 +25,7 @@ export const sports = [
   { id: "volleyball", name: "Volleyball" },
   { id: "badminton", name: "Badminton" },
   { id: "table-tennis", name: "Table Tennis" },
+  { id: "chess", name: "Chess" },
 ];
 
 export const matches: Match[] = [];

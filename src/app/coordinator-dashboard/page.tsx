@@ -3,27 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, ClipboardList, FileUp, LogOut, Send, ShieldCheck, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { Team } from "@/lib/fixture-generator";
-import {
-  AdminFixturePayload,
-  CoordinatorPointsTablePayload,
-  CoordinatorVolunteerPayload,
-  MongoAnnouncement,
-  assignCoordinatorFixtureVolunteer,
-  createCoordinatorRule,
-  createCoordinatorVolunteer,
-  getCoordinatorAnnouncements,
-  getCoordinatorFixtures,
-  getCoordinatorPointsTable,
-  getCoordinatorTeams,
-  getCoordinatorVolunteers,
-} from "@/lib/api";
+import { AdminFixturePayload, CoordinatorVolunteerPayload, TournamentPayload, assignCoordinatorFixtureVolunteer, createCoordinatorRule, createCoordinatorVolunteer, getCoordinatorFixtures, getCoordinatorVolunteers, getPublicTeams, getPublicTournaments, mapMongoTeam } from "@/lib/api";
 import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
+import { sports } from "@/lib/mock-data";
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -34,25 +21,15 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
-function normalizeSportValue(value?: string) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
-}
-
-function getSportDisplayName(sportId?: string, sportName?: string) {
-  const name = sportName?.trim();
-  if (name) return name;
-  return sportId || "Assigned sport";
-}
-
 function CoordinatorDashboardContent() {
   const router = useRouter();
   const [account] = useState<RoleAccount | null>(() => getRoleAccount());
-  const assignedSport = normalizeSportValue(account?.assignedSport);
-  const assignedSportName = getSportDisplayName(assignedSport, account?.assignedSportName);
+  const assignedSport = account?.assignedSport?.trim().toLowerCase() || "";
   const [teams, setTeams] = useState<Team[]>([]);
   const [fixtures, setFixtures] = useState<AdminFixturePayload[]>([]);
-  const [leagueTable, setLeagueTable] = useState<CoordinatorPointsTablePayload[]>([]);
-  const [announcements, setAnnouncements] = useState<MongoAnnouncement[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
+  const selectedTournament = tournaments.find((tournament) => (tournament._id || tournament.id) === selectedTournamentId);
   const [ruleSport, setRuleSport] = useState(assignedSport || "football");
   const [ruleTitle, setRuleTitle] = useState("");
   const [ruleDescription, setRuleDescription] = useState("");
@@ -68,36 +45,23 @@ function CoordinatorDashboardContent() {
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [assigningFixtureId, setAssigningFixtureId] = useState<string | null>(null);
   const [isCreatingVolunteer, setIsCreatingVolunteer] = useState(false);
-  const availableRuleSports = useMemo(() => {
-    return [
-      {
-        id: assignedSport || account?.assignedSport || "football",
-        name: getSportDisplayName(assignedSport, account?.assignedSportName),
-      },
-    ];
-  }, [account?.assignedSportName, assignedSport]);
-
-  const effectiveRuleSport = availableRuleSports.some((sport) => sport.id === ruleSport)
-    ? ruleSport
-    : (availableRuleSports[0]?.id || "football");
+  const availableRuleSports = assignedSport ? sports.filter((sport) => sport.id === assignedSport) : sports;
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadDashboardData() {
-      const [coordinatorTeams, coordinatorVolunteers, coordinatorFixtures, coordinatorLeagueTable, coordinatorAnnouncements] = await Promise.all([
-        getCoordinatorTeams().catch(() => []),
+      const [publicTeams, coordinatorVolunteers, coordinatorFixtures, publicTournaments] = await Promise.all([
+        getPublicTeams(),
         getCoordinatorVolunteers().catch(() => []),
-        getCoordinatorFixtures().catch(() => []),
-        getCoordinatorPointsTable().catch(() => []),
-        getCoordinatorAnnouncements().catch(() => []),
+        getCoordinatorFixtures(selectedTournamentId ? { tournamentId: selectedTournamentId } : undefined).catch(() => []),
+        getPublicTournaments().catch(() => []),
       ]);
       if (!isMounted) return;
-      setTeams(coordinatorTeams as Team[]);
+      setTeams(publicTeams.map((team) => mapMongoTeam(team) as Team));
       setVolunteers(coordinatorVolunteers);
       setFixtures(coordinatorFixtures);
-      setLeagueTable(coordinatorLeagueTable);
-      setAnnouncements(coordinatorAnnouncements);
+      setTournaments(publicTournaments);
     }
 
     void loadDashboardData();
@@ -107,24 +71,21 @@ function CoordinatorDashboardContent() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [selectedTournamentId]);
 
   const assignedTeams = useMemo(() => {
+    const department = account?.department?.trim().toLowerCase();
+    const assignedSport = account?.assignedSport?.trim().toLowerCase();
+
     return teams.filter((team) => {
-      const matchesSport = !assignedSport || normalizeSportValue(team.sport) === assignedSport;
-      return matchesSport;
+      const matchesDepartment = !department || team.department?.trim().toLowerCase() === department || team.name.trim().toLowerCase() === department;
+      const matchesSport = !assignedSport || team.sport.trim().toLowerCase() === assignedSport;
+      return matchesDepartment && matchesSport;
     });
-  }, [assignedSport, teams]);
+  }, [account, teams]);
 
   const totalPlayers = assignedTeams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
   const assignedFixtureCount = fixtures.filter((fixture) => fixture.assignedVolunteer).length;
-
-  const formatAnnouncementDate = (value?: string) => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  };
 
   const handleSignOut = async () => {
     clearPortalSession();
@@ -136,7 +97,7 @@ function CoordinatorDashboardContent() {
 
     const title = ruleTitle.trim();
     const description = ruleDescription.trim();
-    const selectedSport = availableRuleSports.find((sport) => sport.id === effectiveRuleSport);
+    const selectedSport = availableRuleSports.find((sport) => sport.id === ruleSport);
 
     if (!title || !description || !selectedSport) {
       return;
@@ -166,6 +127,8 @@ function CoordinatorDashboardContent() {
       await createCoordinatorRule({
         title,
         description,
+        tournamentId: selectedTournamentId,
+        tournamentName: selectedTournament?.name || "",
         sport: selectedSport.id,
         sportName: selectedSport.name,
         ...attachment,
@@ -202,7 +165,7 @@ function CoordinatorDashboardContent() {
         name,
         email,
         password,
-        assignedSport: assignedSport || account?.assignedSport || "football",
+        assignedSport,
         registrationNumber,
         phone,
       });
@@ -227,7 +190,7 @@ function CoordinatorDashboardContent() {
     setAssigningFixtureId(fixtureId);
 
     try {
-      const updated = await assignCoordinatorFixtureVolunteer(fixtureId, volunteerId);
+      const updated = await assignCoordinatorFixtureVolunteer(fixtureId, volunteerId, selectedTournamentId);
       setFixtures((currentFixtures) =>
         currentFixtures.map((fixture) =>
           fixture.id === fixtureId ? { ...fixture, assignedVolunteer: updated.assignedVolunteer } : fixture
@@ -258,7 +221,6 @@ function CoordinatorDashboardContent() {
           </div>
 
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             <button
               type="button"
               onClick={handleSignOut}
@@ -281,7 +243,7 @@ function CoordinatorDashboardContent() {
               </div>
               <h2 className="sport-heading text-2xl font-black">{account?.name || "Coordinator"}</h2>
               <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                Department: {account?.department || "All assigned departments"} / Sport: {assignedSport ? assignedSportName : "All assigned sports"}
+                Department: {account?.department || "All assigned departments"} / Sport: {account?.assignedSport || "All assigned sports"}
               </p>
             </div>
             <Link
@@ -300,95 +262,6 @@ function CoordinatorDashboardContent() {
           <StatCard icon={UsersRound} label="Sport Volunteers" value={volunteers.length} />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-          <Card className="p-0">
-            <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="mb-2 flex items-center gap-2 text-accent">
-                  <Table2 size={18} />
-                  <span className="text-xs font-black uppercase tracking-widest">League Table</span>
-                </div>
-                <h2 className="sport-heading text-xl font-black">Match League Table</h2>
-                <p className="mt-1 text-sm font-medium text-muted-foreground">Standings for your assigned sport.</p>
-              </div>
-              <Link href="/standings" className="w-fit rounded-xl bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors hover:text-accent">
-                Full standings
-              </Link>
-            </div>
-
-            {leagueTable.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3">Rank</th>
-                      <th className="px-4 py-3">Department</th>
-                      <th className="px-4 py-3">Played</th>
-                      <th className="px-4 py-3">W</th>
-                      <th className="px-4 py-3">D</th>
-                      <th className="px-4 py-3">L</th>
-                      <th className="px-4 py-3">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {leagueTable.map((entry) => (
-                      <tr key={entry.id}>
-                        <td className="px-4 py-4 text-xs font-black text-accent">#{entry.rank}</td>
-                        <td className="px-4 py-4 font-black uppercase tracking-wide text-foreground">{entry.department}</td>
-                        <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{entry.matchesPlayed}</td>
-                        <td className="px-4 py-4 text-xs font-bold text-emerald-500">{entry.wins}</td>
-                        <td className="px-4 py-4 text-xs font-bold text-muted-foreground">{entry.draws}</td>
-                        <td className="px-4 py-4 text-xs font-bold text-red-500">{entry.losses}</td>
-                        <td className="px-4 py-4 text-sm font-black text-foreground">{entry.points}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-sm font-semibold text-muted-foreground">
-                No league table entries are available for your sport yet.
-              </div>
-            )}
-          </Card>
-
-          <Card className="p-0">
-            <div className="border-b border-border p-5">
-              <div className="mb-2 flex items-center gap-2 text-accent">
-                <Megaphone size={18} />
-                <span className="text-xs font-black uppercase tracking-widest">Announcements</span>
-              </div>
-              <h2 className="sport-heading text-xl font-black">Latest Announcements</h2>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">Public notices related to your sport.</p>
-            </div>
-
-            <div className="divide-y divide-border">
-              {announcements.length > 0 ? announcements.slice(0, 5).map((announcement) => (
-                <div key={announcement._id} className="p-5">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <h3 className="text-sm font-black uppercase tracking-wide text-foreground">{announcement.title}</h3>
-                    {announcement.createdAt && (
-                      <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                        {formatAnnouncementDate(announcement.createdAt)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">{announcement.message}</p>
-                  {announcement.attachmentName && (
-                    <span className="mt-3 inline-block rounded-lg bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      {announcement.attachmentName}
-                    </span>
-                  )}
-                </div>
-              )) : (
-                <div className="p-8 text-center text-sm font-semibold text-muted-foreground">
-                  No announcements are available for your sport yet.
-                </div>
-              )}
-            </div>
-          </Card>
-        </section>
-
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -402,13 +275,33 @@ function CoordinatorDashboardContent() {
             </span>
           </div>
 
+          <div className="mb-5 max-w-md space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tournament</label>
+            <select
+              value={selectedTournamentId}
+              onChange={(event) => setSelectedTournamentId(event.target.value)}
+              className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none focus:border-accent"
+            >
+              <option value="">Select tournament</option>
+              {tournaments.map((tournament) => (
+                <option key={tournament._id || tournament.id} value={tournament._id || tournament.id}>
+                  {tournament.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {assignmentMessage && (
             <div className="mb-4 rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
               {assignmentMessage}
             </div>
           )}
 
-          {fixtures.length > 0 ? (
+          {!selectedTournamentId ? (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
+              Please select a tournament.
+            </div>
+          ) : fixtures.length > 0 ? (
             <div className="overflow-x-auto rounded-2xl border border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -478,8 +371,8 @@ function CoordinatorDashboardContent() {
                 <div key={team.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-base font-black uppercase tracking-wide text-foreground">{team.name}</p>
-                      <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                      {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
+                    <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      {sports.find((sport) => sport.id === team.sport)?.name || team.sport} / {team.department || "Department"}
                     </p>
                   </div>
                   <span className="w-fit rounded-xl bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -519,10 +412,25 @@ function CoordinatorDashboardContent() {
           </div>
 
           <form onSubmit={handlePublishRule} className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tournament</label>
+              <select
+                value={selectedTournamentId}
+                onChange={(event) => setSelectedTournamentId(event.target.value)}
+                className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent"
+              >
+                <option value="">Select tournament</option>
+                {tournaments.map((tournament) => (
+                  <option key={tournament._id || tournament.id} value={tournament._id || tournament.id}>
+                    {tournament.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sport</label>
               <select
-                value={effectiveRuleSport}
+                value={ruleSport}
                 onChange={(event) => setRuleSport(event.target.value)}
                 className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent"
               >
@@ -583,7 +491,7 @@ function CoordinatorDashboardContent() {
             <div className="lg:col-span-2">
               <button
                 type="submit"
-                disabled={isPublishingRule || !ruleTitle.trim() || !ruleDescription.trim()}
+                disabled={isPublishingRule || !selectedTournamentId || !ruleTitle.trim() || !ruleDescription.trim()}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Send size={16} />
@@ -682,7 +590,7 @@ function CoordinatorDashboardContent() {
                         <td className="px-4 py-4 text-xs font-bold uppercase tracking-wider text-foreground">{volunteer.registrationNumber || "Not added"}</td>
                         <td className="px-4 py-4 text-xs font-bold text-foreground">{volunteer.phone || "Not added"}</td>
                         <td className="px-4 py-4 text-xs font-black uppercase tracking-widest text-muted-foreground">
-                          {getSportDisplayName(volunteer.assignedSport, volunteer.assignedSportName)}
+                          {sports.find((sport) => sport.id === volunteer.assignedSport)?.name || volunteer.assignedSport || "Assigned sport"}
                         </td>
                       </tr>
                     ))}

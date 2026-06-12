@@ -8,7 +8,7 @@ const liveFeedSchema = new mongoose.Schema(
     volunteerEmail: { type: String, trim: true },
     type: {
       type: String,
-      enum: ["goal", "wicket", "point", "foul", "injury", "timeout", "announcement", "delay", "result"],
+      enum: ["goal", "wicket", "point", "foul", "injury", "timeout", "announcement", "delay", "pause", "resume", "result"],
       default: "announcement",
     },
     addedBy: { type: mongoose.Schema.Types.ObjectId },

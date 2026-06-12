@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { clearPortalSession } from "@/lib/role-auth";
 import { Calendar, LayoutDashboard, LogOut, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 const navigation = [
   { name: "Match Dashboard", href: "/volunteer", icon: LayoutDashboard },
@@ -76,7 +75,6 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volunteer Area</p>
             <h2 className="text-xl font-black uppercase tracking-tight sport-heading">Update Scores and Match Status</h2>
           </div>
-          <ThemeToggle />
         </header>
         <main className="p-4 sm:p-8 md:p-12">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 opacity-[0.02] blur-[20px] pointer-events-none select-none">

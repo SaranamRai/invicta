@@ -16,6 +16,9 @@ export interface ScoreEvent {
 
 export interface MatchData {
   id: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  category?: string;
   teamA: string;
   teamB: string;
   sport: string;
@@ -23,7 +26,7 @@ export interface MatchData {
   type: string;
   scoreA: number;
   scoreB: number;
-  status: "Upcoming" | "Live" | "Finished";
+  status: "Upcoming" | "Live" | "Paused" | "Finished";
   time?: string;
   date?: string;
   venue?: string;
@@ -31,6 +34,9 @@ export interface MatchData {
   startedAt?: number;
   endedAt?: number;
   timerStartedAt?: number;
+  timerPausedAt?: number;
+  totalPausedMs?: number;
+  pausePeriods?: { reason: string; pausedAt: number; resumedAt?: number; elapsedSeconds?: number }[];
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
   clockRunning?: boolean;

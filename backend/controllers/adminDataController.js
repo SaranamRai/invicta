@@ -5,6 +5,15 @@ import Sport from "../models/Sport.js";
 import Team from "../models/Team.js";
 import Player from "../models/Player.js";
 
+const sportNames = {
+  football: "Football",
+  cricket: "Cricket",
+  volleyball: "Volleyball",
+  badminton: "Badminton",
+  "table-tennis": "Table Tennis",
+  chess: "Chess",
+};
+
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
@@ -29,25 +38,20 @@ function assertSportAccess(req, sport) {
 }
 
 function getSportName(sport) {
-  return normalizeText(sport) || "General";
+  return sportNames[sport] || normalizeText(sport) || "General";
 }
 
 async function getOrCreateSport(sport) {
   const normalizedSport = normalizeSport(sport);
   const name = getSportName(normalizedSport);
-  let sportDoc = await Sport.findOne({
-    $or: [
-      { sportName: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-      { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-    ],
-  });
+  let sportDoc = await Sport.findOne({ name });
 
   if (!sportDoc) {
-    sportDoc = await Sport.create({
-      sportName: name,
-      name,
-      categories: ["Male", "Female"],
-      status: "active",
+      sportDoc = await Sport.create({
+        sportName: name,
+        name,
+        category: "Inter-Department",
+        status: "active",
     });
   }
 
@@ -61,11 +65,11 @@ function mapTeam(team) {
     department: team.department,
     sport: team.sport,
     sportName: team.sportName,
-    sportId: team.sportId?.toString?.() || "",
-    category: team.category || "Male",
+    tournamentId: team.tournamentId?.toString?.() || "",
+    tournamentName: team.tournamentName || "",
+    category: team.category || "",
     members: team.members || [],
     coachCaptain: team.captainName || "",
-    captainRegNo: team.captainRegNo || "",
     contactNumber: team.contactNumber || "",
     logo: team.logo || "",
     status: team.status,
@@ -87,88 +91,17 @@ function mapFixture(fixture) {
     teamBName: fixture.teamBName || "",
     sport: fixture.sport,
     sportName: fixture.sportName,
-    sportId: fixture.sportId?.toString?.() || "",
-    category: fixture.category || "Male",
+    tournamentId: fixture.tournamentId?.toString?.() || "",
+    tournamentName: fixture.tournamentName || "",
+    category: fixture.category || "",
     date: fixture.date,
     time: fixture.time,
-    startTime: fixture.startTime,
-    endTime: fixture.endTime,
     venue: fixture.venue,
-    status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "scheduled",
+    status: fixture.status === "completed" ? "completed" : fixture.status === "live" || fixture.status === "paused" ? "live" : "scheduled",
     scoreA: fixture.scoreA || 0,
     scoreB: fixture.scoreB || 0,
     endedAt: fixture.endedAt,
   };
-}
-
-function getFixtureWindow(fixture) {
-  const start = fixture.startTime
-    ? new Date(fixture.startTime)
-    : fixture.date && fixture.time
-      ? new Date(`${fixture.date}T${fixture.time}`)
-      : null;
-  const end = fixture.endTime ? new Date(fixture.endTime) : start ? new Date(start.getTime() + 60 * 60 * 1000) : null;
-
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-    const error = new Error("Fixture startTime and endTime are required and must form a valid time range");
-    error.status = 400;
-    throw error;
-  }
-
-  return { start, end };
-}
-
-async function assertFixtureNoClash(payload, excludeId) {
-  const { start, end } = getFixtureWindow(payload);
-  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
-  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map(normalizeText);
-  const query = {
-    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
-    status: { $ne: "cancelled" },
-    startTime: { $lt: end },
-    endTime: { $gt: start },
-  };
-
-  const overlapping = await Fixture.find(query).lean();
-  const teamClash = overlapping.find((fixture) => {
-    const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
-    return teamIds.some((id) => existingTeamIds.includes(id));
-  });
-  if (teamClash) {
-    const error = new Error("Fixture clash detected: this team already has another match at this time.");
-    error.status = 400;
-    throw error;
-  }
-
-  const departmentClash = overlapping.find((fixture) => {
-    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map(normalizeText);
-    return departments.some((department) => existingDepartments.includes(department));
-  });
-  if (departmentClash) {
-    const error = new Error("Fixture clash detected: this department already has another match at this time.");
-    error.status = 400;
-    throw error;
-  }
-
-  const venueClash = payload.venue ? overlapping.find((fixture) => {
-    return payload.venue && normalizeText(fixture.venue).toLowerCase() === normalizeText(payload.venue).toLowerCase();
-  }) : null;
-  if (venueClash) {
-    const error = new Error("Venue clash detected: this venue is already booked at this time.");
-    error.status = 400;
-    throw error;
-  }
-
-  const volunteerClash = payload.assignedVolunteer ? overlapping.find((fixture) => {
-    return payload.assignedVolunteer && fixture.assignedVolunteer?.toString?.() === String(payload.assignedVolunteer);
-  }) : null;
-  if (volunteerClash) {
-    const error = new Error("Volunteer clash detected: this volunteer is already assigned to another match at this time.");
-    error.status = 400;
-    throw error;
-  }
-
-  return { start, end };
 }
 
 function requireObjectId(id, label) {
@@ -181,15 +114,10 @@ function requireObjectId(id, label) {
 
 export async function listTeams(req, res) {
   const assignedSport = getAssignedSport(req);
-  const assignedSportId = req.user?.assignedSportId?.toString?.() || "";
-  let query = {};
-  if (req.user?.role === "coordinator") {
-    if (assignedSportId) {
-      query = { sportId: assignedSportId };
-    } else if (assignedSport) {
-      query = { sport: assignedSport };
-    }
-  }
+  const query = req.user?.role === "coordinator" && assignedSport ? { sport: assignedSport } : {};
+  if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
+  if (req.query.sportId) query.sportId = req.query.sportId;
+  if (req.query.category) query.category = String(req.query.category);
   const teams = await Team.find(query).sort({ createdAt: -1 }).lean();
   return res.json(teams.map(mapTeam));
 }
@@ -212,6 +140,9 @@ export async function createTeam(req, res) {
     sport,
     sportName: sportDoc.name,
     sportId: sportDoc._id,
+    tournamentId: req.body.tournamentId || undefined,
+    tournamentName: normalizeText(req.body.tournamentName),
+    category: normalizeText(req.body.category),
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName),
     contactNumber: normalizeText(req.body.contactNumber || req.body.phone),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeText).filter(Boolean) : [],
@@ -266,6 +197,9 @@ export async function updateTeam(req, res) {
     sport,
     sportName: sportDoc.name,
     sportId: sportDoc._id,
+    tournamentId: req.body.tournamentId ?? existingTeam.tournamentId,
+    tournamentName: normalizeText(req.body.tournamentName || existingTeam.tournamentName),
+    category: normalizeText(req.body.category || existingTeam.category),
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName || existingTeam.captainName),
     contactNumber: normalizeText(req.body.contactNumber || existingTeam.contactNumber),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeText).filter(Boolean) : existingTeam.members,
@@ -294,6 +228,10 @@ export async function deleteTeam(req, res) {
 export async function listFixtures(req, res) {
   const assignedSport = getAssignedSport(req);
   const query = req.user?.role === "volunteer" && assignedSport ? { sport: assignedSport } : {};
+  if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
+  if (req.query.sportId) query.sportId = req.query.sportId;
+  if (req.query.category) query.category = String(req.query.category);
+  if (req.query.teamId) query.$or = [{ teamA: req.query.teamId }, { teamB: req.query.teamId }];
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
   return res.json(fixtures.map(mapFixture));
 }
@@ -322,6 +260,9 @@ export async function replaceFixtures(req, res) {
       sport,
       sportName: sportDoc.name,
       sportId: sportDoc._id,
+      tournamentId: fixture.tournamentId || teamA.tournamentId || undefined,
+      tournamentName: fixture.tournamentName || teamA.tournamentName || "",
+      category: fixture.category || teamA.category || "",
       matchTitle: `${teamA.teamName} vs ${teamB.teamName}`,
       teamA: teamA._id,
       teamB: teamB._id,
@@ -330,7 +271,7 @@ export async function replaceFixtures(req, res) {
       date: fixture.date,
       time: fixture.time,
       venue: fixture.venue,
-      status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "upcoming",
+      status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : fixture.status === "paused" ? "paused" : "upcoming",
       scoreA: Number(fixture.scoreA || 0),
       scoreB: Number(fixture.scoreB || 0),
       endedAt: fixture.endedAt,
@@ -342,76 +283,21 @@ export async function replaceFixtures(req, res) {
   return res.status(201).json(createdFixtures);
 }
 
-export async function createFixture(req, res) {
-  requireObjectId(req.body.teamA, "Team A id");
-  requireObjectId(req.body.teamB, "Team B id");
-
-  const [teamA, teamB] = await Promise.all([
-    Team.findById(req.body.teamA),
-    Team.findById(req.body.teamB),
-  ]);
-
-  if (!teamA || !teamB) {
-    return res.status(400).json({ message: "Both teams must exist" });
-  }
-
-  const sportId = req.body.sportId || teamA.sportId;
-  requireObjectId(sportId, "Sport id");
-  const sportDoc = await Sport.findById(sportId);
-  if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
-
-  const sportName = sportDoc.sportName || sportDoc.name;
-  const payload = {
-    sport: normalizeSport(sportName),
-    sportName,
-    sportId: sportDoc._id,
-    category: req.body.category || teamA.category || "Male",
-    matchTitle: normalizeText(req.body.matchTitle || `${teamA.teamName} vs ${teamB.teamName}`),
-    teamA: teamA._id,
-    teamB: teamB._id,
-    teamAName: teamA.teamName,
-    teamBName: teamB.teamName,
-    departmentA: teamA.department,
-    departmentB: teamB.department,
-    venue: normalizeText(req.body.venue),
-    date: req.body.date,
-    time: req.body.time,
-    startTime: req.body.startTime,
-    endTime: req.body.endTime,
-    round: normalizeText(req.body.round),
-    status: req.body.status || "upcoming",
-    assignedVolunteer: req.body.assignedVolunteer || undefined,
-    createdBy: req.user?.id,
-  };
-
-  const { start, end } = await assertFixtureNoClash(payload);
-  const fixture = await Fixture.create({ ...payload, startTime: start, endTime: end });
-  return res.status(201).json(mapFixture(fixture));
-}
-
 export async function updateFixture(req, res) {
   requireObjectId(req.params.id, "Fixture id");
-  const existing = await Fixture.findById(req.params.id);
-  if (!existing) return res.status(404).json({ message: "Fixture not found" });
-
-  const updatePayload = {
-    ...existing.toObject(),
-    ...req.body,
-  };
-  const { start, end } = await assertFixtureNoClash(updatePayload, req.params.id);
-
   const fixture = await Fixture.findByIdAndUpdate(
     req.params.id,
     {
       date: req.body.date,
       time: req.body.time,
       venue: req.body.venue,
-      startTime: start,
-      endTime: end,
-      status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
+      status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : req.body.status === "paused" ? "paused" : "upcoming",
       scoreA: Number(req.body.scoreA || 0),
       scoreB: Number(req.body.scoreB || 0),
       endedAt: req.body.endedAt,
+      tournamentId: req.body.tournamentId || undefined,
+      tournamentName: normalizeText(req.body.tournamentName),
+      category: normalizeText(req.body.category),
     },
     { new: true }
   );

@@ -4,17 +4,36 @@ import { useEffect, useState } from "react";
 import { Trophy } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { getPublicFixtures, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
+import { getPublicFixtures, getPublicLiveScores, getPublicTournaments, mapMongoFixture, TournamentPayload } from "@/lib/api";
 import { MatchData } from "@/lib/types";
 
 export default function ResultsPage() {
   const [results, setResults] = useState<MatchData[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getPublicTournaments().then((data) => {
+      if (isMounted) setTournaments(data);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadResults() {
-      const [fixtures, liveScores] = await Promise.all([getPublicFixtures(), getPublicLiveScores()]);
+      if (!selectedTournamentId) {
+        setResults([]);
+        return;
+      }
+      const params = { tournamentId: selectedTournamentId };
+      const [fixtures, liveScores] = await Promise.all([getPublicFixtures(params), getPublicLiveScores(params)]);
       if (!isMounted) return;
       const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
       setResults(fixtures
@@ -29,7 +48,7 @@ export default function ResultsPage() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [selectedTournamentId]);
 
   return (
     <div className="space-y-8">
@@ -40,8 +59,26 @@ export default function ResultsPage() {
         </p>
       </header>
 
+      <div className="max-w-md space-y-2">
+        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tournament</label>
+        <select
+          value={selectedTournamentId}
+          onChange={(event) => setSelectedTournamentId(event.target.value)}
+          className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground outline-none focus:border-accent"
+        >
+          <option value="">Select tournament</option>
+          {tournaments.map((tournament) => (
+            <option key={tournament._id || tournament.id} value={tournament._id || tournament.id}>
+              {tournament.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid gap-4">
-        {results.length > 0 ? results.map((match) => (
+        {!selectedTournamentId ? (
+          <EmptyState label="Please select a tournament." />
+        ) : results.length > 0 ? results.map((match) => (
           <Card key={match.id} className="p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>

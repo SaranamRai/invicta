@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Calendar, Clock, MapPin, Zap } from "lucide-react";
+import React, { useState } from "react";
+import { Calendar, Clock, Zap } from "lucide-react";
 import {
   Team,
   Fixture,
   generateFixtures as generateFixturesUtil,
 } from "@/lib/fixture-generator";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { getPublicSports, MongoSport } from "@/lib/api";
+import { sports } from "@/lib/mock-data";
 
 const DEFAULT_TIMESLOTS = ["09:00", "11:00", "14:00", "16:00", "18:00"];
 
@@ -24,15 +24,13 @@ export function FixtureGenerator({
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [selectedSport, setSelectedSport] = useState<string>("all");
+  const [selectedSports, setSelectedSports] = useState<string[]>(sports.map((sport) => sport.id));
+  const [selectedCategories, setSelectedCategories] = useState<Record<string, string[]>>(
+    () => Object.fromEntries(sports.map((sport) => [sport.id, ["Male", "Female"]]))
+  );
   const [timeslots, setTimeslots] = useState<string[]>(DEFAULT_TIMESLOTS);
   const [newTimeslot, setNewTimeslot] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
-
-  useEffect(() => {
-    getPublicSports().then(setSportsList).catch(() => {});
-  }, []);
 
   const handleAddTimeslot = () => {
     if (newTimeslot && !timeslots.includes(newTimeslot)) {
@@ -46,13 +44,34 @@ export function FixtureGenerator({
     setTimeslots(timeslots.filter((t) => t !== slot));
   };
 
+  const toggleSport = (sportId: string) => {
+    setSelectedSports((current) =>
+      current.includes(sportId)
+        ? current.filter((item) => item !== sportId)
+        : [...current, sportId]
+    );
+  };
+
+  const toggleCategory = (sportId: string, category: string) => {
+    setSelectedCategories((current) => {
+      const sportCategories = current[sportId] || [];
+      return {
+        ...current,
+        [sportId]: sportCategories.includes(category)
+          ? sportCategories.filter((item) => item !== category)
+          : [...sportCategories, category],
+      };
+    });
+  };
+
   const handleGenerate = async () => {
-    const targetTeams = selectedSport === "all" 
-      ? teams 
-      : teams.filter(t => t.sport === selectedSport);
+    const targetTeams = teams.filter((team) =>
+      selectedSports.includes(team.sport) &&
+      (!(team.category) || (selectedCategories[team.sport] || []).includes(team.category))
+    );
 
     if (targetTeams.length < 2) {
-      alert("Need at least 2 teams to generate fixtures for the selected sport.");
+      alert("Need at least 2 teams to generate fixtures for the selected sports.");
       return;
     }
 
@@ -65,17 +84,16 @@ export function FixtureGenerator({
       const fixtures = generateFixturesUtil(targetTeams, startDate, timeslots);
       onGenerateFixtures(fixtures);
       alert(`Generated ${fixtures.length} fixtures successfully!`);
-    } catch (error) {
+    } catch {
       alert("Error generating fixtures");
     } finally {
       setGenerating(false);
     }
   };
 
-  const teamsBySport = (sportsList.length > 0 ? sportsList : []).reduce(
+  const teamsBySport = sports.reduce(
     (acc, sport) => {
-      const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
-      acc[id] = teams.filter((t) => t.sport === id).length;
+      acc[sport.id] = teams.filter((t) => t.sport === sport.id).length;
       return acc;
     },
     {} as Record<string, number>
@@ -119,17 +137,35 @@ export function FixtureGenerator({
                 Sports to Schedule
               </div>
             </label>
-            <select
-              value={selectedSport}
-              onChange={(e) => setSelectedSport(e.target.value)}
-              className="w-full rounded-lg bg-slate-950/60 border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-accent appearance-none cursor-pointer"
-            >
-              <option value="all">All Sports</option>
-              {sportsList.map((sport) => {
-                const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
-                return <option key={id} value={id}>{sport.sportName || sport.name}</option>;
-              })}
-            </select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sports.map((sport) => (
+                <div key={sport.id} className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                  <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-white">
+                    <input
+                      type="checkbox"
+                      checked={selectedSports.includes(sport.id)}
+                      onChange={() => toggleSport(sport.id)}
+                      className="accent-accent"
+                    />
+                    {sport.name}
+                  </label>
+                  <div className="mt-3 flex gap-2">
+                    {["Male", "Female"].map((category) => (
+                      <label key={category} className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={(selectedCategories[sport.id] || []).includes(category)}
+                          onChange={() => toggleCategory(sport.id, category)}
+                          disabled={!selectedSports.includes(sport.id)}
+                          className="accent-accent disabled:opacity-50"
+                        />
+                        {category}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -140,17 +176,14 @@ export function FixtureGenerator({
               Teams Available for Scheduling
             </label>
             <div className="space-y-2">
-              {sportsList.map((sport) => {
-                const id = (sport.sportName || sport.name || "").trim().toLowerCase().replace(/\s+/g, "-");
-                return (
-                  <div key={id} className="flex justify-between text-sm">
-                    <span className="text-slate-400">{sport.sportName || sport.name}</span>
-                    <span className="font-bold text-white">
-                      {teamsBySport[id] || 0} teams
-                    </span>
-                  </div>
-                );
-              })}
+              {sports.map((sport) => (
+                <div key={sport.id} className="flex justify-between text-sm">
+                  <span className="text-slate-400">{sport.name}</span>
+                  <span className="font-bold text-white">
+                    {teamsBySport[sport.id] || 0} teams
+                  </span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

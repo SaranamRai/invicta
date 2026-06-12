@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, ExternalLink, FileText } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { getPublicRules, mapMongoRule } from "@/lib/api";
+import { getPublicRules, getPublicTournaments, mapMongoRule, TournamentPayload } from "@/lib/api";
 
 interface RuleItem {
   id: string;
@@ -19,12 +19,30 @@ interface RuleItem {
 
 export default function RulesPage() {
   const [rules, setRules] = useState<RuleItem[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getPublicTournaments().then((data) => {
+      if (isMounted) setTournaments(data);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadRules() {
-      const publicRules = await getPublicRules();
+      if (!selectedTournamentId) {
+        setRules([]);
+        return;
+      }
+      const publicRules = await getPublicRules({ tournamentId: selectedTournamentId });
       if (!isMounted) return;
       setRules(publicRules.map(mapMongoRule));
     }
@@ -36,7 +54,7 @@ export default function RulesPage() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [selectedTournamentId]);
 
   return (
     <div className="space-y-8">
@@ -47,8 +65,29 @@ export default function RulesPage() {
         </p>
       </header>
 
+      <div className="max-w-md space-y-2">
+        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Tournament</label>
+        <select
+          value={selectedTournamentId}
+          onChange={(event) => setSelectedTournamentId(event.target.value)}
+          className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground outline-none focus:border-accent"
+        >
+          <option value="">Select tournament</option>
+          {tournaments.map((tournament) => (
+            <option key={tournament._id || tournament.id} value={tournament._id || tournament.id}>
+              {tournament.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
-        {rules.length > 0 ? rules.map((rule) => (
+        {!selectedTournamentId ? (
+          <div className="col-span-full rounded-3xl border-2 border-dashed border-border bg-card/40 p-12 text-center">
+            <BookOpen size={44} className="mx-auto text-muted-foreground" />
+            <p className="mt-4 text-sm font-semibold text-muted-foreground">Please select a tournament.</p>
+          </div>
+        ) : rules.length > 0 ? rules.map((rule) => (
           <Card key={rule.id} className="p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-accent">{rule.sportName || rule.sport || "General"}</p>
             <h2 className="mt-2 text-xl font-black text-foreground">{rule.title || "Rule"}</h2>

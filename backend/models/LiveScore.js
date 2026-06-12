@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 const liveScoreSchema = new mongoose.Schema({
   fixtureId: { type: mongoose.Schema.Types.ObjectId, ref: "Fixture", required: true },
+  tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
   sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
-  sportName: { type: String, trim: true },
-  category: { type: String, enum: ["Male", "Female"] },
+  category: { type: String, trim: true },
   teamAName: { type: String, trim: true },
   teamBName: { type: String, trim: true },
   teamAScore: { type: Number, default: 0 },
@@ -15,6 +15,9 @@ const liveScoreSchema = new mongoose.Schema({
   startedAt: { type: Number },
   endedAt: { type: Number },
   timerStartedAt: { type: Number },
+  timerPausedAt: { type: Number },
+  totalPausedMs: { type: Number, default: 0 },
+  pausePeriods: [{ type: mongoose.Schema.Types.Mixed }],
   elapsedSeconds: { type: Number },
   fullMatchSeconds: { type: Number },
   clockRunning: { type: Boolean, default: false },
