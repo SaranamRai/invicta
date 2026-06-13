@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Calendar, ChevronDown, Search, Shield, ShieldOff, Trophy, User, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
 import { getVolunteerTeams, getTeamApprovedRegistrations, TeamRegistrationPayload } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -28,11 +29,12 @@ function formatDate(value?: number) {
 }
 
 function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
+  const gender = label.startsWith("Male") ? "Male" : label.startsWith("Female") ? "Female" : "";
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 border-b border-white/10 pb-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
-          <Icon size={14} />
+          {gender ? <GenderMark gender={gender} className="h-4 w-4" /> : <Icon size={14} />}
         </div>
         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
       </div>

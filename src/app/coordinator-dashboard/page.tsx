@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Send, ShieldCheck, Shield, ShieldOff, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, Calendar, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Search, Send, ShieldCheck, Shield, ShieldOff, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
 import {
   AdminFixturePayload,
@@ -47,6 +48,11 @@ function getSportDisplayName(sportId?: string, sportName?: string) {
   return sportId || "Assigned sport";
 }
 
+type TournamentMeta = {
+  tournamentId?: string;
+  tournamentName?: string;
+};
+
 function CoordinatorDashboardContent() {
   const router = useRouter();
   const [account] = useState<RoleAccount | null>(() => getRoleAccount());
@@ -71,6 +77,11 @@ function CoordinatorDashboardContent() {
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [assigningFixtureId, setAssigningFixtureId] = useState<string | null>(null);
   const [isCreatingVolunteer, setIsCreatingVolunteer] = useState(false);
+  const [selectedTournament, setSelectedTournament] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
+  const [selectedFixtureId, setSelectedFixtureId] = useState("");
+  const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
   const availableRuleSports = useMemo(() => {
     return [
       {
@@ -119,8 +130,42 @@ function CoordinatorDashboardContent() {
     });
   }, [assignedSport, teams]);
 
+  const tournamentOptions = useMemo(() => {
+    const pairs = [...assignedTeams, ...fixtures]
+      .map((item) => {
+        const value = item as TournamentMeta;
+        const id = value.tournamentId || value.tournamentName || "";
+        return [id, value.tournamentName || id] as const;
+      })
+      .filter(([id]) => Boolean(id));
+    return Array.from(new Map(pairs).entries());
+  }, [assignedTeams, fixtures]);
+
+  const filteredTeams = useMemo(() => {
+    const query = teamSearch.trim().toLowerCase();
+    return assignedTeams.filter((team) => {
+      const teamMeta = team as Team & { tournamentId?: string; tournamentName?: string; category?: string; sportId?: string; sportName?: string; coachCaptain?: string };
+      const matchesTournament = !selectedTournament || (teamMeta.tournamentId || teamMeta.tournamentName || "") === selectedTournament;
+      const matchesCategory = !selectedCategory || (teamMeta.category || "Male") === selectedCategory;
+      const matchesSearch =
+        !query ||
+        team.name.toLowerCase().includes(query) ||
+        (team.department || "").toLowerCase().includes(query) ||
+        (teamMeta.coachCaptain || "").toLowerCase().includes(query);
+      return matchesTournament && matchesCategory && matchesSearch;
+    });
+  }, [assignedTeams, selectedCategory, selectedTournament, teamSearch]);
+
+  const filteredFixtures = useMemo(() => {
+    return fixtures.filter((fixture) => {
+      const matchesTournament = !selectedTournament || (fixture.tournamentId || fixture.tournamentName || "") === selectedTournament;
+      const matchesCategory = !selectedCategory || fixture.category === selectedCategory;
+      return matchesTournament && matchesCategory;
+    });
+  }, [fixtures, selectedCategory, selectedTournament]);
+
   const totalPlayers = assignedTeams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
-  const assignedFixtureCount = fixtures.filter((fixture) => fixture.assignedVolunteer).length;
+  const assignedFixtureCount = filteredFixtures.filter((fixture) => fixture.assignedVolunteer).length;
 
   const formatAnnouncementDate = (value?: string) => {
     if (!value) return "";
@@ -230,7 +275,8 @@ function CoordinatorDashboardContent() {
     setAssigningFixtureId(fixtureId);
 
     try {
-      const updated = await assignCoordinatorFixtureVolunteer(fixtureId, volunteerId);
+      const fixture = fixtures.find((item) => item.id === fixtureId);
+      const updated = await assignCoordinatorFixtureVolunteer(fixtureId, volunteerId, fixture?.tournamentId);
       setFixtures((currentFixtures) =>
         currentFixtures.map((fixture) =>
           fixture.id === fixtureId ? { ...fixture, assignedVolunteer: updated.assignedVolunteer } : fixture
@@ -242,6 +288,19 @@ function CoordinatorDashboardContent() {
     } finally {
       setAssigningFixtureId(null);
     }
+  };
+
+  const handleSelectedAssignment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedTournament) {
+      setAssignmentMessage("Please select a tournament first.");
+      return;
+    }
+    if (!selectedFixtureId || !selectedVolunteerId) {
+      setAssignmentMessage("Select a match and volunteer before assigning duty.");
+      return;
+    }
+    await handleAssignVolunteer(selectedFixtureId, selectedVolunteerId);
   };
 
   return (
@@ -396,14 +455,62 @@ function CoordinatorDashboardContent() {
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="sport-heading text-xl font-black">Assign Match Duties</h2>
+              <h2 className="sport-heading text-xl font-black">Tournament Match Duties</h2>
               <p className="mt-1 text-sm font-medium text-muted-foreground">
-                Assign volunteers to fixtures for your sport. Volunteers can update only assigned matches.
+                Select a tournament, review your assigned-sport fixtures, and assign volunteers to match duty.
               </p>
             </div>
             <span className="w-fit rounded-xl bg-secondary px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              {assignedFixtureCount}/{fixtures.length} assigned
+              {assignedFixtureCount}/{filteredFixtures.length} assigned
             </span>
+          </div>
+
+          <div className="mb-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr_1fr]">
+            <label className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</span>
+              <select
+                value={selectedTournament}
+                onChange={(event) => {
+                  setSelectedTournament(event.target.value);
+                  setSelectedFixtureId("");
+                  setSelectedVolunteerId("");
+                }}
+                className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none focus:border-accent"
+              >
+                <option value="">Select tournament...</option>
+                {tournamentOptions.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</span>
+              <select
+                value={selectedCategory}
+                onChange={(event) => {
+                  setSelectedCategory(event.target.value);
+                  setSelectedFixtureId("");
+                }}
+                disabled={!selectedTournament}
+                className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none focus:border-accent disabled:opacity-50"
+              >
+                <option value="">All Categories</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Search Teams</span>
+              <span className="relative block">
+                <Search className="absolute left-3 top-3.5 text-muted-foreground" size={16} />
+                <input
+                  value={teamSearch}
+                  onChange={(event) => setTeamSearch(event.target.value)}
+                  placeholder="Team, department, captain"
+                  className="h-12 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm font-bold text-foreground outline-none placeholder:text-muted-foreground focus:border-accent"
+                />
+              </span>
+            </label>
           </div>
 
           {assignmentMessage && (
@@ -412,19 +519,60 @@ function CoordinatorDashboardContent() {
             </div>
           )}
 
-          {fixtures.length > 0 ? (
+          <form onSubmit={handleSelectedAssignment} className="mb-5 grid gap-3 rounded-2xl border border-border bg-secondary/40 p-4 lg:grid-cols-[1.4fr_1fr_auto]">
+            <select
+              value={selectedFixtureId}
+              onChange={(event) => setSelectedFixtureId(event.target.value)}
+              disabled={!selectedTournament || filteredFixtures.length === 0}
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none focus:border-accent disabled:opacity-50"
+            >
+              <option value="">Select match...</option>
+              {filteredFixtures.map((fixture) => (
+                <option key={fixture.id} value={fixture.id}>
+                  {(fixture.teamAName || "Team A")} vs {(fixture.teamBName || "Team B")} / {fixture.category || "Category"} / {fixture.date || "Date TBD"}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedVolunteerId}
+              onChange={(event) => setSelectedVolunteerId(event.target.value)}
+              disabled={!selectedTournament || volunteers.length === 0}
+              className="h-12 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none focus:border-accent disabled:opacity-50"
+            >
+              <option value="">Select volunteer...</option>
+              {volunteers.map((volunteer) => (
+                <option key={volunteer.id} value={volunteer.id}>
+                  {volunteer.name} / {volunteer.registrationNumber || volunteer.email}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={!selectedTournament || !selectedFixtureId || !selectedVolunteerId || Boolean(assigningFixtureId)}
+              className="h-12 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {assigningFixtureId ? "Assigning..." : "Assign Duty"}
+            </button>
+          </form>
+
+          {!selectedTournament ? (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
+              Please select a tournament to view matches.
+            </div>
+          ) : filteredFixtures.length > 0 ? (
             <div className="overflow-x-auto rounded-2xl border border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Fixture</th>
+                    <th className="px-4 py-3">Category</th>
                     <th className="px-4 py-3">Date & Time</th>
                     <th className="px-4 py-3">Venue</th>
                     <th className="px-4 py-3">Volunteer Duty</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {fixtures.map((fixture) => {
+                  {filteredFixtures.map((fixture) => {
                     const assignedVolunteer = volunteers.find((volunteer) => volunteer.id === fixture.assignedVolunteer);
                     return (
                       <tr key={fixture.id}>
@@ -433,6 +581,9 @@ function CoordinatorDashboardContent() {
                             {fixture.teamAName || "Team A"} vs {fixture.teamBName || "Team B"}
                           </p>
                           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{fixture.sportName || fixture.sport}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <CategoryPill category={fixture.category || "Male"} />
                         </td>
                         <td className="px-4 py-4 text-xs font-bold text-muted-foreground">
                           {fixture.date || "Date TBD"} / {fixture.time || "Time TBD"}
@@ -466,7 +617,7 @@ function CoordinatorDashboardContent() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
-              No fixtures are available for your sport yet.
+              No fixtures are available for this tournament/category yet.
             </div>
           )}
         </section>
@@ -474,25 +625,30 @@ function CoordinatorDashboardContent() {
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <Card className="p-0">
             <div className="border-b border-border p-5">
-              <h2 className="sport-heading text-xl font-black">Assigned Teams</h2>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">Teams matching your assigned department or sport appear here.</p>
+              <h2 className="sport-heading text-xl font-black">Tournament Teams</h2>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">Teams for your assigned sport, filtered by tournament and category.</p>
             </div>
-            {assignedTeams.length > 0 ? (
+            {!selectedTournament ? (
+              <div className="p-10 text-center">
+                <p className="text-sm font-semibold text-muted-foreground">Please select a tournament above to view teams.</p>
+              </div>
+            ) : filteredTeams.length > 0 ? (
               <div className="p-5 space-y-5">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-2">
-                    <Shield size={14} />
-                    <span className="text-xs font-black uppercase tracking-widest">Male Teams ({assignedTeams.filter((t) => (t.category || "Male") === "Male").length})</span>
+                    <GenderMark gender="Male" className="h-5 w-5" />
+                    <span className="text-xs font-black uppercase tracking-widest">Male Teams ({filteredTeams.filter((t) => (t.category || "Male") === "Male").length})</span>
                   </div>
-                  {assignedTeams.filter((t) => (t.category || "Male") === "Male").length > 0 ? (
+                  {filteredTeams.filter((t) => (t.category || "Male") === "Male").length > 0 ? (
                     <div className="space-y-2">
-                      {assignedTeams.filter((t) => (t.category || "Male") === "Male").map((team) => (
+                      {filteredTeams.filter((t) => (t.category || "Male") === "Male").map((team) => (
                         <div key={team.id} className="flex flex-col gap-2 rounded-xl border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-black uppercase tracking-wide text-foreground">{team.name}</p>
                             <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                               {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
                             </p>
+                            {team.tournamentName && <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">{team.tournamentName}</p>}
                           </div>
                           <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                             {team.members?.length || 0} players
@@ -507,18 +663,19 @@ function CoordinatorDashboardContent() {
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-pink-400 border-b border-white/10 pb-2">
-                    <ShieldOff size={14} />
-                    <span className="text-xs font-black uppercase tracking-widest">Female Teams ({assignedTeams.filter((t) => (t.category || "Male") === "Female").length})</span>
+                    <GenderMark gender="Female" className="h-5 w-5" />
+                    <span className="text-xs font-black uppercase tracking-widest">Female Teams ({filteredTeams.filter((t) => (t.category || "Male") === "Female").length})</span>
                   </div>
-                  {assignedTeams.filter((t) => (t.category || "Male") === "Female").length > 0 ? (
+                  {filteredTeams.filter((t) => (t.category || "Male") === "Female").length > 0 ? (
                     <div className="space-y-2">
-                      {assignedTeams.filter((t) => (t.category || "Male") === "Female").map((team) => (
+                      {filteredTeams.filter((t) => (t.category || "Male") === "Female").map((team) => (
                         <div key={team.id} className="flex flex-col gap-2 rounded-xl border border-border bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-black uppercase tracking-wide text-foreground">{team.name}</p>
                             <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                               {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
                             </p>
+                            {team.tournamentName && <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">{team.tournamentName}</p>}
                           </div>
                           <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                             {team.members?.length || 0} players
@@ -533,7 +690,7 @@ function CoordinatorDashboardContent() {
               </div>
             ) : (
               <div className="p-10 text-center">
-                <p className="text-sm font-semibold text-muted-foreground">No teams found for your assignment yet.</p>
+                <p className="text-sm font-semibold text-muted-foreground">No teams found for this tournament/category.</p>
               </div>
             )}
           </Card>
@@ -755,11 +912,12 @@ function CoordinatorDashboardContent() {
 
 function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number; color?: string }) {
   const bgClass = color === "blue" ? "bg-blue-500/15 text-blue-400" : color === "pink" ? "bg-pink-500/15 text-pink-400" : "bg-accent/15 text-accent";
+  const gender = label.startsWith("Male") ? "Male" : label.startsWith("Female") ? "Female" : "";
   return (
     <Card className="p-4">
       <div className="flex items-center gap-3">
         <div className={"flex h-10 w-10 items-center justify-center rounded-xl shrink-0 " + bgClass}>
-          <Icon size={18} />
+          {gender ? <GenderMark gender={gender} className="h-5 w-5" /> : <Icon size={18} />}
         </div>
         <div className="min-w-0">
           <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
@@ -770,10 +928,22 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
   );
 }
 
+function CategoryPill({ category }: { category: string }) {
+  const isFemale = category === "Female";
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
+      isFemale ? "bg-pink-500/10 text-pink-400" : "bg-blue-500/10 text-blue-400"
+    }`}>
+      <GenderMark gender={category} className="h-3.5 w-3.5" />
+      {category}
+    </span>
+  );
+}
+
 function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
   const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTournament, setSelectedTournament] = useState("all");
+  const [selectedTournament, setSelectedTournament] = useState("");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -816,9 +986,9 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
         .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"])
     ).entries()
   );
-  const visibleRegistrations = selectedTournament === "all"
-    ? registrations
-    : registrations.filter((reg) => reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+  const visibleRegistrations = selectedTournament
+    ? registrations.filter((reg) => reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament))
+    : [];
 
   const maleRegs = visibleRegistrations.filter((r) => r.category === "Male");
   const femaleRegs = visibleRegistrations.filter((r) => r.category === "Female");
@@ -835,7 +1005,7 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-sm font-black text-foreground">{reg.teamName}</h4>
           <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
+          <CategoryPill category={reg.category} />
         </div>
         {reg.tournamentName && <p className="mt-1 text-xs font-bold text-accent">{reg.tournamentName}</p>}
         <p className="mt-1 text-xs font-semibold text-muted-foreground">{reg.department} &middot; Captain: {reg.captainName}</p>
@@ -872,11 +1042,16 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
           }}
           className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground outline-none focus:border-accent"
         >
-          <option value="all">All Tournaments</option>
+          <option value="">Select tournament...</option>
           {tournamentOptions.map(([id, name]) => (
             <option key={id} value={id}>{name}</option>
           ))}
         </select>
+      )}
+      {!selectedTournament && (
+        <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm font-semibold text-muted-foreground">
+          Please select a tournament to view approved teams.
+        </div>
       )}
       {maleRegs.length > 0 && (
         <div className="space-y-2">

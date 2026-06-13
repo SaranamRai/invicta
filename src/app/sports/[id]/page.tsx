@@ -5,15 +5,17 @@ import { Card } from "@/components/ui/card";
 import { Users, User, ArrowLeft, Trophy, Loader2, Shield, ShieldOff, Calendar, Search, ChevronLeft, ChevronRight, Hash } from "lucide-react";
 import Link from "next/link";
 import { getPublicSportDetail, SportDetailResponse } from "@/lib/api";
+import { GenderMark } from "@/components/gender-mark";
 
 const MEMBERS_PER_PAGE = 12;
 
 function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
+  const gender = label.startsWith("Male") ? "Male" : label.startsWith("Female") ? "Female" : "";
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 border-b border-white/10 pb-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-          <Icon size={16} />
+          {gender ? <GenderMark gender={gender} className="h-5 w-5" /> : <Icon size={16} />}
         </div>
         <h3 className="text-sm font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
       </div>

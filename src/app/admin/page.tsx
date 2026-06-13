@@ -13,6 +13,7 @@ import { Team, Fixture } from "@/lib/fixture-generator";
 import { Download, LogOut, CheckCircle, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { GenderMark } from "@/components/gender-mark";
 import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
 import {
   deleteAdminFixture,
@@ -161,7 +162,10 @@ function ApprovalsPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-black text-foreground">{reg.teamName}</h3>
                     <span className="rounded-full bg-accent/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
-                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{reg.category}</span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${reg.category === "Female" ? "bg-pink-500/10 text-pink-500" : "bg-blue-500/10 text-blue-500"}`}>
+                      <GenderMark gender={reg.category} className="h-3.5 w-3.5" />
+                      {reg.category}
+                    </span>
                   </div>
                   <p className="text-xs font-semibold text-muted-foreground">
                     {reg.department} &middot; Captain: {reg.captainName} ({reg.captainRegNo}) &middot; {reg.captainEmail}

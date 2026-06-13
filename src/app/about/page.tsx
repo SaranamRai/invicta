@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mail, X } from "lucide-react";
+import { Mail, Phone, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
 
@@ -154,6 +154,22 @@ export default function AboutPage() {
               <p className="mt-4 text-sm font-semibold leading-relaxed text-foreground/70 sm:text-base">
                 Our team combined expertise in frontend development, backend development, and UI/UX design to transform the idea of a digital sports management solution into a functional and scalable web application.
               </p>
+              <div className="mx-auto mt-8 grid max-w-2xl gap-3 sm:grid-cols-2">
+                <a
+                  href="mailto:contact@invicta-sports.com"
+                  className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-4 text-sm font-black text-foreground transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
+                >
+                  <Mail size={18} />
+                  contact@invicta-sports.com
+                </a>
+                <a
+                  href="tel:+91XXXXXXXXXX"
+                  className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-4 text-sm font-black text-foreground transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
+                >
+                  <Phone size={18} />
+                  +91 XXXXXXXXXX
+                </a>
+              </div>
             </div>
 
             {/* Team Members Grid */}
@@ -176,9 +192,9 @@ export default function AboutPage() {
                       aria-label={`Open profile for ${member.name}`}
                       disabled={hasSelection && !isSelected}
                       onClick={() => openMember(member.name)}
-                      whileHover={hasSelection ? undefined : { y: -6, scale: 1.02 }}
-                      whileTap={hasSelection ? undefined : { scale: 0.98 }}
-                      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                      whileHover={hasSelection ? undefined : { y: -8, scale: 1.025 }}
+                      whileTap={hasSelection ? undefined : { scale: 0.985 }}
+                      transition={{ type: "spring", stiffness: 120, damping: 24, mass: 0.9 }}
                       className={`group relative flex min-h-[17rem] cursor-pointer flex-col items-center rounded-2xl border bg-card/60 p-6 text-center outline-none transition-[filter,opacity,border-color,box-shadow] duration-500 ease-out focus-visible:ring-2 focus-visible:ring-[#f4c35a] ${
                         isSelected ? "border-accent shadow-2xl shadow-[#f4c35a]/15" : "border-border hover:border-accent hover:shadow-xl"
                       } ${hasSelection && !isSelected ? "pointer-events-none opacity-50 blur-[2px]" : "opacity-100 blur-0"}`}
@@ -203,7 +219,7 @@ export default function AboutPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
                     onClick={closeProfile}
                   >
                     <motion.div
@@ -216,7 +232,7 @@ export default function AboutPage() {
                       initial={{ opacity: 0, scale: 0.92, y: 24 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.94, y: 16 }}
-                      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                      transition={{ type: "spring", stiffness: 105, damping: 26, mass: 1 }}
                       onClick={(event) => event.stopPropagation()}
                       className="relative max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-white/15 bg-card/85 p-5 text-left shadow-2xl shadow-black/30 outline-none backdrop-blur-xl sm:p-7"
                     >
@@ -324,10 +340,16 @@ export default function AboutPage() {
 
           <div className="md:text-right">
             <h3 className="text-xs font-black uppercase tracking-[0.24em] text-foreground">Contact</h3>
-            <Link href="/contact" className="mt-5 inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-[#f4c35a]">
+            <div className="mt-5 flex flex-col gap-3 text-sm text-foreground/60 md:items-end">
+            <a href="mailto:contact@invicta-sports.com" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
               <Mail size={15} />
-              Contact the Invicta team
-            </Link>
+              contact@invicta-sports.com
+            </a>
+            <a href="tel:+91XXXXXXXXXX" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
+              <Phone size={15} />
+              +91 XXXXXXXXXX
+            </a>
+            </div>
           </div>
         </div>
 
