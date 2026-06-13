@@ -118,6 +118,7 @@ export function LiveSportsPanel() {
   }, []);
 
   const liveMatches = matches.filter((m) => m.status === "Live");
+  const hasLiveMatches = liveMatches.length > 0;
   const upcomingMatches = matches
     .filter((m) => m.status === "Upcoming")
     .slice(0, 2);
@@ -140,16 +141,16 @@ export function LiveSportsPanel() {
                   <span className="relative flex h-2 w-2">
                     <span className={cn(
                       "absolute inline-flex h-full w-full rounded-full opacity-75",
-                      liveMatches.length > 0 ? "animate-ping bg-green-500" : "bg-muted-foreground"
+                      hasLiveMatches ? "animate-ping bg-green-500" : "bg-muted-foreground"
                     )} />
                     <span className={cn(
                       "relative inline-flex rounded-full h-2 w-2",
-                      liveMatches.length > 0 ? "bg-green-500" : "bg-muted-foreground"
+                      hasLiveMatches ? "bg-green-500" : "bg-muted-foreground"
                     )} />
                   </span>
                   <span className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
                     🏆 VIEW LIVE MATCHES
-                    {liveMatches.length > 0 && (
+                    {hasLiveMatches && (
                       <span className="bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full text-[9px] font-bold">
                         {liveMatches.length} Active
                       </span>
@@ -294,12 +295,20 @@ export function LiveSportsPanel() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={() => setIsExpanded(true)}
-              className="relative flex h-12 w-12 items-center justify-center rounded-full border border-green-400/50 bg-card shadow-[0_0_28px_rgba(34,197,94,0.35)] transition-transform hover:scale-105 active:scale-95"
+              className={cn(
+                "relative flex h-12 w-12 items-center justify-center rounded-full border bg-card transition-transform hover:scale-105 active:scale-95",
+                hasLiveMatches
+                  ? "border-green-400/50 shadow-[0_0_28px_rgba(34,197,94,0.35)]"
+                  : "border-border shadow-lg"
+              )}
               aria-label="Expand Live Panel"
             >
-              <span className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" />
-              <Activity className="relative h-5 w-5 animate-pulse text-green-500" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[8px] font-black text-white shadow-md animate-pulse">
+              {hasLiveMatches && <span className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" />}
+              <Activity className={cn("relative h-5 w-5", hasLiveMatches ? "animate-pulse text-green-500" : "text-muted-foreground")} />
+              <span className={cn(
+                "absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white shadow-md",
+                hasLiveMatches ? "bg-green-500 animate-pulse" : "bg-muted-foreground"
+              )}>
                 {liveMatches.length}
               </span>
             </motion.button>

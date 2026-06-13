@@ -156,18 +156,18 @@ export default function AboutPage() {
               </p>
               <div className="mx-auto mt-8 grid max-w-2xl gap-3 sm:grid-cols-2">
                 <a
-                  href="mailto:contact@invicta-sports.com"
+                  href="mailto:msuinvicta2026@gmail.com"
                   className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-4 text-sm font-black text-foreground transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
                 >
                   <Mail size={18} />
-                  contact@invicta-sports.com
+                  msuinvicta2026@gmail.com
                 </a>
                 <a
-                  href="tel:+91XXXXXXXXXX"
+                  href="tel:9883924453"
                   className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-4 text-sm font-black text-foreground transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
                 >
                   <Phone size={18} />
-                  +91 XXXXXXXXXX
+                  9883924453
                 </a>
               </div>
             </div>
@@ -341,13 +341,13 @@ export default function AboutPage() {
           <div className="md:text-right">
             <h3 className="text-xs font-black uppercase tracking-[0.24em] text-foreground">Contact</h3>
             <div className="mt-5 flex flex-col gap-3 text-sm text-foreground/60 md:items-end">
-            <a href="mailto:contact@invicta-sports.com" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
+            <a href="mailto:msuinvicta2026@gmail.com" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
               <Mail size={15} />
-              contact@invicta-sports.com
+              msuinvicta2026@gmail.com
             </a>
-            <a href="tel:+91XXXXXXXXXX" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
+            <a href="tel:9883924453" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
               <Phone size={15} />
-              +91 XXXXXXXXXX
+              9883924453
             </a>
             </div>
           </div>
