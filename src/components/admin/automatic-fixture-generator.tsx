@@ -51,6 +51,11 @@ function getSportNameFromFixture(fixture: AdminFixturePayload) {
   return fixture.sportName || fixture.sport || "Sport";
 }
 
+function getFixtureCategories(sport: MongoSport): ("Male" | "Female")[] {
+  const categories = (sport.categories || []).filter((item): item is "Male" | "Female" => item === "Male" || item === "Female");
+  return categories.length ? categories : ["Male", "Female"];
+}
+
 function getDownloadFileName(sportName: string) {
   const slug = sportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "sport";
   return `invicta-${slug}-fixture-flowchart.doc`;
@@ -146,8 +151,8 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
   const [error, setError] = useState("");
 
   const [tournamentId, setTournamentId] = useState("");
-  const [sportId, setSportId] = useState("");
-  const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
+  const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female")[]>>({});
   const [venueId, setVenueId] = useState("");
   const [startDate, setStartDate] = useState(getTodayInputValue());
   const [dayStartTime, setDayStartTime] = useState("09:00");
@@ -172,7 +177,8 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
         setSports(nextSports);
         setTournaments(nextTournaments);
         setVenues(nextVenues);
-        setSportId(nextSports[0]?._id || "");
+        setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
+        setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
         setTournamentId(getTournamentId(nextTournaments[0] || {}));
         setVenueId(getVenueId(nextVenues[0] || {}));
       } catch (err) {
@@ -189,7 +195,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
     };
   }, []);
 
-  const selectedSport = useMemo(() => sports.find((sport) => sport._id === sportId), [sports, sportId]);
+  const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
   const selectedVenue = useMemo(() => venues.find((venue) => getVenueId(venue) === venueId), [venues, venueId]);
   const fixturesBySport = useMemo(() => {
     const groups = new Map<string, { sportName: string; fixtures: AdminFixturePayload[] }>();
@@ -208,27 +214,39 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
     setMessage("");
     setError("");
 
-    if (!tournamentId || !sportId || !venueId) {
-      setError("Please select tournament, sport, and venue before generating fixtures.");
+    const generationTargets = selectedSportIds.flatMap((nextSportId) =>
+      (categoriesBySport[nextSportId] || []).map((nextCategory) => ({
+        sportId: nextSportId,
+        category: nextCategory,
+      }))
+    );
+
+    if (!tournamentId || generationTargets.length === 0 || !venueId) {
+      setError("Please select tournament, at least one sport/category, and venue before generating fixtures.");
       return;
     }
 
     setSaving(true);
     try {
-      const result = await generateAdminFixtures({
-        tournamentId,
-        sportId,
-        category,
-        venueId,
-        venue: selectedVenue?.name || "",
-        startDate,
-        dayStartTime,
-        dayEndTime,
-        matchDurationMinutes,
-        gapMinutes,
-      });
-      setMessage(result.message || `Generated ${result.totalMatches} fixtures.`);
-      onGenerated(result.fixtures);
+      const results = [];
+      for (const target of generationTargets) {
+        const result = await generateAdminFixtures({
+          tournamentId,
+          sportId: target.sportId,
+          category: target.category,
+          venueId,
+          venue: selectedVenue?.name || "",
+          startDate,
+          dayStartTime,
+          dayEndTime,
+          matchDurationMinutes,
+          gapMinutes,
+        });
+        results.push(result);
+      }
+      const totalMatches = results.reduce((sum, result) => sum + (result.totalMatches || 0), 0);
+      setMessage(`Generated ${totalMatches} fixtures across ${generationTargets.length} sport/category selections.`);
+      onGenerated(results.flatMap((result) => result.fixtures));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fixture generation failed.");
     } finally {
@@ -246,7 +264,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
         <div>
           <h2 className="sport-heading text-2xl font-black text-foreground">Generate Fixtures</h2>
           <p className="max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Generate approved-team round-robin fixtures for one sport and one category. The backend validates weekends, team clashes, department clashes, venue clashes, and volunteer assignment clashes before saving.
+            Generate approved-team round-robin fixtures for multiple sports and categories. The backend validates weekends, team clashes, department clashes, venue clashes, and volunteer assignment clashes before saving.
           </p>
         </div>
       </div>
@@ -299,7 +317,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
 
             <div className="space-y-3">
               <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                <Radio size={13} /> Sport
+                <Radio size={13} /> Sports and Categories
               </span>
               {sports.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm font-bold text-muted-foreground">
@@ -307,51 +325,67 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {sports.map((sport) => (
+                  {sports.map((sport) => {
+                    const isSelected = selectedSportIds.includes(sport._id);
+                    const selectedCategories = categoriesBySport[sport._id] || [];
+                    const availableCategories = getFixtureCategories(sport);
+                    return (
                     <label
                       key={sport._id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition-all ${
-                        sportId === sport._id
+                      className={`flex cursor-pointer flex-col items-start gap-3 rounded-xl border px-4 py-3 transition-all ${
+                        isSelected
                           ? "border-accent bg-accent/10 text-foreground shadow-sm"
                           : "border-border bg-background text-muted-foreground hover:border-accent/50"
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="sportId"
-                        value={sport._id}
-                        checked={sportId === sport._id}
-                        onChange={(event) => setSportId(event.target.value)}
-                        className="h-4 w-4 accent-yellow-400"
-                      />
-                      <span className="text-sm font-black uppercase tracking-wide">{getSportLabel(sport)}</span>
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          value={sport._id}
+                          checked={isSelected}
+                          onChange={(event) => {
+                            setSelectedSportIds((current) =>
+                              event.target.checked
+                                ? [...new Set([...current, sport._id])]
+                                : current.filter((id) => id !== sport._id)
+                            );
+                          }}
+                          className="h-4 w-4 accent-yellow-400"
+                        />
+                        <span className="text-sm font-black uppercase tracking-wide">{getSportLabel(sport)}</span>
+                      </span>
+                      <span className="flex flex-wrap gap-2 pl-7">
+                        {availableCategories.map((option) => (
+                          <span key={option} className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategories.includes(option)}
+                              disabled={!isSelected}
+                              onChange={(event) => {
+                                setCategoriesBySport((current) => {
+                                  const existing = current[sport._id] || [];
+                                  return {
+                                    ...current,
+                                    [sport._id]: event.target.checked
+                                      ? [...new Set([...existing, option])]
+                                      : existing.filter((item) => item !== option),
+                                  };
+                                });
+                              }}
+                              className="accent-yellow-400 disabled:opacity-40"
+                            />
+                            {option}
+                          </span>
+                        ))}
+                      </span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
-              <div className="space-y-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Category</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["Male", "Female"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setCategory(option)}
-                      className={`h-12 rounded-xl border text-xs font-black uppercase tracking-widest transition-colors ${
-                        category === option
-                          ? "border-accent bg-accent text-accent-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-accent/50"
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-2">
                 <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                   <CalendarDays size={13} /> Start Date
@@ -413,7 +447,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
             </div>
 
             <div className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
-              {selectedSport ? getSportLabel(selectedSport) : "Selected sport"} / {category}. Matches are saved only after the backend confirms every fixture fits Saturday or Sunday without clashes.
+              {selectedSports.length > 0
+                ? selectedSports.map((sport) => `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"})`).join(" / ")
+                : "Select sports and categories"}. Matches are saved only after the backend confirms every fixture fits Saturday or Sunday without clashes.
             </div>
 
             {(message || error) && (

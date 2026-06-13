@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Mail } from "lucide-react";
+import { ArrowRight, Camera, Mail, PlayCircle, Share2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LiveSportsPanel } from "@/components/live-sports-panel";
 import { InvictaLogo } from "@/components/invicta-logo";
@@ -18,12 +18,37 @@ const sports = [
   "Volleyball",
   "Arm Wrestling",
   "Table Tennis",
+  "Chess",
 ];
 
 export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
       <LiveSportsPanel />
+      <aside className="fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 lg:block">
+        <div className="flex flex-col items-center gap-4 rounded-l-2xl border border-r-0 border-border bg-background/80 px-3 py-5 shadow-xl backdrop-blur">
+          <span className="writing-mode-vertical text-[9px] font-black uppercase tracking-[0.24em] text-foreground/45 [writing-mode:vertical-rl]">
+            Follow Us
+          </span>
+          <span className="h-8 w-px bg-border" />
+          {[
+            { label: "Instagram", href: "https://www.instagram.com/", icon: Camera },
+            { label: "Facebook", href: "https://www.facebook.com/", icon: Share2 },
+            { label: "YouTube", href: "https://www.youtube.com/", icon: PlayCircle },
+          ].map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={item.label}
+              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-foreground/60 transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
+            >
+              <item.icon size={16} />
+            </a>
+          ))}
+        </div>
+      </aside>
       <header className="absolute inset-x-0 top-0 z-40">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
           <Link href="/" aria-label="MSU Invicta home" className="flex items-center gap-4">
@@ -99,7 +124,7 @@ export default function LandingPage() {
               One Spirit. Every Game.
             </h2>
 
-            <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
               {sports.map((sport) => (
                 <Link key={sport} href="/sports" className="group flex flex-col items-center gap-4">
                   <div className="landing-sport-card landing-slant grid aspect-square w-full place-items-center border border-landing-card-border bg-gradient-to-br from-landing-card-bg to-transparent transition-all group-hover:border-[#f4c35a]/80 group-hover:bg-[#f4c35a]/10">

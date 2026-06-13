@@ -17,6 +17,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { SportMark } from "@/components/sport-mark";
 import { Team } from "@/lib/fixture-generator";
 import {
   getPublicFixtures,
@@ -307,11 +308,7 @@ export default function PublicDashboard() {
                   <div className="flex flex-col gap-4">
                     <div className="flex min-w-0 items-center gap-4">
                       <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-105">
-                        <img
-                          src={match.sport === "Basketball" ? "/basketball_team_logo_1778666861312.png" : "/football_team_logo_1778666910952.png"}
-                          alt={match.sport}
-                          className="h-full w-full object-contain"
-                        />
+                        <SportMark name={match.sportName || match.sport} className="h-full w-full text-slate-950" />
                       </div>
                       <div className="min-w-0">
                         <div className="mb-2 flex flex-wrap items-center gap-2">

@@ -57,6 +57,15 @@ export function SportMark({ name, className }: SportMarkProps) {
     );
   }
 
+  if (normalizedName.includes("chess")) {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true" className={className}>
+        <path d="M24 6a6 6 0 016 6c0 2.7-1.8 5-4.3 5.7L28 25h6l-3 8H17l-3-8h6l2.3-7.3A6 6 0 0124 6zM16 33h16l3 8H13zM19 25h10" {...common} />
+        <path d="M21 12h6M24 9v6" {...common} />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={className}>
       <path d="M10 11h20v26H10zM30 11h8v26h-8M30 24h8M14 37l-3 5M26 37l3 5" {...common} />

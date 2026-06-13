@@ -122,10 +122,6 @@ export function LiveSportsPanel() {
     .filter((m) => m.status === "Upcoming")
     .slice(0, 2);
 
-  if (liveMatches.length === 0) {
-    return null;
-  }
-
   return (
     <>
       <div className="fixed top-24 right-5 sm:right-8 lg:right-10 z-40 w-[320px] max-w-[calc(100vw-2.5rem)] font-sans">

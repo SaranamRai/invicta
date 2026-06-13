@@ -1065,8 +1065,8 @@ export function getTeamPendingRegistrations() {
   return apiFetch<TeamRegistrationPayload[]>("/registrations/pending");
 }
 
-export function getTeamApprovedRegistrations() {
-  return apiFetch<TeamRegistrationPayload[]>("/registrations/approved");
+export function getTeamApprovedRegistrations(params?: Record<string, string | undefined>) {
+  return apiFetch<TeamRegistrationPayload[]>(withQuery("/registrations/approved", params));
 }
 
 export function approveTeamRegistration(id: string) {
@@ -1091,8 +1091,8 @@ function getFilenameFromContentDisposition(value: string | null) {
   return match?.[1] || "";
 }
 
-export async function downloadApprovedRegistrationsExcel() {
-  const { blob, contentDisposition, contentType } = await apiDownload("/registrations/export-excel");
+export async function downloadApprovedRegistrationsExcel(params?: Record<string, string | undefined>) {
+  const { blob, contentDisposition, contentType } = await apiDownload(withQuery("/registrations/export-excel", params));
   const filename = getFilenameFromContentDisposition(contentDisposition) || "approved_registrations.xlsx";
 
   if (!blob.size) {

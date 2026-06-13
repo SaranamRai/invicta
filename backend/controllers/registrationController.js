@@ -185,6 +185,10 @@ export async function listPendingRegistrations(_req, res) {
 export async function listApprovedRegistrations(req, res) {
   try {
     const filter = { status: "approved" };
+    if (req.query.tournamentId) filter.tournamentId = String(req.query.tournamentId);
+    if (req.query.sportId) filter.sportId = String(req.query.sportId);
+    if (req.query.category) filter.category = String(req.query.category);
+    if (req.query.teamId) filter._id = String(req.query.teamId);
 
     // Role-based filtering
     if (req.user.role === "coordinator" || req.user.role === "volunteer") {
@@ -306,9 +310,13 @@ export async function rejectRegistration(req, res) {
 export async function exportApprovedExcel(req, res) {
   try {
     const filters = {};
-    if (req.query.sport) filters.sportId = req.query.sport;
+    if (req.query.tournamentId) filters.tournamentId = String(req.query.tournamentId);
+    if (req.query.sportId) filters.sportId = String(req.query.sportId);
+    if (req.query.sport) filters.sportId = String(req.query.sport);
     if (req.query.category) filters.category = req.query.category;
     if (req.query.department) filters.department = String(req.query.department).trim().toUpperCase();
+    if (req.query.teamId) filters._id = String(req.query.teamId);
+    if (req.query.teamName) filters.teamName = String(req.query.teamName).trim();
 
     filters.status = "approved";
 
@@ -325,6 +333,7 @@ export async function exportApprovedExcel(req, res) {
         category: reg.category,
         department: reg.department,
         teamName: reg.teamName,
+        teamLogo: reg.teamLogo,
         captainName: reg.captainName,
         captainRegNo: reg.captainRegNo,
         captainEmail: reg.captainEmail,
@@ -360,6 +369,7 @@ export async function exportApprovedExcel(req, res) {
         { header: "Category", key: "category", width: 12 },
         { header: "Department", key: "department", width: 20 },
         { header: "Team Name", key: "teamName", width: 25 },
+        { header: "Team Logo URL/Data", key: "teamLogo", width: 28 },
         { header: "Captain Name", key: "captainName", width: 20 },
         { header: "Captain Registration No", key: "captainRegNo", width: 20 },
         { header: "Captain Email", key: "captainEmail", width: 30 },

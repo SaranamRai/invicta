@@ -39,7 +39,7 @@ type AdminTab =
   | "users"
   | "approvals";
 
-function DownloadApprovedRegistrationsButton({ compact = false }: { compact?: boolean }) {
+function DownloadApprovedRegistrationsButton({ compact = false, filters }: { compact?: boolean; filters?: Record<string, string | undefined> }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -48,7 +48,7 @@ function DownloadApprovedRegistrationsButton({ compact = false }: { compact?: bo
     setMessage("");
 
     try {
-      const filename = await downloadApprovedRegistrationsExcel();
+      const filename = await downloadApprovedRegistrationsExcel(filters);
       setMessage(`Downloaded ${filename}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not download approved registrations.");
@@ -245,7 +245,10 @@ function ApprovedTeamsPanel() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
-  const [selectedTournament, setSelectedTournament] = useState("all");
+  const [selectedTournament, setSelectedTournament] = useState("");
+  const [selectedSport, setSelectedSport] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("");
 
   useEffect(() => {
     loadApprovedTeams();
@@ -272,9 +275,28 @@ function ApprovedTeamsPanel() {
         .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"])
     ).entries()
   );
-  const visibleRegistrations = selectedTournament === "all"
-    ? registrations
-    : registrations.filter((reg) => reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+  const sportOptions = Array.from(
+    new Map(
+      registrations
+        .filter((reg) => selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament)))
+        .map((reg) => [reg.sportId, reg.sportName])
+    ).entries()
+  );
+  const teamOptions = registrations.filter((reg) => {
+    const matchesTournament = selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+    const matchesSport = !selectedSport || reg.sportId === selectedSport;
+    const matchesCategory = !selectedCategory || reg.category === selectedCategory;
+    return matchesTournament && matchesSport && matchesCategory;
+  });
+  const visibleRegistrations = selectedTournament
+    ? teamOptions.filter((reg) => !selectedTeam || reg._id === selectedTeam)
+    : [];
+  const exportFilters = {
+    tournamentId: selectedTournament || undefined,
+    sportId: selectedSport || undefined,
+    category: selectedCategory || undefined,
+    teamId: selectedTeam || undefined,
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -283,16 +305,19 @@ function ApprovedTeamsPanel() {
           <h2 className="sport-heading text-2xl font-black text-foreground">Approved Teams</h2>
           <p className="text-sm text-muted-foreground">Approved registrations appear here. Click a team to view its members and approval date.</p>
         </div>
-        <button
-          onClick={loadApprovedTeams}
-          className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={loadApprovedTeams}
+            className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
+          >
+            Refresh
+          </button>
+          <DownloadApprovedRegistrationsButton compact filters={exportFilters} />
+        </div>
       </div>
 
       {tournamentOptions.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</p>
             <p className="text-sm font-semibold text-muted-foreground">Select a tournament before viewing approved teams.</p>
@@ -301,13 +326,54 @@ function ApprovedTeamsPanel() {
             value={selectedTournament}
             onChange={(event) => {
               setSelectedTournament(event.target.value);
+              setSelectedSport("");
+              setSelectedCategory("");
+              setSelectedTeam("");
               setExpandedTeamId(null);
             }}
-            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent sm:w-80"
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
           >
-            <option value="all">All Tournaments</option>
+            <option value="">Select tournament...</option>
             {tournamentOptions.map(([id, name]) => (
               <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={selectedSport}
+            onChange={(event) => {
+              setSelectedSport(event.target.value);
+              setSelectedTeam("");
+            }}
+            disabled={!selectedTournament}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50"
+          >
+            <option value="">All Sports</option>
+            {sportOptions.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={selectedCategory}
+            onChange={(event) => {
+              setSelectedCategory(event.target.value);
+              setSelectedTeam("");
+            }}
+            disabled={!selectedTournament}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50"
+          >
+            <option value="">All Categories</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <select
+            value={selectedTeam}
+            onChange={(event) => setSelectedTeam(event.target.value)}
+            disabled={!selectedTournament}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50 lg:col-start-2"
+          >
+            <option value="">All Teams</option>
+            {teamOptions.map((reg) => (
+              <option key={reg._id} value={reg._id}>{reg.teamName}</option>
             ))}
           </select>
         </div>
@@ -322,6 +388,11 @@ function ApprovedTeamsPanel() {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : !selectedTournament ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
         </div>
       ) : visibleRegistrations.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-10 text-center">
