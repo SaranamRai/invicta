@@ -5,8 +5,10 @@ import Issue from "../models/Issue.js";
 import Announcement from "../models/Announcement.js";
 import Rule from "../models/Rule.js";
 import Sport from "../models/Sport.js";
+import PointsTable from "../models/PointsTable.js";
 import Volunteer from "../models/Volunteer.js";
 import { createRoleAccount } from "./authController.js";
+import bcrypt from "bcryptjs";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -21,6 +23,29 @@ function requireCoordinatorSport(req, sport) {
     error.status = 403;
     throw error;
   }
+}
+
+function mapCoordinatorVolunteer(volunteer) {
+  return {
+    id: volunteer._id.toString(),
+    name: volunteer.name || volunteer.email,
+    email: volunteer.email,
+    assignedSport: volunteer.assignedSport || "",
+    assignedSportId: volunteer.assignedSportId?.toString?.() || "",
+    assignedSportName: volunteer.assignedSportName || "",
+    registrationNumber: volunteer.registrationNumber || "",
+    phone: volunteer.phone || "",
+    status: volunteer.status || "active",
+    createdAt: volunteer.createdAt,
+  };
+}
+
+async function getAssignedSportIds(assignedSport) {
+  if (!assignedSport) return [];
+  const sports = await Sport.find().lean();
+  return sports
+    .filter((sport) => normalizeSport(sport.sportName || sport.name || sport._id) === assignedSport)
+    .map((sport) => sport._id);
 }
 
 export async function myDepartment(req, res) {
@@ -109,15 +134,79 @@ export async function coordinatorVolunteers(req, res) {
   const query = assignedSport ? { assignedSport } : { createdBy: req.user.id };
   const volunteers = await Volunteer.find(query).sort({ createdAt: -1 }).lean();
 
-  return res.json(volunteers.map((volunteer) => ({
-    id: volunteer._id.toString(),
-    name: volunteer.name || volunteer.email,
-    email: volunteer.email,
-    assignedSport: volunteer.assignedSport || "",
-    registrationNumber: volunteer.registrationNumber || "",
-    phone: volunteer.phone || "",
-    createdAt: volunteer.createdAt,
+  return res.json(volunteers.map(mapCoordinatorVolunteer));
+}
+
+export async function updateCoordinatorVolunteer(req, res) {
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const volunteer = await Volunteer.findById(req.params.id);
+  if (!volunteer) return res.status(404).json({ message: "Volunteer not found" });
+
+  if (assignedSport && normalizeSport(volunteer.assignedSport) !== assignedSport) {
+    return res.status(403).json({ message: `This coordinator can only edit volunteers for ${assignedSport}` });
+  }
+
+  const name = normalizeText(req.body.name);
+  const email = normalizeText(req.body.email).toLowerCase();
+  const registrationNumber = normalizeText(req.body.registrationNumber);
+  const phone = normalizeText(req.body.phone || req.body.mobileNo || req.body.mobileNumber);
+
+  if (!name || !email || !registrationNumber || !phone) {
+    return res.status(400).json({ message: "Name, email, registration number, and mobile number are required" });
+  }
+
+  if (email !== volunteer.email) {
+    const existingVolunteer = await Volunteer.findOne({ email, _id: { $ne: volunteer._id } }).lean();
+    if (existingVolunteer) return res.status(409).json({ message: "A volunteer with this email already exists" });
+  }
+
+  volunteer.name = name;
+  volunteer.email = email;
+  volunteer.registrationNumber = registrationNumber;
+  volunteer.phone = phone;
+  if (req.body.status === "active" || req.body.status === "inactive") {
+    volunteer.status = req.body.status;
+  }
+  if (req.body.password) {
+    volunteer.password = await bcrypt.hash(String(req.body.password), 12);
+  }
+
+  await volunteer.save();
+  return res.json(mapCoordinatorVolunteer(volunteer));
+}
+
+export async function coordinatorPointsTable(req, res) {
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const sportIds = await getAssignedSportIds(assignedSport);
+  if (assignedSport && sportIds.length === 0) return res.json([]);
+
+  const rows = await PointsTable.find(assignedSport ? { sportId: { $in: sportIds } } : {})
+    .populate("sportId", "sportName name")
+    .sort({ points: -1, wins: -1, updatedAt: -1 })
+    .lean();
+
+  return res.json(rows.map((row, index) => ({
+    id: row._id.toString(),
+    rank: index + 1,
+    department: row.department,
+    sportId: row.sportId?._id?.toString?.() || row.sportId?.toString?.() || "",
+    sportName: row.sportId?.sportName || row.sportId?.name || "",
+    matchesPlayed: row.matchesPlayed || 0,
+    wins: row.wins || 0,
+    losses: row.losses || 0,
+    draws: row.draws || 0,
+    points: row.points || 0,
+    updatedAt: row.updatedAt,
   })));
+}
+
+export async function coordinatorAnnouncements(req, res) {
+  const announcements = await Announcement.find({ visibleToPublic: true })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .lean();
+
+  return res.json(announcements);
 }
 
 export async function createCoordinatorIssue(req, res) {
