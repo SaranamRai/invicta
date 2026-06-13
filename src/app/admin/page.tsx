@@ -21,11 +21,15 @@ import {
   getAdminTeams,
   updateAdminFixture,
   updateAdminTeam,
+  getAdminSports,
+  getAdminTournaments,
   getTeamPendingRegistrations,
   getTeamApprovedRegistrations,
   approveTeamRegistration,
   rejectTeamRegistration,
+  MongoSport,
   TeamRegistrationPayload,
+  TournamentPayload,
   downloadApprovedRegistrationsExcel,
 } from "@/lib/api";
 
@@ -246,6 +250,8 @@ function formatDate(value?: string) {
 
 function ApprovedTeamsPanel() {
   const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [sports, setSports] = useState<MongoSport[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
@@ -262,8 +268,14 @@ function ApprovedTeamsPanel() {
     setLoading(true);
     setMessage("");
     try {
-      const data = await getTeamApprovedRegistrations();
+      const [data, setupTournaments, setupSports] = await Promise.all([
+        getTeamApprovedRegistrations(),
+        getAdminTournaments().catch(() => []),
+        getAdminSports().catch(() => []),
+      ]);
       setRegistrations(data);
+      setTournaments(setupTournaments);
+      setSports(setupSports);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load approved teams.");
       setRegistrations([]);
@@ -274,25 +286,34 @@ function ApprovedTeamsPanel() {
 
   const tournamentOptions = Array.from(
     new Map(
-      registrations
-        .filter((reg) => reg.tournamentId || reg.tournamentName)
-        .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"])
+      [
+        ...tournaments.map((tournament) => [tournament._id || tournament.id || tournament.name, tournament.name] as const),
+        ...registrations
+          .filter((reg) => reg.tournamentId || reg.tournamentName)
+          .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"] as const),
+      ].filter(([id]) => Boolean(id))
     ).entries()
+  );
+  const registrationsInTournament = registrations.filter((reg) =>
+    selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament))
   );
   const sportOptions = Array.from(
     new Map(
-      registrations
-        .filter((reg) => selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament)))
-        .map((reg) => [reg.sportId, reg.sportName])
+      [
+        ...registrationsInTournament.map((reg) => [reg.sportId, reg.sportName] as const),
+        ...sports
+          .filter((sport) => sport.status !== "inactive")
+          .map((sport) => [sport._id, sport.sportName || sport.name || "Sport"] as const),
+      ].filter(([id]) => Boolean(id))
     ).entries()
   );
   const teamOptions = registrations.filter((reg) => {
     const matchesTournament = selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
-    const matchesSport = !selectedSport || reg.sportId === selectedSport;
+    const matchesSport = selectedSport && reg.sportId === selectedSport;
     const matchesCategory = !selectedCategory || reg.category === selectedCategory;
     return matchesTournament && matchesSport && matchesCategory;
   });
-  const visibleRegistrations = selectedTournament
+  const visibleRegistrations = selectedTournament && selectedSport
     ? teamOptions.filter((reg) => !selectedTeam || reg._id === selectedTeam)
     : [];
   const exportFilters = {
@@ -320,11 +341,10 @@ function ApprovedTeamsPanel() {
         </div>
       </div>
 
-      {tournamentOptions.length > 0 && (
-        <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</p>
-            <p className="text-sm font-semibold text-muted-foreground">Select a tournament before viewing approved teams.</p>
+            <p className="text-sm font-semibold text-muted-foreground">Select tournament, then sport, then view approved teams.</p>
           </div>
           <select
             value={selectedTournament}
@@ -337,7 +357,7 @@ function ApprovedTeamsPanel() {
             }}
             className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
           >
-            <option value="">Select tournament...</option>
+            <option value="">{tournamentOptions.length ? "Select tournament..." : "No tournaments available"}</option>
             {tournamentOptions.map(([id, name]) => (
               <option key={id} value={id}>{name}</option>
             ))}
@@ -351,7 +371,7 @@ function ApprovedTeamsPanel() {
             disabled={!selectedTournament}
             className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50"
           >
-            <option value="">All Sports</option>
+            <option value="">{selectedTournament ? "Select sport..." : "Select tournament first"}</option>
             {sportOptions.map(([id, name]) => (
               <option key={id} value={id}>{name}</option>
             ))}
@@ -372,7 +392,7 @@ function ApprovedTeamsPanel() {
           <select
             value={selectedTeam}
             onChange={(event) => setSelectedTeam(event.target.value)}
-            disabled={!selectedTournament}
+            disabled={!selectedTournament || !selectedSport}
             className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50 lg:col-start-2"
           >
             <option value="">All Teams</option>
@@ -380,8 +400,7 @@ function ApprovedTeamsPanel() {
               <option key={reg._id} value={reg._id}>{reg.teamName}</option>
             ))}
           </select>
-        </div>
-      )}
+      </div>
 
       {message && (
         <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
@@ -398,10 +417,15 @@ function ApprovedTeamsPanel() {
           <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
           <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
         </div>
+      ) : !selectedSport ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a sport inside this tournament.</p>
+        </div>
       ) : visibleRegistrations.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-10 text-center">
           <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
-          <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for this tournament</p>
+          <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for this tournament and sport</p>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">

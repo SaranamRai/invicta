@@ -59,6 +59,7 @@ function CoordinatorDashboardContent() {
   const assignedSport = normalizeSportValue(account?.assignedSport);
   const assignedSportName = getSportDisplayName(assignedSport, account?.assignedSportName);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [approvedRegistrations, setApprovedRegistrations] = useState<TeamRegistrationPayload[]>([]);
   const [fixtures, setFixtures] = useState<AdminFixturePayload[]>([]);
   const [leagueTable, setLeagueTable] = useState<CoordinatorPointsTablePayload[]>([]);
   const [announcements, setAnnouncements] = useState<MongoAnnouncement[]>([]);
@@ -112,6 +113,7 @@ function CoordinatorDashboardContent() {
       setFixtures(coordinatorFixtures);
       setLeagueTable(coordinatorLeagueTable);
       setAnnouncements(coordinatorAnnouncements);
+      setApprovedRegistrations(await getTeamApprovedRegistrations().catch(() => []));
     }
 
     void loadDashboardData();
@@ -123,15 +125,48 @@ function CoordinatorDashboardContent() {
     };
   }, []);
 
+  const approvedRegistrationTeams = useMemo<Team[]>(() => {
+    return approvedRegistrations.map((registration) => ({
+      id: registration._id,
+      name: registration.teamName,
+      department: registration.department,
+      sport: normalizeSportValue(registration.sportName),
+      sportName: registration.sportName,
+      sportId: registration.sportId,
+      tournamentId: registration.tournamentId,
+      tournamentName: registration.tournamentName,
+      category: registration.category,
+      members: registration.members?.map((member) => member.fullName) || [],
+      coachCaptain: registration.captainName,
+      captainRegNo: registration.captainRegNo,
+      contactNumber: registration.captainPhone,
+      logo: registration.teamLogo || "",
+      status: registration.status,
+      reviewedAt: registration.reviewedAt,
+      registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : undefined,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+    }));
+  }, [approvedRegistrations]);
+
   const assignedTeams = useMemo(() => {
-    return teams.filter((team) => {
-      const matchesSport = !assignedSport || normalizeSportValue(team.sport) === assignedSport;
-      return matchesSport;
+    const merged = new Map<string, Team>();
+    [...teams, ...approvedRegistrationTeams].forEach((team) => {
+      const teamMeta = team as Team & { sportId?: string; sportName?: string };
+      const matchesSport =
+        !assignedSport ||
+        normalizeSportValue(team.sport) === assignedSport ||
+        normalizeSportValue(teamMeta.sportName) === assignedSport ||
+        teamMeta.sportId === assignedSport;
+      if (matchesSport) merged.set(team.id, team);
     });
-  }, [assignedSport, teams]);
+    return Array.from(merged.values());
+  }, [approvedRegistrationTeams, assignedSport, teams]);
 
   const tournamentOptions = useMemo(() => {
-    const pairs = [...assignedTeams, ...fixtures]
+    const pairs = [...assignedTeams, ...fixtures, ...approvedRegistrations]
       .map((item) => {
         const value = item as TournamentMeta;
         const id = value.tournamentId || value.tournamentName || "";
@@ -139,13 +174,13 @@ function CoordinatorDashboardContent() {
       })
       .filter(([id]) => Boolean(id));
     return Array.from(new Map(pairs).entries());
-  }, [assignedTeams, fixtures]);
+  }, [approvedRegistrations, assignedTeams, fixtures]);
 
   const filteredTeams = useMemo(() => {
     const query = teamSearch.trim().toLowerCase();
     return assignedTeams.filter((team) => {
       const teamMeta = team as Team & { tournamentId?: string; tournamentName?: string; category?: string; sportId?: string; sportName?: string; coachCaptain?: string };
-      const matchesTournament = !selectedTournament || (teamMeta.tournamentId || teamMeta.tournamentName || "") === selectedTournament;
+      const matchesTournament = !selectedTournament || teamMeta.tournamentId === selectedTournament || (!teamMeta.tournamentId && teamMeta.tournamentName === selectedTournament);
       const matchesCategory = !selectedCategory || (teamMeta.category || "Male") === selectedCategory;
       const matchesSearch =
         !query ||

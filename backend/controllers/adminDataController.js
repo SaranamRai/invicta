@@ -19,6 +19,14 @@ function getAssignedSport(req) {
   return normalizeSport(req.user?.assignedSport);
 }
 
+function getSportSlug(value) {
+  return normalizeText(value).toLowerCase().replace(/\s+/g, "-");
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function assertSportAccess(req, sport) {
   const assignedSport = getAssignedSport(req);
   const requestedSport = normalizeSport(sport);
@@ -331,13 +339,25 @@ function requireObjectId(id, label) {
 
 export async function listTeams(req, res) {
   const assignedSport = getAssignedSport(req);
+  const assignedSportSlug = getSportSlug(req.user?.assignedSport);
   const assignedSportId = req.user?.assignedSportId?.toString?.() || "";
   let query = {};
   if (req.user?.role === "coordinator") {
     if (assignedSportId) {
-      query = { sportId: assignedSportId };
+      query = {
+        $or: [
+          { sportId: assignedSportId },
+          ...(assignedSport ? [{ sport: assignedSport }, { sport: assignedSportSlug }] : []),
+        ],
+      };
     } else if (assignedSport) {
-      query = { sport: assignedSport };
+      query = {
+        $or: [
+          { sport: assignedSport },
+          { sport: assignedSportSlug },
+          { sportName: new RegExp(`^${escapeRegExp(assignedSport).replace(/-/g, "[-\\s]+")}$`, "i") },
+        ],
+      };
     }
   }
   const teams = await Team.find(query).sort({ createdAt: -1 }).lean();

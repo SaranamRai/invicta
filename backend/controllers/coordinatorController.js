@@ -48,6 +48,18 @@ async function getAssignedSportIds(assignedSport) {
     .map((sport) => sport._id);
 }
 
+async function buildAssignedSportQuery(req, sportField = "sport", sportIdField = "sportId") {
+  const assignedSport = normalizeSport(req.user.assignedSport);
+  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
+  const sportIds = assignedSportId ? [assignedSportId] : await getAssignedSportIds(assignedSport);
+  const clauses = [];
+
+  if (assignedSport) clauses.push({ [sportField]: assignedSport });
+  if (sportIds.length) clauses.push({ [sportIdField]: { $in: sportIds } });
+
+  return clauses.length ? { $or: clauses } : {};
+}
+
 export async function myDepartment(req, res) {
   return res.json({
     department: req.user.department || "",
@@ -102,8 +114,7 @@ export async function updatePlayer(req, res) {
 }
 
 export async function coordinatorFixtures(req, res) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const query = assignedSport ? { sport: assignedSport } : {};
+  const query = await buildAssignedSportQuery(req);
   if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
   if (req.query.category) query.category = String(req.query.category);
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
@@ -131,7 +142,15 @@ export async function coordinatorFixtures(req, res) {
 
 export async function coordinatorVolunteers(req, res) {
   const assignedSport = normalizeSport(req.user.assignedSport);
-  const query = assignedSport ? { assignedSport } : { createdBy: req.user.id };
+  const assignedSportId = req.user.assignedSportId?.toString?.() || "";
+  const query = assignedSport
+    ? {
+        $or: [
+          { assignedSport },
+          ...(assignedSportId ? [{ assignedSportId }] : []),
+        ],
+      }
+    : { createdBy: req.user.id };
   const volunteers = await Volunteer.find(query).sort({ createdAt: -1 }).lean();
 
   return res.json(volunteers.map(mapCoordinatorVolunteer));
