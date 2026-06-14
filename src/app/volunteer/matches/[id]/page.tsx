@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { MatchData, MatchPeriod, ScoreEvent } from "@/lib/types";
 import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, Flag, Loader2, Pause, Play, Save, Square } from "lucide-react";
+import { ChevronLeft, Flag, Loader2, Pause, Play, Plus, Save, Square } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +15,7 @@ import {
   getMatchElapsedSeconds,
   getMatchFullTimeSeconds,
   getMatchPeriod,
+  getScheduledFullTimeSeconds,
   parseMatchClock,
 } from "@/lib/match-clock";
 import { getRoleAccount } from "@/lib/role-auth";
@@ -36,6 +37,7 @@ export default function LiveMatchEditPanel() {
   const [status, setStatus] = useState<MatchData['status']>("Upcoming");
   const [timer, setTimer] = useState("");
   const [fullMatchTimer, setFullMatchTimer] = useState("90:00");
+  const [extraTimeMinutes, setExtraTimeMinutes] = useState(5);
   const [announcement, setAnnouncement] = useState("");
   const [pauseReason, setPauseReason] = useState("Timeout");
   const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
@@ -65,7 +67,7 @@ export default function LiveMatchEditPanel() {
         setScoreB(data.scoreB || 0);
         setStatus(data.status || "Upcoming");
         setTimer(data.timer || "");
-        setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(data)));
+        setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(data)));
         setLoading(false);
       }
     }
@@ -112,7 +114,7 @@ export default function LiveMatchEditPanel() {
         await logActivity(matchId, `Auto stopped at ${stopState.period} (${timer})`, email);
         setStatus(stopState.status);
         setTimer(timer);
-        setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(match)));
+        setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(match)));
         showMessage(stopState.status === "Finished" ? "Match ended automatically at full time." : "Clock stopped automatically at half time.", "success");
       } catch (error) {
         console.error(error);
@@ -138,11 +140,8 @@ export default function LiveMatchEditPanel() {
     try {
       const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
-      const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
-      const nextFullMatchSeconds = enteredFullMatchSeconds || getMatchFullTimeSeconds(match);
       const elapsedSeconds = elapsedSecondsOverride ?? getMatchElapsedSeconds(match, now || currentNow);
       const timer = formatMatchClock(elapsedSeconds);
-      const nextFullMatchTimer = formatMatchClock(nextFullMatchSeconds);
 
       await updateMatchDetails(matchId, {
         status: nextStatus,
@@ -152,14 +151,13 @@ export default function LiveMatchEditPanel() {
         startedAt: elapsedSecondsOverride === 0 ? currentNow : match.startedAt || currentNow,
         endedAt: nextStatus === "Finished" ? currentNow : match.endedAt || 0,
         elapsedSeconds,
-        fullMatchSeconds: nextFullMatchSeconds,
         timer,
       });
 
       await logActivity(matchId, `${period}: ${clockRunning ? "clock started" : "clock paused"} at ${timer}`, email);
       setStatus(nextStatus);
       setTimer(timer);
-      setFullMatchTimer(nextFullMatchTimer);
+      setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(match)));
       showMessage(nextStatus === "Finished" ? "Match ended and synced to dashboard." : "Clock updated.", "success");
     } catch (error) {
       console.error(error);
@@ -251,6 +249,40 @@ export default function LiveMatchEditPanel() {
     }
   };
 
+  const handleAddExtraTime = async () => {
+    if (!match || match.status === "Upcoming") return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const minutesToAdd = Math.max(1, Math.floor(extraTimeMinutes || 0));
+      const nextExtraTimeSeconds = Math.max(0, match.extraTimeSeconds || 0) + minutesToAdd * 60;
+      const elapsedSeconds = getMatchElapsedSeconds(match, now || Date.now());
+      const nextStatus = match.status === "Finished" ? "Live" : match.status;
+      const nextPeriod = match.period === "Full Time" ? "Second Half" : getMatchPeriod(match);
+
+      await updateMatchDetails(matchId, {
+        status: nextStatus,
+        period: nextPeriod,
+        clockRunning: false,
+        timerStartedAt: 0,
+        endedAt: 0,
+        elapsedSeconds,
+        timer: formatMatchClock(elapsedSeconds),
+        extraTimeSeconds: nextExtraTimeSeconds,
+      });
+
+      await logActivity(matchId, `Added ${minutesToAdd} minute${minutesToAdd === 1 ? "" : "s"} extra time`, email);
+      setStatus(nextStatus);
+      showMessage(`${minutesToAdd} minute${minutesToAdd === 1 ? "" : "s"} extra time added. Start the clock when ready.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to add extra time.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const recordScore = async (team: "A" | "B", points: number) => {
     if (!match || match.status === "Finished") return;
 
@@ -303,11 +335,8 @@ export default function LiveMatchEditPanel() {
     setSaving(true);
     try {
       const email = getRoleAccount()?.email || "volunteer";
-      const enteredElapsedSeconds = parseMatchClock(timer);
-      const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
-      const nextFullMatchSeconds = match
-        ? enteredFullMatchSeconds || getMatchFullTimeSeconds(match)
-        : enteredFullMatchSeconds;
+      const enteredElapsedSeconds = match ? getMatchElapsedSeconds(match, now || Date.now()) : parseMatchClock(timer);
+      const nextFullMatchSeconds = match ? getMatchFullTimeSeconds(match) : parseMatchClock(fullMatchTimer);
       const stopState = match ? getClockStopState(enteredElapsedSeconds, getMatchPeriod(match), nextFullMatchSeconds) : null;
       const nextElapsedSeconds = stopState?.elapsedSeconds ?? enteredElapsedSeconds;
       const nextTimer = formatMatchClock(nextElapsedSeconds);
@@ -323,7 +352,6 @@ export default function LiveMatchEditPanel() {
         period: nextPeriod,
         timer: nextTimer,
         elapsedSeconds: nextElapsedSeconds,
-        fullMatchSeconds: nextFullMatchSeconds,
         clockRunning: stopState || nextStatus === "Finished" ? false : match?.clockRunning || false,
         timerStartedAt: stopState || nextStatus === "Finished" || !match?.clockRunning ? 0 : currentNow,
         endedAt: nextStatus === "Finished" ? currentNow : match?.endedAt || 0,
@@ -331,7 +359,7 @@ export default function LiveMatchEditPanel() {
       
       setStatus(nextStatus);
       setTimer(nextTimer);
-      setFullMatchTimer(nextFullMatchTimer);
+      setFullMatchTimer(formatMatchClock(match ? getScheduledFullTimeSeconds(match) : nextFullMatchSeconds));
 
       let actionLog = `Updated match status to ${nextStatus}. Score: ${scoreA}-${scoreB}`;
       if (nextTimer) actionLog += `. Timer: ${nextTimer}`;
@@ -505,10 +533,10 @@ export default function LiveMatchEditPanel() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Timer</label>
                   <input 
                     type="text" 
-                    value={timer}
-                    onChange={(e) => setTimer(e.target.value)}
+                    value={getMatchClockText(match, now)}
+                    readOnly
                     placeholder="00:00"
-                    className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white"
+                    className="w-full h-14 bg-black/30 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight text-slate-300"
                   />
                 </div>
                 <div className="space-y-2">
@@ -516,11 +544,45 @@ export default function LiveMatchEditPanel() {
                   <input
                     type="text"
                     value={fullMatchTimer}
-                    onChange={(e) => setFullMatchTimer(e.target.value)}
-                    placeholder="90:00"
-                    className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white"
+                    readOnly
+                    className="w-full h-14 bg-black/30 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight text-slate-300"
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-4 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto] md:items-end">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Extra Time Added</label>
+                    <div className="mt-2 h-12 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm font-black text-accent">
+                      {formatMatchClock(match.extraTimeSeconds || 0)}
+                    </div>
+                  </div>
+                  <label className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Add Minutes</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={extraTimeMinutes}
+                      onChange={(e) => setExtraTimeMinutes(Math.max(1, Number(e.target.value) || 1))}
+                      className="h-12 w-full rounded-xl border border-white/10 bg-black/40 px-4 text-sm font-bold text-white outline-none focus:border-accent"
+                    />
+                  </label>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stop Time</p>
+                    <p className="mt-2 h-12 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm font-black text-white">
+                      {formatMatchClock(getMatchFullTimeSeconds(match))}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddExtraTime}
+                  disabled={saving || match.status === "Upcoming"}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+                >
+                  <Plus size={15} /> Add Extra Time
+                </button>
               </div>
 
               {/* Score Editor */}

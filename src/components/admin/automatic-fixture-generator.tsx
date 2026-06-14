@@ -424,7 +424,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
 
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Duration</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Full Time</span>
                   <input
                     type="number"
                     min={1}
@@ -434,7 +434,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                   />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Gap</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Gap After</span>
                   <input
                     type="number"
                     min={0}
@@ -449,7 +449,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
             <div className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
               {selectedSports.length > 0
                 ? selectedSports.map((sport) => `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"})`).join(" / ")
-                : "Select sports and categories"}. Matches are saved only after the backend confirms every fixture fits Saturday or Sunday without clashes.
+                : "Select sports and categories"}. Full time and gap after each match are saved with every fixture before the backend confirms every fixture fits Saturday or Sunday without clashes.
             </div>
 
             {(message || error) && (

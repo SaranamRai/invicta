@@ -30,6 +30,8 @@ export function FixtureGenerator({
   );
   const [timeslots, setTimeslots] = useState<string[]>(DEFAULT_TIMESLOTS);
   const [newTimeslot, setNewTimeslot] = useState("");
+  const [fullMatchMinutes, setFullMatchMinutes] = useState(45);
+  const [matchGapMinutes, setMatchGapMinutes] = useState(15);
   const [generating, setGenerating] = useState(false);
 
   const handleAddTimeslot = () => {
@@ -81,7 +83,7 @@ export function FixtureGenerator({
       // Simulate processing time
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const fixtures = generateFixturesUtil(targetTeams, startDate, timeslots);
+      const fixtures = generateFixturesUtil(targetTeams, startDate, timeslots, fullMatchMinutes, matchGapMinutes);
       onGenerateFixtures(fixtures);
       alert(`Generated ${fixtures.length} fixtures successfully!`);
     } catch {
@@ -229,6 +231,37 @@ export function FixtureGenerator({
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-slate-900/60 border-white/5 text-white">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Clock size={20} />
+            Match Timing
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2">
+            <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent">Full Time Minutes</span>
+            <input
+              type="number"
+              min={1}
+              value={fullMatchMinutes}
+              onChange={(e) => setFullMatchMinutes(Math.max(1, Number(e.target.value) || 1))}
+              className="w-full rounded-lg bg-slate-950/60 border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-accent"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent">Gap After Match Minutes</span>
+            <input
+              type="number"
+              min={0}
+              value={matchGapMinutes}
+              onChange={(e) => setMatchGapMinutes(Math.max(0, Number(e.target.value) || 0))}
+              className="w-full rounded-lg bg-slate-950/60 border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-accent"
+            />
+          </label>
         </CardContent>
       </Card>
 

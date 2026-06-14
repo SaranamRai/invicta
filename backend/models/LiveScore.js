@@ -20,6 +20,8 @@ const liveScoreSchema = new mongoose.Schema({
   pausePeriods: [{ type: mongoose.Schema.Types.Mixed }],
   elapsedSeconds: { type: Number },
   fullMatchSeconds: { type: Number },
+  scheduledFullMatchSeconds: { type: Number },
+  extraTimeSeconds: { type: Number, default: 0 },
   clockRunning: { type: Boolean, default: false },
   announcements: [{ type: String, trim: true }],
   scoreEvents: [{ type: mongoose.Schema.Types.Mixed }],

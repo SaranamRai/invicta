@@ -22,20 +22,28 @@ export interface Team {
 
 export interface Fixture {
   id: string;
-  teamA: string;
-  teamB: string;
-  sport: string;
   tournamentId?: string;
   tournamentName?: string;
+  teamA: string;
+  teamB: string;
+  teamAName?: string;
+  teamBName?: string;
+  sport: string;
+  sportId?: string;
+  sportName?: string;
   category?: string;
   date: string;
   time: string;       // match start time (HH:MM)
+  startTime?: string | Date;
   endTime?: string;   // match end time (HH:MM) — set manually by admin
   endedAt?: string;   // ISO timestamp of when admin clicked "End Match"
+  fullMatchSeconds?: number;
+  matchGapMinutes?: number;
   venue: string;
   status: "scheduled" | "live" | "paused" | "completed";
   scoreA?: number;
   scoreB?: number;
+  assignedVolunteer?: string;
 }
 
 /**
@@ -45,7 +53,9 @@ export interface Fixture {
 export function generateFixtures(
   teams: Team[],
   startDate: string,
-  timeslots: string[]
+  timeslots: string[],
+  fullMatchMinutes = 45,
+  matchGapMinutes = 15
 ): Fixture[] {
   const fixtures: Fixture[] = [];
   const teamsBySport = groupTeamsBySport(teams);
@@ -86,6 +96,9 @@ export function generateFixtures(
           sport,
           date: slot.date,
           time: slot.time,
+          endTime: addMinutesToTime(slot.time, fullMatchMinutes),
+          fullMatchSeconds: Math.max(1, Math.floor(fullMatchMinutes)) * 60,
+          matchGapMinutes: Math.max(0, Math.floor(matchGapMinutes)),
           venue: slot.venue,
           status: "scheduled",
         });
@@ -94,6 +107,13 @@ export function generateFixtures(
   }
 
   return fixtures;
+}
+
+function addMinutesToTime(time: string, minutesToAdd: number) {
+  const [hours, minutes] = time.split(":").map((value) => Number.parseInt(value, 10));
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return "";
+  const totalMinutes = hours * 60 + minutes + Math.max(0, Math.floor(minutesToAdd));
+  return `${String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
 }
 
 function groupTeamsBySport(teams: Team[]): Record<string, Team[]> {
