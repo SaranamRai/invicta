@@ -35,6 +35,9 @@ export interface MatchData {
   timerStartedAt?: number;
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
+  scheduledFullMatchSeconds?: number;
+  extraTimeSeconds?: number;
+  matchGapMinutes?: number;
   clockRunning?: boolean;
   period?: MatchPeriod;
   timer?: string;

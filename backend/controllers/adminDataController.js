@@ -100,11 +100,14 @@ function mapFixture(fixture) {
     time: fixture.time,
     startTime: fixture.startTime,
     endTime: fixture.endTime,
+    fullMatchSeconds: fixture.fullMatchSeconds || 90 * 60,
+    matchGapMinutes: fixture.matchGapMinutes || 0,
     venue: fixture.venue,
     status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "scheduled",
     scoreA: fixture.scoreA || 0,
     scoreB: fixture.scoreB || 0,
     endedAt: fixture.endedAt,
+    assignedVolunteer: fixture.assignedVolunteer?.toString?.() || "",
   };
 }
 
@@ -192,7 +195,10 @@ function hasFixtureClash(payload, existingFixtures) {
       : fixtureStart
         ? new Date(fixtureStart.getTime() + 60 * 60 * 1000)
         : null;
-    if (!fixtureStart || !fixtureEnd || fixtureStart >= end || fixtureEnd <= start) return false;
+    const fixtureEndWithGap = fixtureEnd
+      ? new Date(fixtureEnd.getTime() + Math.max(0, Number(fixture.matchGapMinutes || 0)) * 60 * 1000)
+      : null;
+    if (!fixtureStart || !fixtureEndWithGap || fixtureStart >= end || fixtureEndWithGap <= start) return false;
 
     const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
     if (teamIds.some((id) => existingTeamIds.includes(id))) return true;
@@ -218,7 +224,7 @@ function buildRoundRobinPairs(teams) {
   return pairs;
 }
 
-function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, category, date, startMinutes, durationMinutes, round, userId }) {
+function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, category, date, startMinutes, durationMinutes, gapMinutes, round, userId }) {
   const endMinutes = startMinutes + durationMinutes;
   const startTime = getDateTime(date, startMinutes);
   const endTime = getDateTime(date, endMinutes);
@@ -245,6 +251,8 @@ function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, ca
     time: timeString,
     startTime,
     endTime,
+    fullMatchSeconds: durationMinutes * 60,
+    matchGapMinutes: gapMinutes,
     round,
     status: "upcoming",
     createdBy: userId,
@@ -257,9 +265,12 @@ function getFixtureWindow(fixture) {
     : fixture.date && fixture.time
       ? new Date(`${fixture.date}T${fixture.time}`)
       : null;
-  const end = fixture.endTime ? new Date(fixture.endTime) : start ? new Date(start.getTime() + 60 * 60 * 1000) : null;
+  const rawEnd = fixture.endTime ? new Date(fixture.endTime) : start ? new Date(start.getTime() + 60 * 60 * 1000) : null;
+  const end = rawEnd
+    ? new Date(rawEnd.getTime() + Math.max(0, Number(fixture.matchGapMinutes || 0)) * 60 * 1000)
+    : null;
 
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+  if (!start || !rawEnd || Number.isNaN(start.getTime()) || Number.isNaN(rawEnd.getTime()) || rawEnd <= start || !end || Number.isNaN(end.getTime())) {
     const error = new Error("Fixture startTime and endTime are required and must form a valid time range");
     error.status = 400;
     throw error;
@@ -498,6 +509,8 @@ export async function replaceFixtures(req, res) {
       teamBName: teamB.teamName,
       date: fixture.date,
       time: fixture.time,
+      fullMatchSeconds: parsePositiveMinutes(fixture.fullMatchMinutes || fixture.matchDurationMinutes || 90, "Full match time") * 60,
+      matchGapMinutes: Math.max(0, Math.floor(Number(fixture.matchGapMinutes || fixture.gapMinutes || 0))),
       venue: fixture.venue,
       status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "upcoming",
       scoreA: Number(fixture.scoreA || 0),
@@ -547,6 +560,8 @@ export async function createFixture(req, res) {
     time: req.body.time,
     startTime: req.body.startTime,
     endTime: req.body.endTime,
+    fullMatchSeconds: parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time") * 60,
+    matchGapMinutes: Math.max(0, Math.floor(Number(req.body.matchGapMinutes || req.body.gapMinutes || 0))),
     round: normalizeText(req.body.round),
     status: req.body.status || "upcoming",
     assignedVolunteer: req.body.assignedVolunteer || undefined,
@@ -651,6 +666,7 @@ export async function generateFixtures(req, res) {
         date: cursorDate,
         startMinutes: cursorMinutes,
         durationMinutes: matchDurationMinutes,
+        gapMinutes,
         round: `Round ${pairIndex + 1}`,
         userId: req.user?.id,
       });
@@ -700,6 +716,8 @@ export async function updateFixture(req, res) {
       venue: req.body.venue,
       startTime: start,
       endTime: end,
+      fullMatchSeconds: existing.fullMatchSeconds || 90 * 60,
+      matchGapMinutes: existing.matchGapMinutes || 0,
       status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
       scoreA: Number(req.body.scoreA || 0),
       scoreB: Number(req.body.scoreB || 0),

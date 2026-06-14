@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Calendar, Clock, MapPin, Trophy, Edit3, X, Save, StopCircle, CheckCircle2 } from "lucide-react";
+import { Calendar, Clock, MapPin, Trophy, Edit3, X, Save, StopCircle, CheckCircle2, Filter, ListChecks, Timer, UsersRound } from "lucide-react";
 import { Fixture } from "@/lib/fixture-generator";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
@@ -21,8 +21,11 @@ export function FixtureViewer({
   onDeleteFixture,
   onUpdateFixture,
 }: FixtureViewerProps) {
+  const [filterTournament, setFilterTournament] = useState<string>("");
   const [filterSport, setFilterSport] = useState<string>("");
   const [filterDate, setFilterDate] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
 
   // Edit Modal State
   const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
@@ -35,12 +38,32 @@ export function FixtureViewer({
   const [venue, setVenue] = useState<string>("");
 
   const filteredFixtures = fixtures.filter((fixture) => {
-    if (filterSport && fixture.sport !== filterSport) return false;
+    if (filterTournament && (fixture.tournamentId || fixture.tournamentName || "no-tournament") !== filterTournament) return false;
+    if (filterSport && (fixture.sportId || fixture.sportName || fixture.sport) !== filterSport) return false;
     if (filterDate && fixture.date !== filterDate) return false;
+    if (filterCategory && (fixture.category || "Male") !== filterCategory) return false;
+    if (filterStatus && fixture.status !== filterStatus) return false;
     return true;
   });
 
-  const uniqueDates = [...new Set(fixtures.map((f) => f.date))].sort();
+  const uniqueDates = [...new Set(fixtures.map((f) => f.date).filter(Boolean))].sort();
+  const tournamentOptions = Array.from(
+    new Map(fixtures.map((fixture) => [
+      fixture.tournamentId || fixture.tournamentName || "no-tournament",
+      fixture.tournamentName || "No tournament recorded",
+    ])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const sportOptions = Array.from(
+    new Map(fixtures.map((fixture) => [
+      fixture.sportId || fixture.sportName || fixture.sport,
+      fixture.sportName || sports.find((sport) => sport.id === fixture.sport)?.name || fixture.sport || "Sport",
+    ])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+  const venueCount = new Set(filteredFixtures.map((fixture) => fixture.venue).filter(Boolean)).size;
+  const liveCount = filteredFixtures.filter((fixture) => fixture.status === "live").length;
+  const completedCount = filteredFixtures.filter((fixture) => fixture.status === "completed").length;
+  const upcomingCount = filteredFixtures.filter((fixture) => fixture.status === "scheduled").length;
+  const assignedVolunteerCount = filteredFixtures.filter((fixture) => Boolean(fixture.assignedVolunteer)).length;
 
   const groupedByDate = filteredFixtures.reduce(
     (acc, fixture) => {
@@ -105,14 +128,88 @@ export function FixtureViewer({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-black sport-heading text-white">
-          Tournament Schedule
-        </h2>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-black sport-heading text-white">
+            Tournament Match Schedule
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm font-semibold text-slate-400">
+            Filter fixtures by tournament, sport, category, date, and match status. Each card shows the timing, teams, venue, score, match duration, rest gap, and assignment details admins need during operations.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setFilterTournament("");
+            setFilterSport("");
+            setFilterDate("");
+            setFilterCategory("");
+            setFilterStatus("");
+          }}
+          className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-slate-900 px-4 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-colors hover:border-accent hover:text-accent"
+        >
+          Clear Filters
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card className="border-white/5 bg-slate-900/60 text-white">
+        <CardContent className="p-4">
+          <div className="mb-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-accent">
+            <Filter size={14} />
+            Schedule Filters
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <FilterSelect label="Tournament" value={filterTournament} onChange={setFilterTournament}>
+              <option value="" className="bg-slate-950 text-white">All Tournaments</option>
+              {tournamentOptions.map(([id, name]) => (
+                <option key={id} value={id} className="bg-slate-950 text-white">{name}</option>
+              ))}
+            </FilterSelect>
+            <FilterSelect label="Sport" value={filterSport} onChange={setFilterSport}>
+              <option value="" className="bg-slate-950 text-white">All Sports</option>
+              {sportOptions.map(([id, name]) => (
+                <option key={id} value={id} className="bg-slate-950 text-white">{name}</option>
+              ))}
+            </FilterSelect>
+            <FilterSelect label="Category" value={filterCategory} onChange={setFilterCategory}>
+              <option value="" className="bg-slate-950 text-white">All Categories</option>
+              <option value="Male" className="bg-slate-950 text-white">Male</option>
+              <option value="Female" className="bg-slate-950 text-white">Female</option>
+            </FilterSelect>
+            <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus}>
+              <option value="" className="bg-slate-950 text-white">All Statuses</option>
+              <option value="scheduled" className="bg-slate-950 text-white">Scheduled</option>
+              <option value="live" className="bg-slate-950 text-white">Live</option>
+              <option value="completed" className="bg-slate-950 text-white">Completed</option>
+            </FilterSelect>
+            <FilterSelect label="Date" value={filterDate} onChange={setFilterDate}>
+              <option value="" className="bg-slate-950 text-white">All Dates</option>
+              {uniqueDates.map((date) => (
+                <option key={date} value={date} className="bg-slate-950 text-white">
+                  {new Date(date).toLocaleDateString("en-US", {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </option>
+              ))}
+            </FilterSelect>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <ScheduleStat icon={ListChecks} label="Shown Matches" value={filteredFixtures.length} />
+        <ScheduleStat icon={Clock} label="Scheduled" value={upcomingCount} />
+        <ScheduleStat icon={Timer} label="Live" value={liveCount} tone="live" />
+        <ScheduleStat icon={CheckCircle2} label="Completed" value={completedCount} tone="done" />
+        <ScheduleStat icon={MapPin} label="Venues Used" value={venueCount} />
+        <ScheduleStat icon={UsersRound} label="Assigned" value={`${assignedVolunteerCount}/${filteredFixtures.length}`} />
+      </div>
+
+      <div className="hidden">
         <div>
           <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">
             Filter by Sport
@@ -352,7 +449,7 @@ export function FixtureViewer({
                         {/* Match Info */}
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">
-                            {sports.find((s) => s.id === fixture.sport)?.name || fixture.sport}
+                            {fixture.sportName || sports.find((s) => s.id === fixture.sport)?.name || fixture.sport}
                           </span>
                           <span
                             className={cn(
@@ -366,6 +463,11 @@ export function FixtureViewer({
                           >
                             {fixture.status.toUpperCase()}
                           </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <InfoPill label="Tournament" value={fixture.tournamentName || "Not recorded"} />
+                          <InfoPill label="Category" value={fixture.category || "Male"} />
                         </div>
 
                         {/* Teams & Scores */}
@@ -416,8 +518,21 @@ export function FixtureViewer({
                             </span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-400">
+                            <Clock size={14} />
+                            <span className="text-xs">
+                              Full time {Math.round((fixture.fullMatchSeconds || 0) / 60) || 90} min
+                              <span className="ml-1 text-slate-500">/ Gap {fixture.matchGapMinutes || 0} min</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-400">
                             <MapPin size={14} />
                             <span className="text-xs">{fixture.venue}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <UsersRound size={14} />
+                            <span className="text-xs">
+                              {fixture.assignedVolunteer ? `Volunteer assigned (${fixture.assignedVolunteer})` : "No volunteer assigned"}
+                            </span>
                           </div>
                           {fixture.endedAt && (
                             <div className="flex items-center gap-2">
@@ -470,6 +585,66 @@ export function FixtureViewer({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="space-y-2">
+      <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none transition-colors focus:border-accent"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function ScheduleStat({
+  icon: Icon,
+  label,
+  value,
+  tone = "default",
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  tone?: "default" | "live" | "done";
+}) {
+  const toneClass = tone === "live"
+    ? "border-red-500/20 bg-red-500/10 text-red-300"
+    : tone === "done"
+      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+      : "border-white/5 bg-slate-900/60 text-white";
+
+  return (
+    <div className={`rounded-xl border p-4 ${toneClass}`}>
+      <Icon size={18} className="text-accent" />
+      <p className="mt-3 text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-black scoreboard-number">{value}</p>
+    </div>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-slate-950/50 px-3 py-2">
+      <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-[11px] font-black uppercase tracking-wide text-slate-300">{value}</p>
     </div>
   );
 }

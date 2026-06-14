@@ -172,6 +172,12 @@ export async function volunteerTeams(req, res) {
 
 export async function updateLiveScore(req, res) {
   const fixture = await requireVolunteerFixture(req, req.params.fixtureId);
+  const existingScore = await LiveScore.findOne({ fixtureId: req.params.fixtureId }).lean();
+  const scheduledFullMatchSeconds = Math.max(60, Number(fixture.fullMatchSeconds || 90 * 60));
+  const requestedExtraTimeSeconds = Number(req.body.extraTimeSeconds);
+  const extraTimeSeconds = Number.isFinite(requestedExtraTimeSeconds) && requestedExtraTimeSeconds >= 0
+    ? Math.floor(requestedExtraTimeSeconds)
+    : Math.max(0, Number(existingScore?.extraTimeSeconds || 0));
   const score = await LiveScore.findOneAndUpdate(
     { fixtureId: req.params.fixtureId },
     {
@@ -180,6 +186,9 @@ export async function updateLiveScore(req, res) {
       sportId: fixture.sportId,
       sportName: fixture.sportName,
       category: fixture.category,
+      scheduledFullMatchSeconds,
+      extraTimeSeconds,
+      fullMatchSeconds: scheduledFullMatchSeconds + extraTimeSeconds,
       updatedBy: req.user.id,
       updatedAt: new Date(),
     },

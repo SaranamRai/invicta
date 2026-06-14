@@ -44,6 +44,12 @@ export const getMatchFullTimeSeconds = (match: MatchData) => {
     : DEFAULT_FULL_MATCH_SECONDS;
 };
 
+export const getScheduledFullTimeSeconds = (match: MatchData) => {
+  return match.scheduledFullMatchSeconds && match.scheduledFullMatchSeconds > 0
+    ? Math.floor(match.scheduledFullMatchSeconds)
+    : Math.max(1, getMatchFullTimeSeconds(match) - Math.max(0, match.extraTimeSeconds || 0));
+};
+
 export const getClockStopState = (
   elapsedSeconds: number,
   period: MatchPeriod,

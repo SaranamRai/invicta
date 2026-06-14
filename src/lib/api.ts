@@ -255,6 +255,8 @@ export interface AdminFixturePayload {
   scoreA?: number;
   scoreB?: number;
   endedAt?: string;
+  fullMatchSeconds?: number;
+  matchGapMinutes?: number;
   assignedVolunteer?: string;
 }
 
@@ -348,6 +350,8 @@ export interface MongoFixture {
   scoreA?: number;
   scoreB?: number;
   endedAt?: string;
+  fullMatchSeconds?: number;
+  matchGapMinutes?: number;
   round?: string;
   status?: "upcoming" | "live" | "half-time" | "completed" | "delayed" | "cancelled";
   assignedVolunteer?: MongoRefName | string;
@@ -369,6 +373,8 @@ export interface MongoLiveScore {
   timerStartedAt?: number;
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
+  scheduledFullMatchSeconds?: number;
+  extraTimeSeconds?: number;
   clockRunning?: boolean;
   announcements?: string[];
   scoreEvents?: unknown[];
@@ -571,7 +577,10 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     endedAt: liveScore?.endedAt ?? (fixture.endedAt ? toTimestamp(fixture.endedAt) : undefined),
     timerStartedAt: liveScore?.timerStartedAt,
     elapsedSeconds: liveScore?.elapsedSeconds,
-    fullMatchSeconds: liveScore?.fullMatchSeconds,
+    fullMatchSeconds: liveScore?.fullMatchSeconds ?? fixture.fullMatchSeconds,
+    scheduledFullMatchSeconds: fixture.fullMatchSeconds ?? liveScore?.scheduledFullMatchSeconds,
+    extraTimeSeconds: liveScore?.extraTimeSeconds || 0,
+    matchGapMinutes: fixture.matchGapMinutes || 0,
     clockRunning: liveScore?.clockRunning,
     period: liveScore?.period as never,
     timer: liveScore?.timer,

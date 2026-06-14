@@ -20,6 +20,8 @@ const fixtureSchema = new mongoose.Schema(
     time: { type: String, trim: true },
     startTime: { type: Date },
     endTime: { type: Date },
+    fullMatchSeconds: { type: Number, default: 90 * 60 },
+    matchGapMinutes: { type: Number, default: 0 },
     scoreA: { type: Number, default: 0 },
     scoreB: { type: Number, default: 0 },
     endedAt: { type: String },
