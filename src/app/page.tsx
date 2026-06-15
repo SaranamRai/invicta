@@ -177,7 +177,7 @@ export default function LandingPage() {
 
         <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35 sm:flex-row">
           <span>© 2026 Invicta. All rights reserved.</span>
-          <span className="text-accent/50 font-black">Managed & Powered by SoCSE</span>
+          <span className="text-sm font-black text-foreground/75 sm:text-base">Managed & Powered by SoCSE</span>
           <span>Medhavi Skills University</span>
         </div>
       </footer>

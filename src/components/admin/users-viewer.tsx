@@ -10,6 +10,7 @@ import {
   UserRoundCheck,
   UsersRound,
   UserPlus,
+  Trash2,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -131,6 +132,8 @@ export function UsersViewer({
   const [playerSemester, setPlayerSemester] = useState("");
   const [playerSaving, setPlayerSaving] = useState(false);
   const [playerError, setPlayerError] = useState("");
+  const [playerDeleteConfirm, setPlayerDeleteConfirm] = useState(false);
+  const [rowPlayerDeleteConfirm, setRowPlayerDeleteConfirm] = useState<string | null>(null);
 
   const fetchRoleAccounts = React.useCallback(async () => {
       try {
@@ -330,11 +333,13 @@ export function UsersViewer({
     setPlayerPhone(player.phone || "");
     setPlayerSemester(player.semester || "");
     setPlayerError("");
+    setPlayerDeleteConfirm(false);
   };
 
   const closePlayerEdit = () => {
     setEditingPlayer(null);
     setPlayerError("");
+    setPlayerDeleteConfirm(false);
   };
 
   const handlePlayerSave = async () => {
@@ -382,6 +387,53 @@ export function UsersViewer({
     } finally {
       setPlayerSaving(false);
     }
+  };
+
+  const deletePlayerFromTeam = async (player: PlayerUser) => {
+    const team = teams.find((item) => item.id === player.teamId);
+    if (!team) {
+      setPlayerError("Team not found for this player.");
+      return;
+    }
+
+    const members = [...(team.members || [])];
+    members.splice(player.memberIndex, 1);
+    const playerRegisteredAt = [...(team.playerRegisteredAt || [])];
+    if (playerRegisteredAt.length > player.memberIndex) {
+      playerRegisteredAt.splice(player.memberIndex, 1);
+    }
+
+    setPlayerSaving(true);
+    try {
+      const savedTeam = await updateAdminTeam({ ...team, members, playerRegisteredAt });
+      onTeamUpdated?.(savedTeam as Team);
+      setRowPlayerDeleteConfirm(null);
+      closePlayerEdit();
+    } catch (error) {
+      setPlayerError(error instanceof Error ? error.message : "Could not delete player.");
+    } finally {
+      setPlayerSaving(false);
+    }
+  };
+
+  const handlePlayerDelete = async () => {
+    if (!editingPlayer) return;
+
+    if (!playerDeleteConfirm) {
+      setPlayerDeleteConfirm(true);
+      return;
+    }
+
+    await deletePlayerFromTeam(editingPlayer);
+  };
+
+  const handleRowPlayerDelete = async (player: PlayerUser) => {
+    if (rowPlayerDeleteConfirm !== player.id) {
+      setRowPlayerDeleteConfirm(player.id);
+      return;
+    }
+
+    await deletePlayerFromTeam(player);
   };
 
   const players = useMemo<PlayerUser[]>(
@@ -596,7 +648,12 @@ export function UsersViewer({
       {activeSection === "volunteers" ? (
         <VolunteersTable volunteers={filteredVolunteers} loading={loading} onEdit={canManageAccounts ? openEditModal : undefined} />
       ) : (
-        <PlayersTable players={filteredPlayers} onEdit={canManageAccounts ? openPlayerEdit : undefined} />
+        <PlayersTable
+          players={filteredPlayers}
+          onEdit={canManageAccounts ? openPlayerEdit : undefined}
+          onDelete={canManageAccounts ? handleRowPlayerDelete : undefined}
+          deleteConfirmId={rowPlayerDeleteConfirm}
+        />
       )}
 
       {editingUser && (
@@ -638,6 +695,8 @@ export function UsersViewer({
           onPhoneChange={setPlayerPhone}
           onSemesterChange={setPlayerSemester}
           onSave={handlePlayerSave}
+          onDelete={handlePlayerDelete}
+          deleteConfirm={playerDeleteConfirm}
           onClose={closePlayerEdit}
         />
       )}
@@ -750,7 +809,19 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
   );
 }
 
-function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (player: PlayerUser) => void }) {
+function PlayersTable({
+  players,
+  onEdit,
+  onDelete,
+  deleteConfirmId,
+}: {
+  players: PlayerUser[];
+  onEdit?: (player: PlayerUser) => void;
+  onDelete?: (player: PlayerUser) => void;
+  deleteConfirmId?: string | null;
+}) {
+  const canManagePlayers = Boolean(onEdit || onDelete);
+
   return (
     <Card className="bg-slate-900/60 border-white/5 text-white">
       <CardContent className="p-0 overflow-hidden">
@@ -785,14 +856,32 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
                     </div>
                   </div>
                 </div>
-                {onEdit && (
-                  <button
-                    type="button"
-                    onClick={() => onEdit(player)}
-                    className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
-                  >
-                    Edit Player
-                  </button>
+                {canManagePlayers && (
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(player)}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(player)}
+                        className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-3 text-[10px] font-black uppercase tracking-wide transition-all ${
+                          deleteConfirmId === player.id
+                            ? "border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                            : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                        }`}
+                      >
+                        <Trash2 size={12} />
+                        {deleteConfirmId === player.id ? "Confirm" : "Delete"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -808,7 +897,7 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
                   <th className="px-6 py-4">Sport</th>
                   <th className="px-6 py-4">Registration Date</th>
                   <th className="px-6 py-4 text-right">Type</th>
-                  {onEdit && <th className="px-6 py-4 text-right">Actions</th>}
+                  {canManagePlayers && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -830,15 +919,33 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
                     <td className="px-6 py-5 text-right">
                       <RolePill icon={UsersRound} label="Player" />
                     </td>
-                    {onEdit && (
+                    {canManagePlayers && (
                       <td className="px-6 py-5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(player)}
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          {onEdit && (
+                            <button
+                              type="button"
+                              onClick={() => onEdit(player)}
+                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {onDelete && (
+                            <button
+                              type="button"
+                              onClick={() => onDelete(player)}
+                              className={`inline-flex h-8 items-center gap-1 rounded-lg border px-3 text-[10px] font-black uppercase tracking-wider transition-all ${
+                                deleteConfirmId === player.id
+                                  ? "border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                                  : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                              }`}
+                            >
+                              <Trash2 size={12} />
+                              {deleteConfirmId === player.id ? "Confirm" : "Delete"}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -855,7 +962,8 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
 
 function EditPlayerModal({
   player, name, registrationNo, phone, semester, saving, error,
-  onNameChange, onRegistrationNoChange, onPhoneChange, onSemesterChange, onSave, onClose,
+  deleteConfirm,
+  onNameChange, onRegistrationNoChange, onPhoneChange, onSemesterChange, onSave, onDelete, onClose,
 }: {
   player: PlayerUser;
   name: string;
@@ -864,11 +972,13 @@ function EditPlayerModal({
   semester: string;
   saving: boolean;
   error: string;
+  deleteConfirm: boolean;
   onNameChange: (value: string) => void;
   onRegistrationNoChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onSemesterChange: (value: string) => void;
   onSave: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   return (
@@ -916,22 +1026,37 @@ function EditPlayerModal({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col-reverse gap-2 border-t border-white/5 pt-4 sm:flex-row sm:justify-end">
+        <div className="mt-6 flex flex-col gap-2 border-t border-white/5 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
-            onClick={onClose}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-wide text-slate-400 transition-colors hover:text-white sm:tracking-widest"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
+            onClick={onDelete}
             disabled={saving}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-wide text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:tracking-widest"
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-5 text-[10px] font-black uppercase tracking-wide transition-colors disabled:opacity-50 sm:tracking-widest ${
+              deleteConfirm
+                ? "border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30"
+                : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+            }`}
           >
-            {saving ? "Saving..." : "Save Player"}
+            <Trash2 size={14} />
+            {deleteConfirm ? "Confirm Delete" : "Delete Player"}
           </button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-wide text-slate-400 transition-colors hover:text-white sm:tracking-widest"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-wide text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:tracking-widest"
+            >
+              {saving ? "Saving..." : "Save Player"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
