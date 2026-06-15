@@ -42,6 +42,10 @@ export const updateMatchDetails = async (matchId: string, details: Partial<Match
     body.currentStatus = toMongoStatus(details.status);
   }
 
+  Object.keys(body).forEach((key) => {
+    if (body[key] === undefined) delete body[key];
+  });
+
   await apiFetch(`/volunteer/live-scores/${encodeURIComponent(matchId)}`, {
     method: "PUT",
     body: JSON.stringify(body),

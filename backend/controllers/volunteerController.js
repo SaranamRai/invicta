@@ -24,6 +24,13 @@ function toFixtureStatus(status) {
   return "upcoming";
 }
 
+function pickDefinedFields(source, fields) {
+  return fields.reduce((payload, field) => {
+    if (source[field] !== undefined) payload[field] = source[field];
+    return payload;
+  }, {});
+}
+
 async function requireVolunteerFixture(req, fixtureId) {
   const assignedSport = normalizeSport(req.user.assignedSport);
   const assignedSportId = req.user.assignedSportId?.toString?.() || "";
@@ -193,23 +200,54 @@ export async function updateLiveScore(req, res) {
   const extraTimeSeconds = Number.isFinite(requestedExtraTimeSeconds) && requestedExtraTimeSeconds >= 0
     ? Math.floor(requestedExtraTimeSeconds)
     : Math.max(0, Number(existingScore?.extraTimeSeconds || 0));
+  const liveScorePatch = pickDefinedFields(req.body, [
+    "teamAName",
+    "teamBName",
+    "timer",
+    "period",
+    "startedAt",
+    "endedAt",
+    "timerStartedAt",
+    "timerPausedAt",
+    "totalPausedMs",
+    "pausePeriods",
+    "elapsedSeconds",
+    "clockRunning",
+    "announcements",
+    "scoreEvents",
+    "volleyballSets",
+    "winner",
+    "winnerName",
+  ]);
+
+  if (req.body.teamAScore !== undefined || req.body.scoreA !== undefined) {
+    liveScorePatch.teamAScore = Number(req.body.teamAScore ?? req.body.scoreA ?? 0);
+  }
+  if (req.body.teamBScore !== undefined || req.body.scoreB !== undefined) {
+    liveScorePatch.teamBScore = Number(req.body.teamBScore ?? req.body.scoreB ?? 0);
+  }
+
   const score = await LiveScore.findOneAndUpdate(
     { fixtureId: req.params.fixtureId },
     {
-      ...req.body,
-      fixtureId: req.params.fixtureId,
-      tournamentId: fixture.tournamentId,
-      sportId: fixture.sportId,
-      sportName: fixture.sportName,
-      category: fixture.category,
-      currentStatus: nextStatus,
-      scheduledFullMatchSeconds,
-      extraTimeSeconds,
-      fullMatchSeconds: scheduledFullMatchSeconds + extraTimeSeconds,
-      updatedBy: req.user.id,
-      updatedAt: new Date(),
+      $set: {
+        ...liveScorePatch,
+        tournamentId: fixture.tournamentId,
+        sportId: fixture.sportId,
+        sportName: fixture.sportName,
+        category: fixture.category,
+        currentStatus: nextStatus,
+        scheduledFullMatchSeconds,
+        extraTimeSeconds,
+        fullMatchSeconds: scheduledFullMatchSeconds + extraTimeSeconds,
+        updatedBy: req.user.id,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        fixtureId: req.params.fixtureId,
+      },
     },
-    { upsert: true, new: true }
+    { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
   const fixturePatch = {

@@ -440,6 +440,17 @@ export async function reviewRule(req, res) {
   rule.reviewedAt = new Date();
   await rule.save();
 
+  if (status === "approved") {
+    await Announcement.create({
+      title: `${rule.sportName || rule.sport || "Tournament"} Rules Approved`,
+      message: `${rule.title} has been approved and published for public viewing.`,
+      priority: "important",
+      visibleToPublic: true,
+      postedBy: req.user.id,
+      postedByRole: req.user.role,
+    });
+  }
+
   return res.json(rule);
 }
 

@@ -6,6 +6,7 @@ import Team from "../models/Team.js";
 import Player from "../models/Player.js";
 import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
+import Announcement from "../models/Announcement.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -830,6 +831,16 @@ export async function generateFixtures(req, res) {
   }
 
   const createdFixtures = scheduledFixtures.length ? await Fixture.insertMany(scheduledFixtures) : [];
+  if (createdFixtures.length > 0) {
+    await Announcement.create({
+      title: `${sportName || "Sport"} Fixtures Published`,
+      message: `${createdFixtures.length} ${category} ${sportName || "sport"} fixture${createdFixtures.length === 1 ? "" : "s"} for ${tournament.name} ${createdFixtures.length === 1 ? "has" : "have"} been published.`,
+      priority: "important",
+      visibleToPublic: true,
+      postedBy: req.user?.id,
+      postedByRole: req.user?.role || "supercoordinator",
+    });
+  }
 
   return res.status(201).json({
     message: teams.length === 1

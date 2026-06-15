@@ -60,7 +60,9 @@ export default function MatchesPage() {
     }
 
     void loadMatches();
-    const interval = window.setInterval(loadMatches, 1000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void loadMatches();
+    }, 5000);
 
     return () => {
       isMounted = false;

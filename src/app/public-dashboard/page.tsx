@@ -116,7 +116,12 @@ export default function PublicDashboard() {
   const liveMatches = matchesData.filter((match) => match.status === "Live").length;
   const upcomingMatches = matchesData.filter((match) => match.status === "Upcoming").length;
   const sports = getAvailableSports(teamsData, matchesData);
-  const standings = buildStandings(matchesData, teamsData).slice(0, 5);
+  const standingsBySport = sports
+    .map((sport) => ({
+      ...sport,
+      rows: buildStandings(matchesData, teamsData, sport.id).slice(0, 5),
+    }))
+    .filter((sport) => sport.rows.length > 0);
 
   const stats = [
     { label: "Registered Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
@@ -251,29 +256,39 @@ export default function PublicDashboard() {
             <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
 
-          <Card className="overflow-hidden border-2 p-0">
-            {standings.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-[520px] w-full text-left text-sm">
-                  <thead className="bg-secondary text-secondary-foreground">
-                    <tr>
-                      <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Rank</th>
-                      <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">DEPARTMENT</th>
-                      <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Played</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {standings.map((team) => (
-                      <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
-                        <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
-                        <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
-                        <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
-                        <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <Card className="border-2 p-4 sm:p-5">
+            {standingsBySport.length > 0 ? (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {standingsBySport.map((sport) => (
+                  <div key={sport.id} className="overflow-hidden rounded-xl border border-border bg-background/40">
+                    <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary px-3 py-3 sm:px-4">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-secondary-foreground">{sport.name}</h3>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Top {sport.rows.length}</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[440px] text-left text-sm">
+                        <thead className="text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-wide sm:px-4">Rank</th>
+                            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-wide sm:px-4">Department</th>
+                            <th className="px-3 py-3 text-center text-[9px] font-black uppercase tracking-wide sm:px-4">Played</th>
+                            <th className="px-3 py-3 text-right text-[9px] font-black uppercase tracking-wide sm:px-4">Points</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {sport.rows.map((team) => (
+                            <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
+                              <td className="sport-heading px-3 py-3 text-base font-black sm:px-4">{team.rank}</td>
+                              <td className="px-3 py-3 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-4">{team.team}</td>
+                              <td className="px-3 py-3 text-center font-bold text-muted-foreground sm:px-4">{team.played}</td>
+                              <td className="sport-heading px-3 py-3 text-right text-base font-black text-primary sm:px-4">{team.pts}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="p-10 text-center">
