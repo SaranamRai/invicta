@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { createAdminCoordinator, createAdminVolunteer, getAdminRoleAccounts, getPublicSports, updateAdminRoleAccount, deleteAdminRoleAccount, MongoSport } from "@/lib/api";
+import { createAdminCoordinator, createAdminVolunteer, getAdminRoleAccounts, getPublicSports, updateAdminRoleAccount, deleteAdminRoleAccount, updateAdminTeam, MongoSport } from "@/lib/api";
 import { Team } from "@/lib/fixture-generator";
 
 interface AppUser {
@@ -32,10 +32,16 @@ interface AppUser {
 interface PlayerUser {
   id: string;
   fullName: string;
+  registrationNo?: string;
+  phone?: string;
+  semester?: string;
   teamName: string;
+  teamId: string;
+  memberIndex: number;
   department: string;
   sport: string;
   registeredAt?: number;
+  rawMember: unknown;
 }
 
 function formatCreatedAt(value: unknown) {
@@ -73,7 +79,15 @@ function sortByName<T extends { fullName: string }>(users: T[]) {
   return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 }
 
-export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[]; canManageAccounts?: boolean }) {
+export function UsersViewer({
+  teams,
+  canManageAccounts = false,
+  onTeamUpdated,
+}: {
+  teams: Team[];
+  canManageAccounts?: boolean;
+  onTeamUpdated?: (team: Team) => void;
+}) {
   const generateTempPassword = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
     let pwd = "";
@@ -109,6 +123,13 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<PlayerUser | null>(null);
+  const [playerName, setPlayerName] = useState("");
+  const [playerRegNo, setPlayerRegNo] = useState("");
+  const [playerPhone, setPlayerPhone] = useState("");
+  const [playerSemester, setPlayerSemester] = useState("");
+  const [playerSaving, setPlayerSaving] = useState(false);
+  const [playerError, setPlayerError] = useState("");
 
   const fetchRoleAccounts = React.useCallback(async () => {
       try {
@@ -280,6 +301,79 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
     return m.fullName || m.name || m.registrationNumber || m.regNo || "";
   }
 
+  function getMemberRegNo(member: unknown): string {
+    if (!member || typeof member !== "object") return "";
+    const m = member as { registrationNo?: string; registrationNumber?: string; regNo?: string };
+    return m.registrationNo || m.registrationNumber || m.regNo || "";
+  }
+
+  function getMemberField(member: unknown, field: "phone" | "semester"): string {
+    if (!member || typeof member !== "object") return "";
+    const m = member as { phone?: string; semester?: string };
+    return m[field] || "";
+  }
+
+  const openPlayerEdit = (player: PlayerUser) => {
+    setEditingPlayer(player);
+    setPlayerName(player.fullName);
+    setPlayerRegNo(player.registrationNo || "");
+    setPlayerPhone(player.phone || "");
+    setPlayerSemester(player.semester || "");
+    setPlayerError("");
+  };
+
+  const closePlayerEdit = () => {
+    setEditingPlayer(null);
+    setPlayerError("");
+  };
+
+  const handlePlayerSave = async () => {
+    if (!editingPlayer) return;
+    const team = teams.find((item) => item.id === editingPlayer.teamId);
+    if (!team) {
+      setPlayerError("Team not found for this player.");
+      return;
+    }
+    if (!playerName.trim()) {
+      setPlayerError("Player name is required.");
+      return;
+    }
+
+    const members = [...(team.members || [])];
+    const existingMember = members[editingPlayer.memberIndex];
+    const nextMember = typeof existingMember === "object" && existingMember !== null
+      ? {
+          ...(existingMember as Record<string, unknown>),
+          fullName: playerName.trim(),
+          registrationNo: playerRegNo.trim().toUpperCase(),
+          registrationNumber: playerRegNo.trim().toUpperCase(),
+          phone: playerPhone.trim(),
+          semester: playerSemester.trim(),
+        }
+      : playerRegNo.trim()
+        ? {
+            fullName: playerName.trim(),
+            registrationNo: playerRegNo.trim().toUpperCase(),
+            registrationNumber: playerRegNo.trim().toUpperCase(),
+            phone: playerPhone.trim(),
+            semester: playerSemester.trim(),
+          }
+        : playerName.trim();
+
+    members[editingPlayer.memberIndex] = nextMember as never;
+
+    setPlayerSaving(true);
+    try {
+      const savedTeam = await updateAdminTeam({ ...team, members });
+      onTeamUpdated?.(savedTeam as Team);
+      closePlayerEdit();
+    } catch (error) {
+      setPlayerError(error instanceof Error ? error.message : "Could not update player.");
+    } finally {
+      setPlayerSaving(false);
+    }
+  };
+
   const players = useMemo<PlayerUser[]>(
     () =>
       sortByName(
@@ -289,10 +383,16 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
             .map((member, index) => ({
               id: `${team.id}-${index}`,
               fullName: getMemberName(member),
+              registrationNo: getMemberRegNo(member),
+              phone: getMemberField(member, "phone"),
+              semester: getMemberField(member, "semester"),
               teamName: team.name,
+              teamId: team.id,
+              memberIndex: index,
               department: team.department || team.name,
               sport: team.sport,
               registeredAt: team.playerRegisteredAt?.[index] || team.registeredAt,
+              rawMember: member,
             }))
         )
       ),
@@ -481,7 +581,7 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
       {activeSection === "volunteers" ? (
         <VolunteersTable volunteers={filteredVolunteers} loading={loading} onEdit={canManageAccounts ? openEditModal : undefined} />
       ) : (
-        <PlayersTable players={filteredPlayers} />
+        <PlayersTable players={filteredPlayers} onEdit={canManageAccounts ? openPlayerEdit : undefined} />
       )}
 
       {editingUser && (
@@ -506,6 +606,24 @@ export function UsersViewer({ teams, canManageAccounts = false }: { teams: Team[
           onSave={handleEditSave}
           onDelete={handleDeleteAccount}
           onClose={closeEditModal}
+        />
+      )}
+
+      {editingPlayer && (
+        <EditPlayerModal
+          player={editingPlayer}
+          name={playerName}
+          registrationNo={playerRegNo}
+          phone={playerPhone}
+          semester={playerSemester}
+          saving={playerSaving}
+          error={playerError}
+          onNameChange={setPlayerName}
+          onRegistrationNoChange={setPlayerRegNo}
+          onPhoneChange={setPlayerPhone}
+          onSemesterChange={setPlayerSemester}
+          onSave={handlePlayerSave}
+          onClose={closePlayerEdit}
         />
       )}
     </div>
@@ -591,7 +709,7 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
   );
 }
 
-function PlayersTable({ players }: { players: PlayerUser[] }) {
+function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (player: PlayerUser) => void }) {
   return (
     <Card className="bg-slate-900/60 border-white/5 text-white">
       <CardContent className="p-0 overflow-hidden">
@@ -603,11 +721,13 @@ function PlayersTable({ players }: { players: PlayerUser[] }) {
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-6 py-4">Player Name</th>
+                  <th className="px-6 py-4">Registration No.</th>
                   <th className="px-6 py-4">Team</th>
                   <th className="px-6 py-4">Department</th>
                   <th className="px-6 py-4">Sport</th>
                   <th className="px-6 py-4">Registration Date</th>
                   <th className="px-6 py-4 text-right">Type</th>
+                  {onEdit && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -616,6 +736,7 @@ function PlayersTable({ players }: { players: PlayerUser[] }) {
                     <td className="px-6 py-5">
                       <NameCell name={player.fullName} />
                     </td>
+                    <td className="px-6 py-5 text-slate-300 text-xs font-mono uppercase">{player.registrationNo || "N/A"}</td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-black uppercase tracking-wide">{player.teamName}</td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-bold uppercase">{player.department}</td>
                     <td className="px-6 py-5 text-slate-400 text-xs font-bold">{player.sport || "N/A"}</td>
@@ -628,6 +749,17 @@ function PlayersTable({ players }: { players: PlayerUser[] }) {
                     <td className="px-6 py-5 text-right">
                       <RolePill icon={UsersRound} label="Player" />
                     </td>
+                    {onEdit && (
+                      <td className="px-6 py-5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(player)}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -636,6 +768,91 @@ function PlayersTable({ players }: { players: PlayerUser[] }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function EditPlayerModal({
+  player, name, registrationNo, phone, semester, saving, error,
+  onNameChange, onRegistrationNoChange, onPhoneChange, onSemesterChange, onSave, onClose,
+}: {
+  player: PlayerUser;
+  name: string;
+  registrationNo: string;
+  phone: string;
+  semester: string;
+  saving: boolean;
+  error: string;
+  onNameChange: (value: string) => void;
+  onRegistrationNoChange: (value: string) => void;
+  onPhoneChange: (value: string) => void;
+  onSemesterChange: (value: string) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <h3 className="sport-heading text-lg font-black text-white">Edit Player</h3>
+        <p className="mb-5 mt-1 text-xs font-semibold text-slate-400">
+          {player.teamName} / {player.department}
+        </p>
+
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-bold text-red-300">{error}</div>
+        )}
+
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder="Player full name"
+            className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+          />
+          <input
+            type="text"
+            value={registrationNo}
+            onChange={(event) => onRegistrationNoChange(event.target.value)}
+            placeholder="Registration number"
+            className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold uppercase text-white outline-none placeholder:text-slate-500 focus:border-accent"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              type="text"
+              value={semester}
+              onChange={(event) => onSemesterChange(event.target.value)}
+              placeholder="Semester"
+              className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+            />
+            <input
+              type="tel"
+              value={phone}
+              onChange={(event) => onPhoneChange(event.target.value)}
+              placeholder="Phone"
+              className="h-12 w-full rounded-xl border border-white/10 bg-slate-950 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2 border-t border-white/5 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-white"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="inline-flex h-11 items-center rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Player"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

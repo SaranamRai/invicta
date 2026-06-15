@@ -729,7 +729,15 @@ export default function AdminDashboard() {
 
         {activeTab === "rules" && <RulesViewer />}
 
-        {activeTab === "users" && <UsersViewer teams={teams} canManageAccounts={canManageSetup} />}
+        {activeTab === "users" && (
+          <UsersViewer
+            teams={teams}
+            canManageAccounts={canManageSetup}
+            onTeamUpdated={(updatedTeam) => {
+              setTeams((currentTeams) => currentTeams.map((team) => team.id === updatedTeam.id ? updatedTeam : team));
+            }}
+          />
+        )}
 
         {activeTab === "approvals" && canManageSetup && (
           <ApprovalsPanel />

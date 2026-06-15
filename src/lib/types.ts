@@ -39,6 +39,9 @@ export interface MatchData {
   pausePeriods?: { reason: string; pausedAt: number; resumedAt?: number; elapsedSeconds?: number }[];
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
+  scheduledFullMatchSeconds?: number;
+  extraTimeSeconds?: number;
+  matchGapMinutes?: number;
   clockRunning?: boolean;
   period?: MatchPeriod;
   timer?: string;

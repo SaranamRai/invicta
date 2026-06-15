@@ -187,6 +187,12 @@ export async function updateLiveScore(req, res) {
     return res.status(409).json({ message: "This match is already completed and cannot be started again." });
   }
 
+  const existingScore = await LiveScore.findOne({ fixtureId: req.params.fixtureId }).lean();
+  const scheduledFullMatchSeconds = Math.max(60, Number(fixture.fullMatchSeconds || 90 * 60));
+  const requestedExtraTimeSeconds = Number(req.body.extraTimeSeconds);
+  const extraTimeSeconds = Number.isFinite(requestedExtraTimeSeconds) && requestedExtraTimeSeconds >= 0
+    ? Math.floor(requestedExtraTimeSeconds)
+    : Math.max(0, Number(existingScore?.extraTimeSeconds || 0));
   const score = await LiveScore.findOneAndUpdate(
     { fixtureId: req.params.fixtureId },
     {
@@ -197,6 +203,9 @@ export async function updateLiveScore(req, res) {
       sportName: fixture.sportName,
       category: fixture.category,
       currentStatus: nextStatus,
+      scheduledFullMatchSeconds,
+      extraTimeSeconds,
+      fullMatchSeconds: scheduledFullMatchSeconds + extraTimeSeconds,
       updatedBy: req.user.id,
       updatedAt: new Date(),
     },
