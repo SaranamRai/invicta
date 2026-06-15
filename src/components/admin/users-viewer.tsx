@@ -133,7 +133,6 @@ export function UsersViewer({
   const [playerSaving, setPlayerSaving] = useState(false);
   const [playerError, setPlayerError] = useState("");
   const [playerDeleteConfirm, setPlayerDeleteConfirm] = useState(false);
-  const [rowPlayerDeleteConfirm, setRowPlayerDeleteConfirm] = useState<string | null>(null);
 
   const fetchRoleAccounts = React.useCallback(async () => {
       try {
@@ -407,7 +406,6 @@ export function UsersViewer({
     try {
       const savedTeam = await updateAdminTeam({ ...team, members, playerRegisteredAt });
       onTeamUpdated?.(savedTeam as Team);
-      setRowPlayerDeleteConfirm(null);
       closePlayerEdit();
     } catch (error) {
       setPlayerError(error instanceof Error ? error.message : "Could not delete player.");
@@ -425,15 +423,6 @@ export function UsersViewer({
     }
 
     await deletePlayerFromTeam(editingPlayer);
-  };
-
-  const handleRowPlayerDelete = async (player: PlayerUser) => {
-    if (rowPlayerDeleteConfirm !== player.id) {
-      setRowPlayerDeleteConfirm(player.id);
-      return;
-    }
-
-    await deletePlayerFromTeam(player);
   };
 
   const players = useMemo<PlayerUser[]>(
@@ -651,8 +640,6 @@ export function UsersViewer({
         <PlayersTable
           players={filteredPlayers}
           onEdit={canManageAccounts ? openPlayerEdit : undefined}
-          onDelete={canManageAccounts ? handleRowPlayerDelete : undefined}
-          deleteConfirmId={rowPlayerDeleteConfirm}
         />
       )}
 
@@ -812,16 +799,10 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
 function PlayersTable({
   players,
   onEdit,
-  onDelete,
-  deleteConfirmId,
 }: {
   players: PlayerUser[];
   onEdit?: (player: PlayerUser) => void;
-  onDelete?: (player: PlayerUser) => void;
-  deleteConfirmId?: string | null;
 }) {
-  const canManagePlayers = Boolean(onEdit || onDelete);
-
   return (
     <Card className="bg-slate-900/60 border-white/5 text-white">
       <CardContent className="p-0 overflow-hidden">
@@ -856,32 +837,14 @@ function PlayersTable({
                     </div>
                   </div>
                 </div>
-                {canManagePlayers && (
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    {onEdit && (
-                      <button
-                        type="button"
-                        onClick={() => onEdit(player)}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
-                      >
-                        Edit
-                      </button>
-                    )}
-                    {onDelete && (
-                      <button
-                        type="button"
-                        onClick={() => onDelete(player)}
-                        className={`inline-flex h-9 items-center justify-center gap-1 rounded-lg border px-3 text-[10px] font-black uppercase tracking-wide transition-all ${
-                          deleteConfirmId === player.id
-                            ? "border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
-                            : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                        }`}
-                      >
-                        <Trash2 size={12} />
-                        {deleteConfirmId === player.id ? "Confirm" : "Delete"}
-                      </button>
-                    )}
-                  </div>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(player)}
+                    className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                  >
+                    Edit Player
+                  </button>
                 )}
               </div>
             ))}
@@ -897,7 +860,7 @@ function PlayersTable({
                   <th className="px-6 py-4">Sport</th>
                   <th className="px-6 py-4">Registration Date</th>
                   <th className="px-6 py-4 text-right">Type</th>
-                  {canManagePlayers && <th className="px-6 py-4 text-right">Actions</th>}
+                  {onEdit && <th className="px-6 py-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -919,33 +882,15 @@ function PlayersTable({
                     <td className="px-6 py-5 text-right">
                       <RolePill icon={UsersRound} label="Player" />
                     </td>
-                    {canManagePlayers && (
+                    {onEdit && (
                       <td className="px-6 py-5 text-right">
-                        <div className="flex justify-end gap-2">
-                          {onEdit && (
-                            <button
-                              type="button"
-                              onClick={() => onEdit(player)}
-                              className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {onDelete && (
-                            <button
-                              type="button"
-                              onClick={() => onDelete(player)}
-                              className={`inline-flex h-8 items-center gap-1 rounded-lg border px-3 text-[10px] font-black uppercase tracking-wider transition-all ${
-                                deleteConfirmId === player.id
-                                  ? "border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
-                                  : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                              }`}
-                            >
-                              <Trash2 size={12} />
-                              {deleteConfirmId === player.id ? "Confirm" : "Delete"}
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onEdit(player)}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                        >
+                          Edit
+                        </button>
                       </td>
                     )}
                   </tr>
