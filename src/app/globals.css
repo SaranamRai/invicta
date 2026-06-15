@@ -34,16 +34,16 @@ img, picture, video, canvas, svg {
   --font-heading: var(--font-outfit);
   --font-body: var(--font-inter);
 
-  --landing-overlay-98: rgba(255, 255, 255, 0.98);
-  --landing-overlay-90: rgba(255, 255, 255, 0.90);
-  --landing-overlay-48: rgba(255, 255, 255, 0.48);
-  --landing-overlay-42: rgba(255, 255, 255, 0.35);
-  --landing-overlay-photo: rgba(255, 255, 255, 0.16);
-  --landing-overlay-bottom: #ffffff;
-  --landing-overlay-top: rgba(255, 248, 226, 0.14);
-  --landing-photo-opacity: 0.76;
-  --landing-photo-fade-solid: rgba(255, 255, 255, 0.98);
-  --landing-photo-fade-mid: rgba(255, 255, 255, 0.56);
+  --landing-overlay-98: rgba(255, 255, 255, 0.94);
+  --landing-overlay-90: rgba(255, 255, 255, 0.68);
+  --landing-overlay-48: rgba(255, 248, 226, 0.24);
+  --landing-overlay-42: rgba(255, 238, 181, 0.12);
+  --landing-overlay-photo: rgba(255, 255, 255, 0.02);
+  --landing-overlay-bottom: #fffaf0;
+  --landing-overlay-top: rgba(255, 222, 138, 0.2);
+  --landing-photo-opacity: 0.94;
+  --landing-photo-fade-solid: rgba(255, 255, 255, 0.92);
+  --landing-photo-fade-mid: rgba(255, 248, 226, 0.28);
   --landing-card-bg: rgba(0, 0, 0, 0.03);
   --landing-card-border: rgba(0, 0, 0, 0.08);
   --landing-footer-bg: #f8fafc;
@@ -316,6 +316,10 @@ a {
 
 .landing-hero-photo {
   opacity: var(--landing-photo-opacity);
+  filter: saturate(1.42) contrast(1.12) brightness(1.2);
+}
+
+:root[data-theme="dark"] .landing-hero-photo {
   filter: saturate(1.24) contrast(1.12) brightness(1.1);
 }
 
