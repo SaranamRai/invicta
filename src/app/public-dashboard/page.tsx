@@ -143,17 +143,17 @@ export default function PublicDashboard() {
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
         <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url('/msu-logo-flat.png')] bg-[length:auto,620px_auto] bg-[position:center,right_2rem_center] bg-no-repeat" />
-        <div className="relative flex flex-col items-start gap-6 p-5 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
+        <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-accent">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
             </div>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-5">
-              <span className="sport-heading text-5xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-5">
+              <span className="sport-heading text-4xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
                 MSU
               </span>
-              <InvictaLogo className="h-16 w-56 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
+              <InvictaLogo className="h-12 w-44 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
             </div>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
@@ -161,14 +161,14 @@ export default function PublicDashboard() {
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-80 lg:grid-cols-1">
-            <Link href="/sports" className="group relative flex h-12 w-full items-center justify-center overflow-hidden rounded-xl bg-accent text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
-              <span className="sport-heading relative z-10 text-xs font-black uppercase tracking-[0.2em]">View Sports</span>
+            <Link href="/sports" className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-accent px-3 text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
+              <span className="sport-heading relative z-10 text-[10px] font-black uppercase tracking-wide sm:text-xs sm:tracking-[0.2em]">View Sports</span>
               <div className="absolute inset-0 hidden translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0 sm:block" />
             </Link>
-            <Link href="/matches" className="flex h-12 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 text-xs font-black uppercase tracking-[0.2em] text-white transition-all hover:border-accent hover:text-accent sm:h-14">
+            <Link href="/matches" className="flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wide text-white transition-all hover:border-accent hover:text-accent sm:h-14 sm:text-xs sm:tracking-[0.2em]">
               View Live Matches
             </Link>
-            <Link href="/" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white">
+            <Link href="/" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[9px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white sm:text-[10px] sm:tracking-[0.18em]">
               <Home size={14} className="text-accent" />
               Landing Page
             </Link>
@@ -253,26 +253,28 @@ export default function PublicDashboard() {
 
           <Card className="overflow-hidden border-2 p-0">
             {standings.length > 0 ? (
-              <table className="w-full text-left text-sm">
-                <thead className="bg-secondary text-secondary-foreground">
-                  <tr>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Rank</th>
-                    <th className="px-3 py-3 text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">DEPARTMENT</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Played</th>
-                    <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-widest sm:px-5 sm:py-4">Points</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {standings.map((team) => (
-                    <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
-                      <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
-                      <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
-                      <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
-                      <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
+              <div className="overflow-x-auto">
+                <table className="min-w-[520px] w-full text-left text-sm">
+                  <thead className="bg-secondary text-secondary-foreground">
+                    <tr>
+                      <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Rank</th>
+                      <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">DEPARTMENT</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Played</th>
+                      <th className="px-3 py-3 text-right text-[10px] font-black uppercase tracking-wide sm:px-5 sm:py-4 sm:tracking-widest">Points</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {standings.map((team) => (
+                      <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
+                        <td className="sport-heading px-3 py-4 text-lg font-black sm:px-5 sm:py-5">{team.rank}</td>
+                        <td className="px-3 py-4 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-5 sm:py-5">{team.team}</td>
+                        <td className="px-3 py-4 text-center font-bold text-muted-foreground sm:px-5 sm:py-5">{team.played}</td>
+                        <td className="sport-heading px-3 py-4 text-right text-lg font-black text-primary sm:px-5 sm:py-5">{team.pts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               <div className="p-10 text-center">
                 <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
@@ -410,7 +412,7 @@ export default function PublicDashboard() {
               </p>
               <Link
                 href={isLoggedIn ? "/register" : "/public-register"}
-                className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-accent text-sm font-black uppercase tracking-[0.2em] text-accent-foreground transition-all hover:bg-accent/90"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-wide text-accent-foreground transition-all hover:bg-accent/90 sm:h-14 sm:text-sm sm:tracking-[0.2em]"
               >
                 Open Registration
               </Link>
@@ -430,7 +432,7 @@ export default function PublicDashboard() {
               <button
                 type="button"
                 disabled
-                className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-slate-400 text-sm font-black uppercase tracking-[0.2em] text-white opacity-70"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-slate-400 px-4 text-xs font-black uppercase tracking-wide text-white opacity-70 sm:h-14 sm:text-sm sm:tracking-[0.2em]"
               >
                 Registration Closed
               </button>

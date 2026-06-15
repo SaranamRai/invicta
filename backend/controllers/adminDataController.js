@@ -382,11 +382,48 @@ function normalizeMember(member) {
   }
   if (member && typeof member === "object") {
     const fullName = normalizeText(member.fullName || member.name || "");
-    const registrationNumber = member.registrationNumber || member.regNo ? normalizeText(String(member.registrationNumber || member.regNo)).toUpperCase() : "";
+    const registrationNumber = member.registrationNumber || member.registrationNo || member.regNo ? normalizeText(String(member.registrationNumber || member.registrationNo || member.regNo)).toUpperCase() : "";
+    const phone = normalizeText(member.phone || "");
+    const semester = normalizeText(member.semester || "");
     if (!fullName && !registrationNumber) return null;
-    return { fullName: fullName || undefined, registrationNumber: registrationNumber || undefined };
+    return {
+      fullName: fullName || undefined,
+      registrationNo: registrationNumber || undefined,
+      registrationNumber: registrationNumber || undefined,
+      phone: phone || undefined,
+      semester: semester || undefined,
+    };
   }
   return null;
+}
+
+async function syncTeamPlayers(team) {
+  await Player.deleteMany({ teamId: team._id });
+
+  const members = Array.isArray(team.members) ? team.members : [];
+  const playerDocs = members
+    .map((member) => {
+      const normalized = normalizeMember(member);
+      if (!normalized) return null;
+      const memberName = typeof normalized === "string" ? normalized : normalized.fullName;
+      if (!memberName) return null;
+
+      return {
+        name: memberName,
+        registrationNo: typeof normalized === "string" ? "" : normalized.registrationNo || normalized.registrationNumber || "",
+        department: team.department,
+        semester: typeof normalized === "string" ? "" : normalized.semester || "",
+        phone: typeof normalized === "string" ? "" : normalized.phone || "",
+        sportId: team.sportId,
+        teamId: team._id,
+        isCaptain: Boolean(team.captainName && memberName === team.captainName),
+      };
+    })
+    .filter(Boolean);
+
+  if (playerDocs.length > 0) {
+    await Player.insertMany(playerDocs);
+  }
 }
 
 export async function createTeam(req, res) {
@@ -422,28 +459,9 @@ export async function createTeam(req, res) {
     createdBy: req.user?.id,
   });
 
-  // Create Player documents for each member string so players collection is populated
   try {
-    const members = Array.isArray(team.members) ? team.members : [];
-    const createdPlayers = [];
-    for (let i = 0; i < members.length; i++) {
-      const member = members[i];
-      const memberName = typeof member === "string" ? member.trim() : (member?.fullName || "").trim();
-      const memberRegNo = typeof member === "object" && member !== null ? member.registrationNumber || "" : "";
-      if (!memberName) continue;
-      const player = await Player.create({
-        name: memberName,
-        registrationNo: memberRegNo,
-        department: team.department,
-        phone: "",
-        sportId: team.sportId,
-        teamId: team._id,
-        isCaptain: Boolean(team.captainName && memberName === team.captainName),
-      });
-      createdPlayers.push(player);
-    }
+    await syncTeamPlayers(team);
   } catch (err) {
-    // don't block team creation on player creation failures; log for visibility
     console.error("Failed to create player docs for team:", err);
   }
 
@@ -480,6 +498,11 @@ export async function updateTeam(req, res) {
   });
 
   await existingTeam.save();
+  try {
+    await syncTeamPlayers(existingTeam);
+  } catch (err) {
+    console.error("Failed to sync player docs for team:", err);
+  }
   return res.json(mapTeam(existingTeam));
 }
 

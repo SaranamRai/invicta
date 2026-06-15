@@ -245,7 +245,11 @@ export function TeamManager({
       sportId: sport,
       category,
       department: department.trim(),
-      members: membersList.map((m) => m.fullName),
+      members: membersList.map((m) => ({
+        fullName: m.fullName,
+        registrationNo: m.registrationNo,
+        registrationNumber: m.registrationNo,
+      })) as unknown as string[],
       memberRegNos: membersList.map((m) => m.registrationNo),
       playerRegisteredAt: membersList.map((_, i) => playerRegisteredAt[i] || savedRegisteredAt),
       coachCaptain: captainName.trim(),

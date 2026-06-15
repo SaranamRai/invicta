@@ -288,6 +288,21 @@ a {
   color: #ffffff !important;
 }
 
+.dashboard-surface button,
+.dashboard-surface a,
+.dashboard-surface th,
+.dashboard-surface td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .dashboard-surface button,
+  .dashboard-surface a {
+    max-width: 100%;
+    letter-spacing: 0;
+  }
+}
+
 .sport-border {
   border-left: 4px solid var(--accent);
 }

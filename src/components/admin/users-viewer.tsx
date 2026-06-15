@@ -109,6 +109,7 @@ export function UsersViewer({
   const [accountRegistrationNo, setAccountRegistrationNo] = useState("");
   const [accountPhone, setAccountPhone] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [accountSuccess, setAccountSuccess] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [sportsList, setSportsList] = useState<MongoSport[]>([]);
   const [, setAutoGeneratePassword] = useState(true);
@@ -175,6 +176,7 @@ export function UsersViewer({
   const handleCreateAccount = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAccountError("");
+    setAccountSuccess("");
 
     const finalPassword = accountPassword.trim() || generateTempPassword();
 
@@ -214,8 +216,16 @@ export function UsersViewer({
         setAccountSportName(first.sportName || first.name || "");
       }
 
-      const msg = (result as { message?: string })?.message;
-      if (msg) setAccountError(msg === "Account created successfully" ? "" : msg);
+      const response = result as { message?: string; emailSent?: boolean };
+      const msg = response.message || "";
+      const roleLabel = accountRole === "coordinator" ? "Coordinator" : "Volunteer";
+      if (response.emailSent) {
+        setAccountSuccess(`${roleLabel} account created successfully. Duty assignment email sent to ${payload.email}.`);
+      } else if (msg.replace(/\.$/, "") === "Account created successfully") {
+        setAccountSuccess(`${roleLabel} account created successfully.`);
+      } else if (msg) {
+        setAccountError(msg);
+      }
 
       await fetchRoleAccounts();
     } catch (error) {
@@ -451,6 +461,11 @@ export function UsersViewer({
                 {accountError}
               </div>
             )}
+            {accountSuccess && (
+              <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-bold text-emerald-300">
+                {accountSuccess}
+              </div>
+            )}
 
             <form onSubmit={handleCreateAccount} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -531,7 +546,7 @@ export function UsersViewer({
                   className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:px-5"
                 >
                   <UserPlus size={15} className="shrink-0" />
-                  <span className="truncate">{isCreatingAccount ? "Creating..." : "Create Coordinator"}</span>
+                  <span className="truncate">{isCreatingAccount ? "Creating..." : `Create ${accountRole === "coordinator" ? "Coordinator" : "Volunteer"}`}</span>
                 </button>
               </div>
             </form>
@@ -632,8 +647,8 @@ export function UsersViewer({
 
 function CountCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="min-w-[130px] rounded-xl border border-white/5 bg-slate-900 px-4 py-2.5 text-center">
-      <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</span>
+    <div className="min-w-0 rounded-xl border border-white/5 bg-slate-900 px-3 py-2.5 text-center sm:min-w-[130px] sm:px-4">
+      <span className="block text-[9px] font-black uppercase tracking-wide text-slate-400 sm:text-[10px] sm:tracking-wider">{label}</span>
       <span className="scoreboard-number block text-2xl font-black text-white">{value}</span>
     </div>
   );
@@ -648,8 +663,33 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
         ) : volunteers.length === 0 ? (
           <EmptyState label="No Role Accounts Found" detail="Create role accounts from the admin dashboard." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <>
+          <div className="grid gap-3 p-3 md:hidden">
+            {volunteers.map((volunteer) => (
+              <div key={volunteer.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <NameCell name={volunteer.fullName} />
+                  <RolePill icon={ShieldCheck} label={volunteer.role || "No role"} />
+                </div>
+                <div className="mt-4 space-y-2 text-xs font-semibold text-slate-400">
+                  <p className="break-all font-mono text-slate-300">{volunteer.email}</p>
+                  <p className="uppercase">{volunteer.assignedSportName || (volunteer.assignedSport ? getSportName(volunteer.assignedSport, volunteer.assignedSportName) : volunteer.deptName)}</p>
+                  <p>{formatCreatedAt(volunteer.createdAt)}</p>
+                </div>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(volunteer)}
+                    className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-[900px] w-full text-left">
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-6 py-4">Name</th>
@@ -703,6 +743,7 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
               </tbody>
             </table>
           </div>
+          </>
         )}
       </CardContent>
     </Card>
@@ -716,8 +757,48 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
         {players.length === 0 ? (
           <EmptyState label="No Players Found" detail="Registered team members will appear here automatically." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <>
+          <div className="grid gap-3 p-3 md:hidden">
+            {players.map((player) => (
+              <div key={player.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <NameCell name={player.fullName} />
+                  <RolePill icon={UsersRound} label="Player" />
+                </div>
+                <div className="mt-4 grid gap-2 text-xs font-semibold text-slate-400">
+                  <div>
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Registration</span>
+                    <span className="font-mono uppercase text-slate-300">{player.registrationNo || "N/A"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Team</span>
+                    <span className="uppercase text-slate-300">{player.teamName}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Department</span>
+                      <span className="uppercase text-slate-300">{player.department}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Sport</span>
+                      <span className="text-slate-300">{player.sport || "N/A"}</span>
+                    </div>
+                  </div>
+                </div>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(player)}
+                    className="mt-4 inline-flex h-9 w-full items-center justify-center rounded-lg border border-white/10 bg-slate-800 px-3 text-[10px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-accent hover:bg-accent hover:text-accent-foreground"
+                  >
+                    Edit Player
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-[980px] w-full text-left">
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-6 py-4">Player Name</th>
@@ -765,6 +846,7 @@ function PlayersTable({ players, onEdit }: { players: PlayerUser[]; onEdit?: (pl
               </tbody>
             </table>
           </div>
+          </>
         )}
       </CardContent>
     </Card>
@@ -790,8 +872,8 @@ function EditPlayerModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fadeIn" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-3 backdrop-blur-sm animate-fadeIn sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-4 shadow-2xl sm:p-6" onClick={(event) => event.stopPropagation()}>
         <h3 className="sport-heading text-lg font-black text-white">Edit Player</h3>
         <p className="mb-5 mt-1 text-xs font-semibold text-slate-400">
           {player.teamName} / {player.department}
@@ -834,11 +916,11 @@ function EditPlayerModal({
           </div>
         </div>
 
-        <div className="mt-6 flex justify-end gap-2 border-t border-white/5 pt-4">
+        <div className="mt-6 flex flex-col-reverse gap-2 border-t border-white/5 pt-4 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-11 items-center rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-white"
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-slate-800 px-5 text-[10px] font-black uppercase tracking-wide text-slate-400 transition-colors hover:text-white sm:tracking-widest"
           >
             Cancel
           </button>
@@ -846,7 +928,7 @@ function EditPlayerModal({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="inline-flex h-11 items-center rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-accent px-6 text-[10px] font-black uppercase tracking-wide text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:tracking-widest"
           >
             {saving ? "Saving..." : "Save Player"}
           </button>
@@ -858,11 +940,11 @@ function EditPlayerModal({
 
 function NameCell({ name }: { name: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-9 w-9 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-center text-accent text-sm font-black">
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="h-9 w-9 shrink-0 rounded-xl bg-slate-950 border border-white/10 flex items-center justify-center text-accent text-sm font-black">
         {name.slice(0, 1).toUpperCase()}
       </div>
-      <span className="font-bold text-white uppercase text-sm tracking-wide">{name}</span>
+      <span className="min-w-0 break-words font-bold text-white uppercase text-sm tracking-wide">{name}</span>
     </div>
   );
 }
