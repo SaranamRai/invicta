@@ -6,6 +6,10 @@ export interface VolleyballSet {
   scoreB: number;
   winner: "A" | "B";
   winnerName: string;
+  startedAt?: number;
+  finishedAt?: number;
+  durationSeconds?: number;
+  fullTime?: string;
   timestamp: number;
 }
 

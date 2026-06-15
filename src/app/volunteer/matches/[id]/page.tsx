@@ -346,8 +346,66 @@ export default function LiveMatchEditPanel() {
     B: sets.filter((set) => set.winner === "B").length,
   });
 
+  const getNextVolleyballSetNumber = (sets: VolleyballSet[]) => Math.min(sets.length + 1, 3);
+  const isVolleyballSetRunning = () => {
+    const nextSetNumber = getNextVolleyballSetNumber(volleyballSets);
+    return match?.status === "Live" && match.startedAt && match.period === (`Set ${nextSetNumber}` as MatchPeriod);
+  };
+
+  const handleStartVolleyballSet = async () => {
+    if (!match || match.status === "Finished") return;
+    if (volleyballSets.length >= 3) {
+      showMessage("All three volleyball sets have already been played.", "error");
+      return;
+    }
+    if (isVolleyballSetRunning()) {
+      showMessage(`Set ${getNextVolleyballSetNumber(volleyballSets)} is already running.`, "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const currentNow = Date.now();
+      const nextSetNumber = getNextVolleyballSetNumber(volleyballSets);
+      const nextPeriod = `Set ${nextSetNumber}` as MatchPeriod;
+
+      await updateMatchDetails(matchId, {
+        status: "Live",
+        period: nextPeriod,
+        startedAt: currentNow,
+        elapsedSeconds: 0,
+        timer: "00:00",
+        clockRunning: false,
+      });
+      await logActivity(matchId, `Volleyball set ${nextSetNumber} begins`, email);
+
+      setStatus("Live");
+      setTimer("00:00");
+      setMatch((current) => current ? {
+        ...current,
+        status: "Live",
+        period: nextPeriod,
+        startedAt: currentNow,
+        elapsedSeconds: 0,
+        timer: "00:00",
+        clockRunning: false,
+      } : current);
+      showMessage(`Set ${nextSetNumber} started.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to start volleyball set.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const recordVolleyballSet = async (nextSetWinner: "A" | "B") => {
     if (!match || match.status === "Finished") return;
+    if (!isVolleyballSetRunning()) {
+      showMessage(`Start set ${getNextVolleyballSetNumber(volleyballSets)} before finishing it.`, "error");
+      return;
+    }
     if (currentSetScoreA === currentSetScoreB) {
       showMessage("A volleyball set cannot end tied.", "error");
       return;
@@ -365,12 +423,19 @@ export default function LiveMatchEditPanel() {
     try {
       const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
+      const setStartedAt = match.startedAt || currentNow;
+      const durationSeconds = Math.max(0, Math.floor((currentNow - setStartedAt) / 1000));
+      const setFullTime = formatMatchClock(durationSeconds);
       const nextSet: VolleyballSet = {
         setNumber: volleyballSets.length + 1,
         scoreA: currentSetScoreA,
         scoreB: currentSetScoreB,
         winner: nextSetWinner,
         winnerName: nextSetWinner === "A" ? match.teamA : match.teamB,
+        startedAt: setStartedAt,
+        finishedAt: currentNow,
+        durationSeconds,
+        fullTime: setFullTime,
         timestamp: currentNow,
       };
       const nextSets = [...volleyballSets, nextSet];
@@ -396,8 +461,10 @@ export default function LiveMatchEditPanel() {
         scoreB: setWins.B,
         status: nextStatus,
         clockRunning: false,
-        elapsedSeconds: 0,
-        timer: "",
+        startedAt: 0,
+        endedAt: matchWinner ? currentNow : 0,
+        elapsedSeconds: durationSeconds,
+        timer: setFullTime,
         period: matchWinner ? "Result" : (`Set ${Math.min(nextSet.setNumber + 1, 3)}` as MatchPeriod),
         volleyballSets: nextSets,
         winner: matchWinner,
@@ -407,7 +474,7 @@ export default function LiveMatchEditPanel() {
 
       await logActivity(
         matchId,
-        `Volleyball set ${nextSet.setNumber}: ${match.teamA} ${currentSetScoreA}-${currentSetScoreB} ${match.teamB}. ${nextSet.winnerName} won the set${matchWinner ? " and the match" : ""}.`,
+        `Volleyball set ${nextSet.setNumber} finished in ${setFullTime}: ${match.teamA} ${currentSetScoreA}-${currentSetScoreB} ${match.teamB}. ${nextSet.winnerName} won the set${matchWinner ? " and the match" : `. Set ${nextSet.setNumber + 1} begins next`}.`,
         email
       );
       setVolleyballSets(nextSets);
@@ -417,7 +484,23 @@ export default function LiveMatchEditPanel() {
       setStatus(nextStatus);
       setCurrentSetScoreA(0);
       setCurrentSetScoreB(0);
-      showMessage(matchWinner ? `${matchWinner === "A" ? match.teamA : match.teamB} won the match.` : "Set saved. Continue to the next set.", "success");
+      setTimer(setFullTime);
+      setMatch((current) => current ? {
+        ...current,
+        scoreA: setWins.A,
+        scoreB: setWins.B,
+        status: nextStatus,
+        period: matchWinner ? "Result" : (`Set ${Math.min(nextSet.setNumber + 1, 3)}` as MatchPeriod),
+        volleyballSets: nextSets,
+        winner: matchWinner,
+        winnerName: matchWinner ? (matchWinner === "A" ? match.teamA : match.teamB) : "",
+        startedAt: 0,
+        endedAt: matchWinner ? currentNow : 0,
+        elapsedSeconds: durationSeconds,
+        timer: setFullTime,
+        clockRunning: false,
+      } : current);
+      showMessage(matchWinner ? `${matchWinner === "A" ? match.teamA : match.teamB} won the match.` : `Set ${nextSet.setNumber} saved. Start set ${nextSet.setNumber + 1} when ready.`, "success");
     } catch (error) {
       console.error(error);
       showMessage("Failed to record volleyball set.", "error");
@@ -550,6 +633,12 @@ export default function LiveMatchEditPanel() {
     );
   }
 
+  const activeVolleyballSetNumber = getNextVolleyballSetNumber(volleyballSets);
+  const volleyballSetRunning = Boolean(isVolleyballSetRunning());
+  const volleyballSetClock = volleyballSetRunning && match.startedAt
+    ? formatMatchClock(Math.max(0, Math.floor(((now || match.startedAt) - match.startedAt) / 1000)))
+    : timer || match.timer || "00:00";
+
   return (
     <div className="space-y-10">
       <div className="flex items-center gap-4">
@@ -663,7 +752,7 @@ export default function LiveMatchEditPanel() {
             
             <form onSubmit={handleSave} className="space-y-8">
               {/* Status & Timer */}
-              <div className={`grid grid-cols-1 gap-6 ${isFootball ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+              <div className={`grid grid-cols-1 gap-6 ${isFootball ? "md:grid-cols-3" : !isVolleyball ? "md:grid-cols-2" : ""}`}>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Status</label>
                   <select 
@@ -698,7 +787,7 @@ export default function LiveMatchEditPanel() {
                       />
                     </div>
                   </>
-                ) : (
+                ) : !isVolleyball ? (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Winner</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -724,7 +813,7 @@ export default function LiveMatchEditPanel() {
                       </button>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {isFootball && (
@@ -770,9 +859,11 @@ export default function LiveMatchEditPanel() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Set {Math.min(volleyballSets.length + 1, 3)} Score
+                        Set {activeVolleyballSetNumber} Score
                       </p>
-                      <p className="mt-1 text-xs font-bold text-slate-500">Match sets: {scoreA}-{scoreB}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        Match sets: {scoreA}-{scoreB} / Set time: {volleyballSetClock}
+                      </p>
                     </div>
                     {winner && (
                       <span className="rounded-full bg-accent/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
@@ -780,16 +871,34 @@ export default function LiveMatchEditPanel() {
                       </span>
                     )}
                   </div>
+                  <div className="grid gap-3 rounded-xl border border-white/10 bg-black/30 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-white">
+                        {volleyballSetRunning ? `Set ${activeVolleyballSetNumber} running` : winner ? "Match finished" : `Ready for set ${activeVolleyballSetNumber}`}
+                      </p>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        Start the set first. Finish it after entering the final set score.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartVolleyballSet}
+                      disabled={saving || volleyballSetRunning || match.status === "Finished"}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                    >
+                      <Play size={15} /> Start Set {activeVolleyballSetNumber}
+                    </button>
+                  </div>
                   <div className="grid grid-cols-3 gap-6 items-center">
                     <div className="space-y-4 text-center">
                       <label className="text-sm font-black uppercase tracking-widest text-white">{match.teamA}</label>
                       <div className="flex items-center justify-center gap-4">
-                        <button type="button" onClick={() => setCurrentSetScoreA(Math.max(0, currentSetScoreA - 1))} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold">-</button>
+                        <button type="button" onClick={() => setCurrentSetScoreA(Math.max(0, currentSetScoreA - 1))} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold disabled:opacity-50">-</button>
                         <span className="text-4xl font-black text-white w-16">{currentSetScoreA}</span>
-                        <button type="button" onClick={() => setCurrentSetScoreA(currentSetScoreA + 1)} disabled={saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
+                        <button type="button" onClick={() => setCurrentSetScoreA(currentSetScoreA + 1)} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
                       </div>
-                      <button type="button" onClick={() => recordVolleyballSet("A")} disabled={saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
-                        Award Set
+                      <button type="button" onClick={() => recordVolleyballSet("A")} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
+                        Finish Set
                       </button>
                     </div>
 
@@ -798,12 +907,12 @@ export default function LiveMatchEditPanel() {
                     <div className="space-y-4 text-center">
                       <label className="text-sm font-black uppercase tracking-widest text-white">{match.teamB}</label>
                       <div className="flex items-center justify-center gap-4">
-                        <button type="button" onClick={() => setCurrentSetScoreB(Math.max(0, currentSetScoreB - 1))} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold">-</button>
+                        <button type="button" onClick={() => setCurrentSetScoreB(Math.max(0, currentSetScoreB - 1))} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold disabled:opacity-50">-</button>
                         <span className="text-4xl font-black text-white w-16">{currentSetScoreB}</span>
-                        <button type="button" onClick={() => setCurrentSetScoreB(currentSetScoreB + 1)} disabled={saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
+                        <button type="button" onClick={() => setCurrentSetScoreB(currentSetScoreB + 1)} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
                       </div>
-                      <button type="button" onClick={() => recordVolleyballSet("B")} disabled={saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
-                        Award Set
+                      <button type="button" onClick={() => recordVolleyballSet("B")} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
+                        Finish Set
                       </button>
                     </div>
                   </div>
@@ -863,6 +972,11 @@ export default function LiveMatchEditPanel() {
                   <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
                     Winner: {set.winnerName}
                   </p>
+                  {set.fullTime && (
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      Full time: {set.fullTime}
+                    </p>
+                  )}
                 </div>
               )) : (
                 <p className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Completed sets will appear here</p>
