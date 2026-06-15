@@ -283,6 +283,45 @@ function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, ca
   };
 }
 
+function getNextWeekendDate(date) {
+  const nextDate = new Date(date);
+  while (!isWeekend(nextDate)) {
+    nextDate.setDate(nextDate.getDate() + 1);
+  }
+  return nextDate;
+}
+
+function buildByeFixturePayload({ team, sportDoc, tournament, venueName, category, date, round, userId }) {
+  const sportName = sportDoc.sportName || sportDoc.name || "Sport";
+  const dateString = toDateInputValue(getNextWeekendDate(date));
+  const now = Date.now();
+
+  return {
+    tournamentId: tournament._id,
+    tournamentName: tournament.name,
+    sport: normalizeSport(sportName),
+    sportName,
+    sportId: sportDoc._id,
+    category,
+    matchTitle: `${team.teamName} advances by bye`,
+    teamA: team._id,
+    teamAName: team.teamName,
+    teamBName: "BYE",
+    departmentA: team.department,
+    venue: venueName || "BYE",
+    date: dateString,
+    time: "",
+    scoreA: 1,
+    scoreB: 0,
+    round,
+    status: "completed",
+    isCompleted: true,
+    completedAt: now,
+    endedAt: new Date(now).toISOString(),
+    createdBy: userId,
+  };
+}
+
 function getFixtureWindow(fixture) {
   const start = fixture.startTime
     ? new Date(fixture.startTime)
@@ -693,13 +732,41 @@ export async function generateFixtures(req, res) {
     ],
   }).sort({ teamName: 1 }).lean();
 
-  if (teams.length < 2) {
-    return res.status(400).json({ message: "At least two approved teams are required to generate fixtures" });
+  const byeFixtures = [];
+  let fixtureTeams = teams;
+  if (teams.length === 0) {
+    return res.status(400).json({ message: "At least one approved team is required to generate fixtures" });
   }
 
-  const pairs = buildRoundRobinPairs(teams);
+  if (teams.length === 1) {
+    byeFixtures.push(buildByeFixturePayload({
+      team: teams[0],
+      sportDoc,
+      tournament,
+      venueName: selectedVenueName,
+      category,
+      date: startDate,
+      round: "Default Winner",
+      userId: req.user?.id,
+    }));
+  } else if (teams.length % 2 === 1) {
+    const byeTeam = teams[teams.length - 1];
+    fixtureTeams = teams.slice(0, -1);
+    byeFixtures.push(buildByeFixturePayload({
+      team: byeTeam,
+      sportDoc,
+      tournament,
+      venueName: selectedVenueName,
+      category,
+      date: startDate,
+      round: "Bye",
+      userId: req.user?.id,
+    }));
+  }
+
+  const pairs = fixtureTeams.length > 1 ? buildRoundRobinPairs(fixtureTeams) : [];
   const existingFixtures = await Fixture.find({ status: { $ne: "cancelled" } }).lean();
-  const scheduledFixtures = [];
+  const scheduledFixtures = [...byeFixtures];
   const maxMatchesPerSportPerDay = 2;
   let cursorDate = new Date(startDate);
   let cursorMinutes = dayStartMinutes;
@@ -762,10 +829,12 @@ export async function generateFixtures(req, res) {
     }
   }
 
-  const createdFixtures = await Fixture.insertMany(scheduledFixtures);
+  const createdFixtures = scheduledFixtures.length ? await Fixture.insertMany(scheduledFixtures) : [];
 
   return res.status(201).json({
-    message: `Generated ${createdFixtures.length} fixture${createdFixtures.length === 1 ? "" : "s"}.`,
+    message: teams.length === 1
+      ? `${teams[0].teamName} marked as default winner.`
+      : `Generated ${createdFixtures.length} fixture${createdFixtures.length === 1 ? "" : "s"}${byeFixtures.length ? " including bye/default winner entries" : ""}.`,
     totalMatches: createdFixtures.length,
     fixtures: createdFixtures.map(mapFixture),
   });
