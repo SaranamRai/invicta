@@ -41,6 +41,8 @@ interface PlayerUser {
   memberIndex: number;
   department: string;
   sport: string;
+  category: string;
+  tournamentName: string;
   registeredAt?: number;
   rawMember: unknown;
 }
@@ -76,6 +78,13 @@ function getSportName(sportId?: string, sportName?: string) {
   return sportId || "Not assigned";
 }
 
+function normalizeCategory(value?: string) {
+  const category = String(value || "").trim().toLowerCase();
+  if (category === "male") return "Male";
+  if (category === "female") return "Female";
+  return value?.trim() || "Not recorded";
+}
+
 function sortByName<T extends { fullName: string }>(users: T[]) {
   return [...users].sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 }
@@ -97,6 +106,7 @@ export function UsersViewer({
   };
 
   const [activeSection, setActiveSection] = useState<"volunteers" | "players">("volunteers");
+  const [playerCategoryFilter, setPlayerCategoryFilter] = useState<"all" | "Male" | "Female">("all");
   const [roleAccounts, setRoleAccounts] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -442,6 +452,8 @@ export function UsersViewer({
               memberIndex: index,
               department: team.department || team.name,
               sport: team.sport,
+              category: normalizeCategory(team.category),
+              tournamentName: team.tournamentName || "Not recorded",
               registeredAt: team.playerRegisteredAt?.[index] || team.registeredAt,
               rawMember: member,
             }))
@@ -461,7 +473,8 @@ export function UsersViewer({
   );
   const filteredPlayers = sortByName(
     players.filter((player) =>
-        [player.fullName, player.teamName, player.department, getSportName(player.sport)]
+        (playerCategoryFilter === "all" || normalizeCategory(player.category) === playerCategoryFilter) &&
+        [player.fullName, player.teamName, player.department, player.tournamentName, player.category, getSportName(player.sport)]
         .join(" ")
         .toLowerCase()
         .includes(query)
@@ -626,10 +639,34 @@ export function UsersViewer({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${activeSection === "volunteers" ? "role accounts" : "players"} by name, email, team, or department...`}
+                placeholder={`Search ${activeSection === "volunteers" ? "role accounts" : "players"} by name, team, tournament, category, or department...`}
                 className="w-full rounded-xl bg-slate-950/60 border border-white/10 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-accent transition-all"
               />
             </div>
+
+            {activeSection === "players" && (
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-slate-950/60 p-1 lg:w-[270px]">
+                {[
+                  { id: "all" as const, label: "All" },
+                  { id: "Male" as const, label: "Male" },
+                  { id: "Female" as const, label: "Female" },
+                ].map((option) => {
+                  const isActive = playerCategoryFilter === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setPlayerCategoryFilter(option.id)}
+                      className={`h-10 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                        isActive ? "bg-accent text-accent-foreground" : "text-slate-400 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -826,6 +863,10 @@ function PlayersTable({
                     <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Team</span>
                     <span className="uppercase text-slate-300">{player.teamName}</span>
                   </div>
+                  <div>
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Tournament</span>
+                    <span className="uppercase text-slate-300">{player.tournamentName}</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Department</span>
@@ -834,6 +875,10 @@ function PlayersTable({
                     <div>
                       <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Sport</span>
                       <span className="text-slate-300">{player.sport || "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-black uppercase tracking-wide text-slate-500">Category</span>
+                      <span className="text-slate-300">{player.category}</span>
                     </div>
                   </div>
                 </div>
@@ -850,14 +895,16 @@ function PlayersTable({
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-[980px] w-full text-left">
+            <table className="min-w-[1220px] w-full text-left">
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-6 py-4">Player Name</th>
                   <th className="px-6 py-4">Registration No.</th>
                   <th className="px-6 py-4">Team</th>
+                  <th className="px-6 py-4">Tournament</th>
                   <th className="px-6 py-4">Department</th>
                   <th className="px-6 py-4">Sport</th>
+                  <th className="px-6 py-4">Category</th>
                   <th className="px-6 py-4">Registration Date</th>
                   <th className="px-6 py-4 text-right">Type</th>
                   {onEdit && <th className="px-6 py-4 text-right">Actions</th>}
@@ -871,8 +918,10 @@ function PlayersTable({
                     </td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-mono uppercase">{player.registrationNo || "N/A"}</td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-black uppercase tracking-wide">{player.teamName}</td>
+                    <td className="px-6 py-5 text-slate-300 text-xs font-bold uppercase">{player.tournamentName}</td>
                     <td className="px-6 py-5 text-slate-300 text-xs font-bold uppercase">{player.department}</td>
                     <td className="px-6 py-5 text-slate-400 text-xs font-bold">{player.sport || "N/A"}</td>
+                    <td className="px-6 py-5 text-slate-300 text-xs font-black uppercase">{player.category}</td>
                     <td className="px-6 py-5 text-slate-400 text-xs">
                       <div className="flex items-center gap-1.5">
                         <Calendar size={13} className="text-slate-600" />
