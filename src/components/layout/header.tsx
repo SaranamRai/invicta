@@ -2,6 +2,7 @@
 
 import { Bell } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { InvictaLogo } from "@/components/invicta-logo";
@@ -16,6 +17,8 @@ interface GuestNotification extends NotificationData {
 export function Header() {
   const [notifications, setNotifications] = useState<GuestNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const showLogo = pathname !== "/public-dashboard";
 
   useEffect(() => {
     let isMounted = true;
@@ -37,11 +40,15 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 hidden min-h-16 w-full items-center justify-between gap-3 border-b border-border bg-background/90 px-6 py-3 backdrop-blur-xl lg:flex lg:h-20 lg:px-8 lg:py-0">
-      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-        <Link href="/public-dashboard" aria-label="Invicta home">
-          <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
-        </Link>
-      </div>
+      {showLogo ? (
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <Link href="/public-dashboard" aria-label="Invicta home">
+            <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
+          </Link>
+        </div>
+      ) : (
+        <div aria-hidden="true" />
+      )}
 
 
 
