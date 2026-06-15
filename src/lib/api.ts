@@ -395,6 +395,9 @@ export interface MongoLiveScore {
   clockRunning?: boolean;
   announcements?: string[];
   scoreEvents?: unknown[];
+  volleyballSets?: unknown[];
+  winner?: "A" | "B" | "";
+  winnerName?: string;
   updatedAt?: string;
 }
 
@@ -611,6 +614,9 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     timer: liveScore?.timer,
     announcements: liveScore?.announcements || [],
     scoreEvents: liveScore?.scoreEvents as never[] || [],
+    volleyballSets: liveScore?.volleyballSets as never[] || [],
+    winner: liveScore?.winner || "",
+    winnerName: liveScore?.winnerName || "",
     assignedVolunteer: typeof fixture.assignedVolunteer === "string"
       ? fixture.assignedVolunteer
       : fixture.assignedVolunteer?._id || fixture.assignedVolunteer?.id || "",

@@ -13,6 +13,8 @@ const fixtureSchema = new mongoose.Schema(
     teamB: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     teamAName: { type: String, trim: true },
     teamBName: { type: String, trim: true },
+    departmentA: { type: String, trim: true },
+    departmentB: { type: String, trim: true },
     venue: { type: String, trim: true },
     date: { type: String, trim: true },
     time: { type: String, trim: true },

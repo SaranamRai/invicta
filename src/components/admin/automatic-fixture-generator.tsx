@@ -56,6 +56,10 @@ function getFixtureCategories(sport: MongoSport): ("Male" | "Female")[] {
   return categories.length ? categories : ["Male", "Female"];
 }
 
+function isFootballSport(sport: MongoSport) {
+  return String(sport.sportName || sport.name || "").trim().toLowerCase().includes("football");
+}
+
 function getDownloadFileName(sportName: string) {
   const slug = sportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "sport";
   return `invicta-${slug}-fixture-flowchart.doc`;
@@ -196,6 +200,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
   }, []);
 
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
+  const selectedIncludesFootball = useMemo(() => selectedSports.some(isFootballSport), [selectedSports]);
   const selectedVenue = useMemo(() => venues.find((venue) => getVenueId(venue) === venueId), [venues, venueId]);
   const fixturesBySport = useMemo(() => {
     const groups = new Map<string, { sportName: string; fixtures: AdminFixturePayload[] }>();
@@ -422,9 +427,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                 />
               </label>
 
+              {selectedIncludesFootball && (
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Full Time</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Football Full Time</span>
                   <input
                     type="number"
                     min={1}
@@ -444,12 +450,13 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                   />
                 </label>
               </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
               {selectedSports.length > 0
                 ? selectedSports.map((sport) => `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"})`).join(" / ")
-                : "Select sports and categories"}. Full time and gap after each match are saved with every fixture before the backend confirms every fixture fits Saturday or Sunday without clashes.
+                : "Select sports and categories"}. The backend saves fixtures only on Saturdays and Sundays, limits each sport to 2 matches per day, and checks team clashes across sports. Full-time controls apply only to football.
             </div>
 
             {(message || error) && (

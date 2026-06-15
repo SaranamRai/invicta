@@ -100,6 +100,8 @@ function mapFixture(fixture) {
     teamB: fixture.teamB?.toString?.() || "",
     teamAName: fixture.teamAName || "",
     teamBName: fixture.teamBName || "",
+    departmentA: fixture.departmentA || "",
+    departmentB: fixture.departmentB || "",
     sport: fixture.sport,
     sportName: fixture.sportName,
     sportId: fixture.sportId?.toString?.() || "",
@@ -178,6 +180,20 @@ function toDateInputValue(date) {
 function isWeekend(date) {
   const day = date.getDay();
   return day === 0 || day === 6;
+}
+
+function isSameFixtureSport(fixture, sportDoc) {
+  const sportName = sportDoc.sportName || sportDoc.name || "";
+  const sport = normalizeSport(sportName);
+  return fixture.sportId?.toString?.() === sportDoc._id.toString() || normalizeSport(fixture.sport || fixture.sportName) === sport;
+}
+
+function getSportDateMatchCount(dateString, sportDoc, fixtures) {
+  return fixtures.filter((fixture) => (
+    fixture.status !== "cancelled" &&
+    fixture.date === dateString &&
+    isSameFixtureSport(fixture, sportDoc)
+  )).length;
 }
 
 function getDateTime(date, minutes) {
@@ -395,6 +411,10 @@ function normalizeMember(member) {
     };
   }
   return null;
+}
+
+function exceedsSportDailyLimit(payload, sportDoc, fixtures, maxMatchesPerDay) {
+  return getSportDateMatchCount(payload.date, sportDoc, fixtures) >= maxMatchesPerDay;
 }
 
 async function syncTeamPlayers(team) {
@@ -680,6 +700,7 @@ export async function generateFixtures(req, res) {
   const pairs = buildRoundRobinPairs(teams);
   const existingFixtures = await Fixture.find({ status: { $ne: "cancelled" } }).lean();
   const scheduledFixtures = [];
+  const maxMatchesPerSportPerDay = 2;
   let cursorDate = new Date(startDate);
   let cursorMinutes = dayStartMinutes;
 
@@ -691,6 +712,13 @@ export async function generateFixtures(req, res) {
       while (!isWeekend(cursorDate)) {
         cursorDate.setDate(cursorDate.getDate() + 1);
         cursorMinutes = dayStartMinutes;
+      }
+
+      const dateString = toDateInputValue(cursorDate);
+      if (getSportDateMatchCount(dateString, sportDoc, [...existingFixtures, ...scheduledFixtures]) >= maxMatchesPerSportPerDay) {
+        cursorDate.setDate(cursorDate.getDate() + 1);
+        cursorMinutes = dayStartMinutes;
+        continue;
       }
 
       if (cursorMinutes + matchDurationMinutes > dayEndMinutes) {
@@ -714,7 +742,10 @@ export async function generateFixtures(req, res) {
         userId: req.user?.id,
       });
 
-      if (!hasFixtureClash(payload, [...existingFixtures, ...scheduledFixtures])) {
+      if (
+        !exceedsSportDailyLimit(payload, sportDoc, [...existingFixtures, ...scheduledFixtures], maxMatchesPerSportPerDay) &&
+        !hasFixtureClash(payload, [...existingFixtures, ...scheduledFixtures])
+      ) {
         scheduledFixtures.push(payload);
         cursorMinutes += matchDurationMinutes + gapMinutes;
         placed = true;

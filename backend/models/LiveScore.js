@@ -25,6 +25,9 @@ const liveScoreSchema = new mongoose.Schema({
   clockRunning: { type: Boolean, default: false },
   announcements: [{ type: String, trim: true }],
   scoreEvents: [{ type: mongoose.Schema.Types.Mixed }],
+  volleyballSets: [{ type: mongoose.Schema.Types.Mixed }],
+  winner: { type: String, enum: ["A", "B", ""], default: "" },
+  winnerName: { type: String, trim: true },
   updatedBy: { type: mongoose.Schema.Types.ObjectId },
   updatedAt: { type: Date, default: Date.now },
 });
