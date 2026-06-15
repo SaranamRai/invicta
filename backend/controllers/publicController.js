@@ -43,6 +43,8 @@ export function listPublic(resource) {
     const model = publicModels[resource];
     const filter = addQueryFilters(resource, req, resource === "announcements"
       ? { visibleToPublic: true }
+      : resource === "rules"
+      ? { $or: [{ status: "approved" }, { status: { $exists: false } }] }
       : resource === "teams"
       ? { status: "approved" }
       : {});

@@ -527,6 +527,9 @@ export interface MongoRule {
   attachmentName?: string;
   attachmentType?: string;
   attachmentKind?: "document" | "image";
+  status?: "pending" | "approved" | "rejected";
+  reviewedByName?: string;
+  reviewedAt?: string;
   createdByName?: string;
   createdByEmail?: string;
   createdAt?: string;
@@ -651,6 +654,9 @@ export function mapMongoRule(rule: MongoRule) {
     attachmentName: rule.attachmentName,
     attachmentType: rule.attachmentType,
     attachmentKind: rule.attachmentKind,
+    status: rule.status || "approved",
+    reviewedByName: rule.reviewedByName,
+    reviewedAt: rule.reviewedAt ? toTimestamp(rule.reviewedAt) : undefined,
   };
 }
 
@@ -706,6 +712,17 @@ export function getPublicAnnouncements() {
 
 export function getPublicRules(params?: Record<string, string | undefined>) {
   return publicApiFetch<MongoRule>(withQuery("/public/rules", params));
+}
+
+export function getAdminRules() {
+  return apiFetch<MongoRule[]>("/admin/rules");
+}
+
+export function reviewAdminRule(id: string, status: "approved" | "rejected") {
+  return apiFetch<MongoRule>(`/admin/rules/${encodeURIComponent(id)}/review`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function getPublicGallery() {

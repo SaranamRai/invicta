@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { adminHandlers, listIssues, listRoleAccounts, listTournaments, reviewTeamRegistration, tournamentReport, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
+import { adminHandlers, listIssues, listRoleAccounts, listRules, listTournaments, reviewRule, reviewTeamRegistration, tournamentReport, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
 import {
   createTeam,
   createFixture,
@@ -61,7 +61,9 @@ router.post("/venues", superOnly, adminHandlers.createVenue);
 router.put("/venues/:id", superOnly, adminHandlers.updateVenue);
 router.delete("/venues/:id", superOnly, adminHandlers.deleteVenue);
 router.get("/registrations/pending", adminOrSuper, adminHandlers.listPendingRegistrations);
+router.get("/rules", adminOrSuper, listRules);
 router.post("/rules", superOnly, adminHandlers.createRule);
+router.patch("/rules/:id/review", superOnly, reviewRule);
 router.post("/results", superOnly, adminHandlers.createResult);
 router.put("/results/:id/verify", adminOrSuper, verifyResult);
 router.post("/create-admin", superOnly, adminHandlers.createAdmin);

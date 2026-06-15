@@ -420,6 +420,29 @@ export async function deleteRoleAccount(req, res) {
   return res.json({ message: "Account deleted successfully" });
 }
 
+export async function listRules(_req, res) {
+  const rules = await Rule.find().sort({ status: 1, createdAt: -1 }).lean();
+  return res.json(rules);
+}
+
+export async function reviewRule(req, res) {
+  const { status } = req.body;
+  if (!["approved", "rejected"].includes(status)) {
+    return res.status(400).json({ message: "Rule status must be approved or rejected" });
+  }
+
+  const rule = await Rule.findById(req.params.id);
+  if (!rule) return res.status(404).json({ message: "Rule not found" });
+
+  rule.status = status;
+  rule.reviewedBy = req.user.id;
+  rule.reviewedByName = req.user.name || req.user.email || "Super Coordinator";
+  rule.reviewedAt = new Date();
+  await rule.save();
+
+  return res.json(rule);
+}
+
 export const adminHandlers = {
   listSports,
   createSport,
@@ -434,7 +457,18 @@ export const adminHandlers = {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
-  createRule: createDoc(Rule),
+  createRule: async (req, res) => {
+    const rule = await Rule.create({
+      ...req.body,
+      status: "approved",
+      reviewedBy: req.user?.id,
+      reviewedByName: req.user?.name || req.user?.email || "Super Coordinator",
+      reviewedAt: new Date(),
+      createdByName: req.user?.name || "Super Coordinator",
+      createdByEmail: req.user?.email || "",
+    });
+    return res.status(201).json(rule);
+  },
   createResult: createDoc(Result),
   createTournament: createDoc(Tournament),
   updateTournament: updateDoc(Tournament),

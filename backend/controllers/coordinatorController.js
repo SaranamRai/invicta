@@ -9,6 +9,7 @@ import PointsTable from "../models/PointsTable.js";
 import Volunteer from "../models/Volunteer.js";
 import { createRoleAccount } from "./authController.js";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -295,7 +296,7 @@ export async function publishRule(req, res) {
   const tournamentName = normalizeText(req.body.tournamentName);
   const category = normalizeText(req.body.category);
 
-  if (!title || !description || !sport || !tournamentId) {
+  if (!title || !description || !sport || (!tournamentId && !tournamentName)) {
     return res.status(400).json({ message: "Tournament, sport, title, and rules are required" });
   }
 
@@ -320,7 +321,7 @@ export async function publishRule(req, res) {
     sport,
     sportName,
     sportId: sportDoc._id,
-    tournamentId,
+    tournamentId: mongoose.Types.ObjectId.isValid(tournamentId) ? tournamentId : undefined,
     tournamentName,
     category,
     title,
@@ -330,14 +331,15 @@ export async function publishRule(req, res) {
     attachmentName: req.body.attachmentName || "",
     attachmentType: req.body.attachmentType || "",
     attachmentKind: req.body.attachmentKind || undefined,
+    status: "pending",
     createdByName: req.user.name || "Coordinator",
     createdByEmail: req.user.email || "",
   });
 
   await Announcement.create({
-    title: `${sportName} Rules Published`,
-    message: `${req.user.name || "Coordinator"} added rules for ${sportName}.`,
-    visibleToPublic: true,
+    title: `${sportName} Rules Submitted`,
+    message: `${req.user.name || "Coordinator"} submitted rules for ${sportName} for supercoordinator approval.`,
+    visibleToPublic: false,
     postedBy: req.user.id,
     postedByRole: req.user.role,
   });

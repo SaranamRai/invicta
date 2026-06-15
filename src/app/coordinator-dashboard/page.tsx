@@ -68,6 +68,7 @@ function CoordinatorDashboardContent() {
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleAttachment, setRuleAttachment] = useState<File | null>(null);
   const [isPublishingRule, setIsPublishingRule] = useState(false);
+  const [ruleMessage, setRuleMessage] = useState("");
   const [volunteers, setVolunteers] = useState<CoordinatorVolunteerPayload[]>([]);
   const [volunteerName, setVolunteerName] = useState("");
   const [volunteerEmail, setVolunteerEmail] = useState("");
@@ -220,12 +221,15 @@ function CoordinatorDashboardContent() {
     const title = ruleTitle.trim();
     const description = ruleDescription.trim();
     const selectedSport = availableRuleSports.find((sport) => sport.id === effectiveRuleSport);
+    const selectedTournamentName = tournamentOptions.find(([id]) => id === selectedTournament)?.[1] || "";
 
-    if (!title || !description || !selectedSport) {
+    if (!title || !description || !selectedSport || !selectedTournament) {
+      setRuleMessage("Select a tournament before submitting rules for approval.");
       return;
     }
 
     setIsPublishingRule(true);
+    setRuleMessage("");
 
     try {
       let attachment:
@@ -247,6 +251,8 @@ function CoordinatorDashboardContent() {
       }
 
       await createCoordinatorRule({
+        tournamentId: selectedTournament,
+        tournamentName: selectedTournamentName,
         title,
         description,
         sport: selectedSport.id,
@@ -257,7 +263,10 @@ function CoordinatorDashboardContent() {
       setRuleTitle("");
       setRuleDescription("");
       setRuleAttachment(null);
+      setRuleMessage("Rule submitted to the Super Coordinator for approval.");
       event.currentTarget.reset();
+    } catch (error) {
+      setRuleMessage(error instanceof Error ? error.message : "Could not submit rule for approval.");
     } finally {
       setIsPublishingRule(false);
     }
@@ -757,10 +766,16 @@ function CoordinatorDashboardContent() {
             <div>
               <h2 className="sport-heading text-xl font-black">Publish Sport Rules</h2>
               <p className="text-sm font-medium text-muted-foreground">
-                Add rules for a sport. Admins and public visitors will see them in the Rules section.
+                Submit sport rules for Super Coordinator approval before they appear in the public Rules section.
               </p>
             </div>
           </div>
+
+          {ruleMessage && (
+            <div className="mb-4 rounded-xl border border-border bg-secondary/60 px-4 py-3 text-sm font-bold text-foreground">
+              {ruleMessage}
+            </div>
+          )}
 
           <form onSubmit={handlePublishRule} className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
             <div className="space-y-2">
@@ -827,11 +842,11 @@ function CoordinatorDashboardContent() {
             <div className="lg:col-span-2">
               <button
                 type="submit"
-                disabled={isPublishingRule || !ruleTitle.trim() || !ruleDescription.trim()}
+                disabled={isPublishingRule || !selectedTournament || !ruleTitle.trim() || !ruleDescription.trim()}
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Send size={16} />
-                {isPublishingRule ? "Publishing..." : "Publish Rule"}
+                {isPublishingRule ? "Submitting..." : "Submit for Approval"}
               </button>
             </div>
           </form>
