@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { InvictaLogo } from "@/components/invicta-logo";
 import { SportMark } from "@/components/sport-mark";
 import { Team } from "@/lib/fixture-generator";
 import {
@@ -153,7 +152,6 @@ export default function PublicDashboard() {
               <span className="sport-heading text-5xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
                 MSU
               </span>
-              <InvictaLogo className="h-16 w-56 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
             </div>
             <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
