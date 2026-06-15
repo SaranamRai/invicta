@@ -157,7 +157,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
   const [tournamentId, setTournamentId] = useState("");
   const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
   const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female")[]>>({});
-  const [venueId, setVenueId] = useState("");
+  const [venueBySport, setVenueBySport] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState(getTodayInputValue());
   const [dayStartTime, setDayStartTime] = useState("09:00");
   const [dayEndTime, setDayEndTime] = useState("17:00");
@@ -184,7 +184,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
         setTournamentId(getTournamentId(nextTournaments[0] || {}));
-        setVenueId(getVenueId(nextVenues[0] || {}));
+        setVenueBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getVenueId(nextVenues[0] || {})])));
       } catch (err) {
         if (isMounted) setError(err instanceof Error ? err.message : "Could not load fixture setup data.");
       } finally {
@@ -201,7 +201,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
 
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
   const selectedIncludesFootball = useMemo(() => selectedSports.some(isFootballSport), [selectedSports]);
-  const selectedVenue = useMemo(() => venues.find((venue) => getVenueId(venue) === venueId), [venues, venueId]);
   const fixturesBySport = useMemo(() => {
     const groups = new Map<string, { sportName: string; fixtures: AdminFixturePayload[] }>();
     fixtures.forEach((fixture) => {
@@ -223,11 +222,15 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
       (categoriesBySport[nextSportId] || []).map((nextCategory) => ({
         sportId: nextSportId,
         category: nextCategory,
+        venueId: venueBySport[nextSportId] || "",
       }))
     );
 
-    if (!tournamentId || generationTargets.length === 0 || !venueId) {
-      setError("Please select tournament, at least one sport/category, and venue before generating fixtures.");
+    const missingVenueSport = selectedSports.find((sport) => !venueBySport[sport._id]);
+    if (!tournamentId || generationTargets.length === 0 || missingVenueSport) {
+      setError(missingVenueSport
+        ? `Please select a venue for ${getSportLabel(missingVenueSport)}.`
+        : "Please select tournament and at least one sport/category before generating fixtures.");
       return;
     }
 
@@ -235,11 +238,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
     try {
       const results = [];
       for (const target of generationTargets) {
+        const selectedVenue = venues.find((venue) => getVenueId(venue) === target.venueId);
         const result = await generateAdminFixtures({
           tournamentId,
           sportId: target.sportId,
           category: target.category,
-          venueId,
+          venueId: target.venueId,
           venue: selectedVenue?.name || "",
           startDate,
           dayStartTime,
@@ -300,24 +304,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                   ))}
                 </select>
               </label>
-
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                  <MapPin size={13} /> Venue
-                </span>
-                <select
-                  value={venueId}
-                  onChange={(event) => setVenueId(event.target.value)}
-                  className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent"
-                >
-                  <option value="">Select venue...</option>
-                  {venues.map((venue) => (
-                    <option key={getVenueId(venue)} value={getVenueId(venue)}>
-                      {venue.name}{venue.location ? ` / ${venue.location}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
 
             <div className="space-y-3">
@@ -354,6 +340,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                                 ? [...new Set([...current, sport._id])]
                                 : current.filter((id) => id !== sport._id)
                             );
+                            if (event.target.checked && !venueBySport[sport._id]) {
+                              setVenueBySport((current) => ({
+                                ...current,
+                                [sport._id]: getVenueId(venues[0] || {}),
+                              }));
+                            }
                           }}
                           className="h-4 w-4 accent-yellow-400"
                         />
@@ -383,6 +375,29 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
                           </span>
                         ))}
                       </span>
+                      <label className="w-full space-y-2 pl-7">
+                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          <MapPin size={12} /> Venue for {getSportLabel(sport)}
+                        </span>
+                        <select
+                          value={venueBySport[sport._id] || ""}
+                          disabled={!isSelected}
+                          onChange={(event) => {
+                            setVenueBySport((current) => ({
+                              ...current,
+                              [sport._id]: event.target.value,
+                            }));
+                          }}
+                          className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition-colors focus:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <option value="">Select venue...</option>
+                          {venues.map((venue) => (
+                            <option key={getVenueId(venue)} value={getVenueId(venue)}>
+                              {venue.name}{venue.location ? ` / ${venue.location}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </label>
                     );
                   })}
@@ -455,8 +470,11 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated }: AutomaticFi
 
             <div className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-xs font-semibold text-muted-foreground">
               {selectedSports.length > 0
-                ? selectedSports.map((sport) => `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"})`).join(" / ")
-                : "Select sports and categories"}. The backend saves fixtures only on Saturdays and Sundays, limits each sport to 2 matches per day, and checks team clashes across sports. Full-time controls apply only to football.
+                ? selectedSports.map((sport) => {
+                    const venue = venues.find((item) => getVenueId(item) === venueBySport[sport._id]);
+                    return `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"}${venue ? `, ${venue.name}` : ", no venue"})`;
+                  }).join(" / ")
+                : "Select sports and categories"}. The backend saves fixtures only on Saturdays and Sundays, limits each sport to 2 matches per day, and checks team clashes across sports. Each sport uses its selected venue. Full-time controls apply only to football.
             </div>
 
             {(message || error) && (
