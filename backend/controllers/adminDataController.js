@@ -391,37 +391,48 @@ function getCompetitionSportKey(value) {
   return normalizeSport(value).replace(/[^a-z]/g, "");
 }
 
-function usesTwoGroupRoundRobin(sportName) {
+function usesRoundRobin(sportName) {
   return ["football", "volleyball"].includes(getCompetitionSportKey(sportName));
 }
 
-function splitTeamsIntoTwoGroups(teams) {
-  if (teams.length < 3) return [teams];
-  const groups = [[], []];
-  teams.forEach((team, index) => {
-    groups[index % 2].push(team);
-  });
-  return groups.filter((group) => group.length > 0);
+function shuffleTeams(teams) {
+  const shuffled = [...teams];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
-function buildTwoGroupRoundRobinFixtures(teams) {
+function buildRoundRobinFixtures(teams) {
+  const participants = shuffleTeams(teams);
+  if (participants.length % 2 === 1) participants.push(null);
+
+  const rounds = participants.length - 1;
+  const half = participants.length / 2;
   const fixtures = [];
   let matchNumber = 1;
 
-  splitTeamsIntoTwoGroups(teams).forEach((group, groupIndex) => {
-    const groupName = getGroupName(groupIndex);
-    for (let teamAIndex = 0; teamAIndex < group.length; teamAIndex += 1) {
-      for (let teamBIndex = teamAIndex + 1; teamBIndex < group.length; teamBIndex += 1) {
+  for (let roundIndex = 0; roundIndex < rounds; roundIndex += 1) {
+    for (let index = 0; index < half; index += 1) {
+      const teamA = participants[index];
+      const teamB = participants[participants.length - 1 - index];
+      if (teamA && teamB) {
         fixtures.push({
-          teamA: group[teamAIndex],
-          teamB: group[teamBIndex],
-          round: `${groupName} Round Robin`,
+          teamA,
+          teamB,
+          round: `Round Robin Round ${roundIndex + 1}`,
           matchNumber,
         });
         matchNumber += 1;
       }
     }
-  });
+
+    const fixed = participants[0];
+    const rotating = participants.slice(1);
+    rotating.unshift(rotating.pop());
+    participants.splice(0, participants.length, fixed, ...rotating);
+  }
 
   return fixtures;
 }
@@ -679,8 +690,15 @@ function normalizeMember(member) {
   return null;
 }
 
-function exceedsSportDailyLimit(payload, sportDoc, fixtures, maxMatchesPerDay) {
-  return getSportDateMatchCount(payload.date, sportDoc, fixtures) >= maxMatchesPerDay;
+function hasTeamMatchOnDate(payload, fixtures) {
+  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
+  if (teamIds.length === 0) return false;
+
+  return fixtures.some((fixture) => {
+    if (fixture.status === "cancelled" || fixture.date !== payload.date) return false;
+    const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
+    return teamIds.some((teamId) => existingTeamIds.includes(teamId));
+  });
 }
 
 async function syncTeamPlayers(team) {
@@ -985,15 +1003,14 @@ export async function generateFixtures(req, res) {
     }));
   }
 
-  const isRoundRobinSport = usesTwoGroupRoundRobin(sportName);
+  const isRoundRobinSport = usesRoundRobin(sportName);
   const competitionFixtures = teams.length > 1
     ? isRoundRobinSport
-      ? buildTwoGroupRoundRobinFixtures(teams)
+      ? buildRoundRobinFixtures(teams)
       : buildTournamentBracketFixtures(teams)
     : [];
   const existingFixtures = await Fixture.find({ status: { $ne: "cancelled" } }).lean();
   const scheduledFixtures = [...byeFixtures];
-  const maxMatchesPerSportPerDay = 2;
   let cursorDate = new Date(startDate);
   let cursorMinutes = dayStartMinutes;
 
@@ -1004,13 +1021,6 @@ export async function generateFixtures(req, res) {
       while (!isWeekend(cursorDate)) {
         cursorDate.setDate(cursorDate.getDate() + 1);
         cursorMinutes = dayStartMinutes;
-      }
-
-      const dateString = toDateInputValue(cursorDate);
-      if (getSportDateMatchCount(dateString, sportDoc, [...existingFixtures, ...scheduledFixtures]) >= maxMatchesPerSportPerDay) {
-        cursorDate.setDate(cursorDate.getDate() + 1);
-        cursorMinutes = dayStartMinutes;
-        continue;
       }
 
       if (cursorMinutes + matchDurationMinutes > dayEndMinutes) {
@@ -1036,7 +1046,7 @@ export async function generateFixtures(req, res) {
       });
 
       if (
-        !exceedsSportDailyLimit(payload, sportDoc, [...existingFixtures, ...scheduledFixtures], maxMatchesPerSportPerDay) &&
+        !hasTeamMatchOnDate(payload, [...existingFixtures, ...scheduledFixtures]) &&
         !hasFixtureClash(payload, [...existingFixtures, ...scheduledFixtures])
       ) {
         scheduledFixtures.push(payload);
@@ -1070,7 +1080,7 @@ export async function generateFixtures(req, res) {
   return res.status(201).json({
     message: teams.length === 1
       ? `${teams[0].teamName} marked as default winner.`
-      : `Generated ${createdFixtures.length} ${isRoundRobinSport ? "two-group round robin" : "knockout"} fixture${createdFixtures.length === 1 ? "" : "s"}${byeFixtures.length ? " including bye/default winner entries" : ""}.`,
+      : `Generated ${createdFixtures.length} ${isRoundRobinSport ? "round robin" : "knockout"} fixture${createdFixtures.length === 1 ? "" : "s"}${byeFixtures.length ? " including bye/default winner entries" : ""}.`,
     totalMatches: createdFixtures.length,
     fixtures: createdFixtures.map(mapFixture),
   });
