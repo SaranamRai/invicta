@@ -5,15 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
   Activity,
-  ChevronRight,
   X,
   Radio,
   Minimize2,
-  Maximize2,
   Calendar,
   MapPin,
   Clock,
-  ChevronDown
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -46,7 +43,7 @@ export function LiveSportsPanel() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
   const [highlightedTeam, setHighlightedTeam] = useState<{ [matchId: string]: "A" | "B" | "both" | null }>({});
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const prevScoresRef = useRef<{ [matchId: string]: { scoreA: number; scoreB: number } }>({});
 
   const loadMatches = async () => {
@@ -168,8 +165,7 @@ export function LiveSportsPanel() {
 
               {/* Scrollable Match List */}
               <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar pr-0.5">
-                {liveMatches.length > 0 ? (
-                  liveMatches.map((match) => {
+                {hasLiveMatches ? liveMatches.map((match) => {
                     const highlight = highlightedTeam[match.id];
                     return (
                       <div
@@ -225,58 +221,59 @@ export function LiveSportsPanel() {
                         </div>
                       </div>
                     );
-                  })
-                ) : (
-                  <div className="space-y-3">
-                    {/* Empty State */}
-                    <div className="text-center py-4 border border-dashed border-border rounded-xl">
-                      <Radio size={22} className="mx-auto text-muted-foreground/60 mb-2" />
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                        No live matches
-                      </p>
-                      <p className="text-[9px] text-muted-foreground/60 mt-0.5">Showing next matches instead</p>
-                    </div>
-
-                    {/* Upcoming matches */}
-                    {upcomingMatches.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1 mb-1">
-                          Upcoming matches
-                        </div>
-                        {upcomingMatches.map((match) => (
-                          <div
-                            key={match.id}
-                            onClick={() => setSelectedMatch(match)}
-                            className="p-2.5 rounded-lg border border-border bg-secondary/20 hover:bg-secondary/40 cursor-pointer transition-all hover:border-accent/30"
-                          >
-                            <div className="flex items-center justify-between text-[9px] font-bold text-muted-foreground mb-1.5">
-                              <div className="flex items-center gap-1">
-                                <SportIcon name={match.sport} className="h-3 w-3" />
-                                <span>{match.sportName || match.sport}</span>
-                              </div>
-                              <span className="text-blue-500 font-extrabold uppercase tracking-wide">Next</span>
-                            </div>
-                            <div className="flex items-center justify-between font-bold text-xs text-foreground uppercase tracking-wide">
-                              <span className="truncate max-w-[100px]">{match.teamA}</span>
-                              <span className="text-muted-foreground/45 text-[10px] lowercase font-semibold">vs</span>
-                              <span className="truncate max-w-[100px] text-right">{match.teamB}</span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Clock size={10} />
-                                <span>{match.time || "TBD"}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Calendar size={10} />
-                                <span>{match.date || "TBD"}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                  }) : (
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-dashed border-border py-4 text-center">
+                        <Radio size={22} className="mx-auto mb-2 text-muted-foreground/60" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          No live matches
+                        </p>
+                        <p className="mt-0.5 text-[9px] text-muted-foreground/60">Showing next matches instead</p>
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      {upcomingMatches.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="mb-1 ml-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                            Upcoming matches
+                          </div>
+                          {upcomingMatches.map((match) => (
+                            <div
+                              key={match.id}
+                              onClick={() => setSelectedMatch(match)}
+                              className="cursor-pointer rounded-lg border border-border bg-secondary/20 p-2.5 transition-all hover:border-accent/30 hover:bg-secondary/40"
+                            >
+                              <div className="mb-1.5 flex items-center justify-between text-[9px] font-bold text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <SportIcon name={match.sport} className="h-3 w-3" />
+                                  <span>{match.sportName || match.sport}</span>
+                                </div>
+                                <span className="font-extrabold uppercase tracking-wide text-blue-500">Next</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-foreground">
+                                <span className="max-w-[100px] truncate">{match.teamA}</span>
+                                <span className="text-[10px] font-semibold lowercase text-muted-foreground/45">vs</span>
+                                <span className="max-w-[100px] truncate text-right">{match.teamB}</span>
+                              </div>
+                              <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Clock size={10} />
+                                  <span>{match.time || "TBD"}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar size={10} />
+                                  <span>{match.date || "TBD"}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-border bg-secondary/20 p-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Fixtures will appear here after scheduling
+                        </div>
+                      )}
+                    </div>
+                  )}
               </div>
 
               {/* View All Matches Button */}
