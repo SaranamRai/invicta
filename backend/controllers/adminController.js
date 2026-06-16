@@ -7,12 +7,15 @@ import Department from "../models/Department.js";
 import Fixture from "../models/Fixture.js";
 import Announcement from "../models/Announcement.js";
 import Team from "../models/Team.js";
+import TeamRegistration from "../models/TeamRegistration.js";
+import Player from "../models/Player.js";
 import Rule from "../models/Rule.js";
 import Result from "../models/Result.js";
 import Issue from "../models/Issue.js";
 import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
 import LiveScore from "../models/LiveScore.js";
+import LiveFeed from "../models/LiveFeed.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
 import bcrypt from "bcryptjs";
@@ -113,6 +116,34 @@ export async function deleteAnnouncement(req, res) {
   return res.json({ message: "Announcement deleted successfully" });
 }
 
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeSlug(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function sportNameRegex(value) {
+  const label = String(value || "").trim();
+  if (!label) return null;
+  return new RegExp(`^${escapeRegExp(label).replace(/[-\s]+/g, "[-\\s]+")}$`, "i");
+}
+
+async function deleteFixtureRecords(fixtures) {
+  const fixtureIds = fixtures.map((fixture) => fixture._id);
+  if (fixtureIds.length === 0) return 0;
+
+  await Promise.all([
+    LiveScore.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    LiveFeed.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    Result.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    Fixture.deleteMany({ _id: { $in: fixtureIds } }),
+  ]);
+
+  return fixtureIds.length;
+}
+
 export async function listVenues(_req, res) {
   const venues = await Venue.find().sort({ name: 1 }).lean();
   return res.json(venues);
@@ -134,9 +165,19 @@ export async function updateVenue(req, res) {
 }
 
 export async function deleteVenue(req, res) {
-  const venue = await Venue.findByIdAndDelete(req.params.id);
+  const venue = await Venue.findById(req.params.id).lean();
   if (!venue) return res.status(404).json({ message: "Venue not found" });
-  return res.json({ message: "Venue deleted successfully" });
+
+  const venueNames = [venue.name, venue.venueName].filter(Boolean);
+  const fixtures = venueNames.length
+    ? await Fixture.find({
+        $or: venueNames.map((name) => ({ venue: new RegExp(`^${escapeRegExp(name)}$`, "i") })),
+      }).lean()
+    : [];
+  const deletedFixtures = await deleteFixtureRecords(fixtures);
+  await Venue.deleteOne({ _id: venue._id });
+
+  return res.json({ message: "Venue deleted successfully", deletedFixtures });
 }
 
 export async function listSports(_req, res) {
@@ -209,6 +250,76 @@ export async function updateSport(req, res) {
   const sport = await Sport.findByIdAndUpdate(req.params.id, payload, { new: true });
   if (!sport) return res.status(404).json({ message: "Sport not found" });
   return res.json(sport);
+}
+
+export async function deleteSport(req, res) {
+  const sport = await Sport.findById(req.params.id).lean();
+  if (!sport) return res.status(404).json({ message: "Sport not found" });
+
+  const sportLabel = sport.sportName || sport.name || "";
+  const sportSlug = normalizeSlug(sportLabel);
+  const sportRegex = sportNameRegex(sportLabel);
+  const sportRefQuery = {
+    $or: [
+      { sportId: sport._id },
+      { sport: sportSlug },
+      ...(sportRegex ? [{ sportName: sportRegex }, { name: sportRegex }] : []),
+    ],
+  };
+
+  const [teams, fixtures] = await Promise.all([
+    Team.find(sportRefQuery).lean(),
+    Fixture.find(sportRefQuery).lean(),
+  ]);
+  const teamIds = teams.map((team) => team._id);
+  const deletedFixtures = await deleteFixtureRecords(fixtures);
+
+  const [
+    deletedPlayers,
+    deletedRegistrations,
+    deletedRules,
+    deletedTeams,
+  ] = await Promise.all([
+    Player.deleteMany({
+      $or: [
+        { sportId: sport._id },
+        ...(teamIds.length ? [{ teamId: { $in: teamIds } }] : []),
+      ],
+    }),
+    TeamRegistration.deleteMany({
+      $or: [
+        { sportId: sport._id },
+        ...(sportRegex ? [{ sportName: sportRegex }] : []),
+      ],
+    }),
+    Rule.deleteMany({
+      $or: [
+        { sportId: sport._id },
+        { sport: sportSlug },
+        ...(sportRegex ? [{ sportName: sportRegex }] : []),
+      ],
+    }),
+    Team.deleteMany({ _id: { $in: teamIds } }),
+    Coordinator.updateMany(
+      { $or: [{ assignedSportId: sport._id }, { assignedSport: sportSlug }, ...(sportRegex ? [{ assignedSportName: sportRegex }] : [])] },
+      { $unset: { assignedSportId: "", assignedSport: "", assignedSportName: "" } }
+    ),
+    Volunteer.updateMany(
+      { $or: [{ assignedSportId: sport._id }, { assignedSport: sportSlug }, ...(sportRegex ? [{ assignedSportName: sportRegex }] : [])] },
+      { $unset: { assignedSportId: "", assignedSport: "", assignedSportName: "" } }
+    ),
+  ]);
+
+  await Sport.deleteOne({ _id: sport._id });
+
+  return res.json({
+    message: "Sport deleted successfully",
+    deletedTeams: deletedTeams.deletedCount || 0,
+    deletedPlayers: deletedPlayers.deletedCount || 0,
+    deletedFixtures,
+    deletedRegistrations: deletedRegistrations.deletedCount || 0,
+    deletedRules: deletedRules.deletedCount || 0,
+  });
 }
 
 export async function reviewTeamRegistration(req, res) {
@@ -458,7 +569,7 @@ export const adminHandlers = {
   listSports,
   createSport,
   updateSport,
-  deleteSport: deleteDoc(Sport),
+  deleteSport,
   createDepartment: createDoc(Department),
   updateDepartment: updateDoc(Department),
   deleteDepartment: deleteDoc(Department),

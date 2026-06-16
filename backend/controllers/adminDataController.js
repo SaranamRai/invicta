@@ -812,10 +812,32 @@ export async function updateTeam(req, res) {
 
 export async function deleteTeam(req, res) {
   requireObjectId(req.params.id, "Team id");
-  const team = await Team.findByIdAndDelete(req.params.id);
+  const team = await Team.findById(req.params.id);
   if (!team) return res.status(404).json({ message: "Team not found" });
-  await Fixture.deleteMany({ $or: [{ teamA: team._id }, { teamB: team._id }] });
-  return res.json({ message: "Team deleted successfully" });
+
+  const fixtures = await Fixture.find({ $or: [{ teamA: team._id }, { teamB: team._id }] }).lean();
+  const fixtureResult = fixtures.length ? await deleteFixtureDocuments(fixtures, req) : { deletedCount: 0 };
+
+  const registrationQuery = {
+    teamName: team.teamName,
+    department: team.department,
+    ...(team.sportId ? { sportId: team.sportId } : { sport: team.sport }),
+    ...(team.tournamentId ? { tournamentId: team.tournamentId } : {}),
+    ...(team.category ? { category: team.category } : {}),
+  };
+
+  const [playerDeleteResult, registrationDeleteResult] = await Promise.all([
+    Player.deleteMany({ teamId: team._id }),
+    TeamRegistration.deleteMany(registrationQuery),
+  ]);
+  await Team.deleteOne({ _id: team._id });
+
+  return res.json({
+    message: "Team deleted successfully",
+    deletedPlayers: playerDeleteResult.deletedCount || 0,
+    deletedRegistrations: registrationDeleteResult.deletedCount || 0,
+    deletedFixtures: fixtureResult.deletedCount || 0,
+  });
 }
 
 export async function listFixtures(req, res) {
@@ -828,7 +850,10 @@ export async function listFixtures(req, res) {
 export async function replaceFixtures(req, res) {
   const fixtures = Array.isArray(req.body.fixtures) ? req.body.fixtures : [];
 
-  await Fixture.deleteMany({});
+  const existingFixtures = await Fixture.find({}).lean();
+  if (existingFixtures.length > 0) {
+    await deleteFixtureDocuments(existingFixtures, req);
+  }
 
   const createdFixtures = [];
   for (const fixture of fixtures) {
