@@ -29,7 +29,7 @@ export function Sidebar() {
       <aside className="sticky top-0 z-40 border-b border-border bg-background/95 px-2 py-2 text-foreground backdrop-blur-xl lg:hidden">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <Link href="/public-dashboard" className="flex min-w-0 shrink items-center gap-2">
-            <MedhaviLogo className="h-10 w-40 sm:h-12 sm:w-48" />
+            <MedhaviLogo className="h-11 w-44 max-w-[58vw] sm:h-14 sm:w-56" />
           </Link>
           <div className="flex shrink-0 items-center gap-1.5">
             <ThemeToggle />
@@ -44,7 +44,7 @@ export function Sidebar() {
         </div>
 
         <nav className="nav-compact no-scrollbar flex flex-nowrap gap-1 overflow-x-auto pb-0.5">
-          {menuItems.slice(0, 6).map((item) => {
+          {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
@@ -68,7 +68,7 @@ export function Sidebar() {
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-[#020617] text-white lg:block">
         <div className="no-scrollbar flex h-full flex-col overflow-y-auto px-5 py-6">
           <Link href="/public-dashboard" className="mb-7 block">
-            <MedhaviLogo className="mx-auto mb-4 h-16 w-full" />
+            <MedhaviLogo className="mx-auto mb-4 h-20 w-full" />
             <div className="border-t border-white/10 pt-4">
               <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">Sports Hub</p>
             </div>

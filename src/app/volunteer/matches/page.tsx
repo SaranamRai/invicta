@@ -41,22 +41,22 @@ export default function MatchesSelectionPage() {
   });
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter text-white uppercase sport-heading">All Matches</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase sport-heading sm:text-4xl">All Matches</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
             Find the match you are responsible for, then open it to update the clock, score, announcements, and match events.
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-1">
+        <div className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-1 sm:gap-2">
           {(["All", "Live", "Paused", "Upcoming", "Finished"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                "shrink-0 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-wide transition-all sm:px-4 sm:tracking-widest",
                 filter === f ? "bg-accent text-accent-foreground" : "text-slate-400 hover:text-white"
               )}
             >
@@ -67,7 +67,7 @@ export default function MatchesSelectionPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
+      <div className="relative w-full max-w-md">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         <input 
           type="text" 
@@ -81,7 +81,7 @@ export default function MatchesSelectionPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredMatches.map(match => (
           <Link key={match.id} href={`/volunteer/matches/${match.id}`}>
-            <Card className="bg-white/5 border-white/10 p-6 hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden group">
+            <Card className="bg-white/5 border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden group sm:p-6">
               {match.status === "Live" && (
                 <div className="absolute left-0 top-0 h-full w-1 bg-accent" />
               )}

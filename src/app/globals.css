@@ -301,6 +301,81 @@ a {
     max-width: 100%;
     letter-spacing: 0;
   }
+
+  .dashboard-surface {
+    font-size: 14px;
+  }
+
+  .dashboard-surface h1 {
+    font-size: clamp(1.45rem, 7vw, 2.1rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .dashboard-surface h2 {
+    font-size: clamp(1.1rem, 5vw, 1.45rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .dashboard-surface h3 {
+    font-size: clamp(0.98rem, 4.5vw, 1.2rem) !important;
+    line-height: 1.2 !important;
+  }
+
+  .dashboard-surface input,
+  .dashboard-surface select,
+  .dashboard-surface textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .dashboard-surface button,
+  .dashboard-surface a[role="button"] {
+    min-height: 42px;
+  }
+
+  .dashboard-surface table {
+    min-width: 640px;
+  }
+
+  .dashboard-surface th,
+  .dashboard-surface td {
+    padding: 0.75rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .dashboard-surface [class*="p-8"],
+  .dashboard-surface [class*="p-10"],
+  .dashboard-surface [class*="p-12"],
+  .dashboard-surface [class*="p-16"],
+  .dashboard-surface [class*="p-20"] {
+    padding: 1rem !important;
+  }
+
+  .dashboard-surface [class*="rounded-[2.5rem]"],
+  .dashboard-surface [class*="rounded-[3rem]"] {
+    border-radius: 1.25rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-surface button,
+  .dashboard-surface a,
+  .dashboard-surface label,
+  .dashboard-surface th,
+  .dashboard-surface td {
+    letter-spacing: 0 !important;
+  }
+
+  .dashboard-surface button,
+  .dashboard-surface a[role="button"] {
+    font-size: 0.75rem;
+  }
+
+  .dashboard-surface [class*="gap-10"],
+  .dashboard-surface [class*="gap-12"] {
+    gap: 1rem !important;
+  }
 }
 
 .sport-border {
