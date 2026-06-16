@@ -5,6 +5,7 @@ import Sport from "../models/Sport.js";
 import Team from "../models/Team.js";
 import Player from "../models/Player.js";
 import Tournament from "../models/Tournament.js";
+import TeamRegistration from "../models/TeamRegistration.js";
 import Venue from "../models/Venue.js";
 import Announcement from "../models/Announcement.js";
 import LiveScore from "../models/LiveScore.js";
@@ -423,6 +424,53 @@ function buildTwoGroupRoundRobinFixtures(teams) {
   });
 
   return fixtures;
+}
+
+async function syncApprovedRegistrationsForFixtureGeneration({ tournament, sportDoc, category, sportName, userId }) {
+  const registrations = await TeamRegistration.find({
+    status: "approved",
+    tournamentId: tournament._id,
+    sportId: sportDoc._id,
+    category,
+  }).lean();
+
+  if (registrations.length === 0) return;
+
+  const sport = normalizeSport(sportName);
+  await Promise.all(registrations.map((registration) => Team.findOneAndUpdate(
+    {
+      sportId: registration.sportId,
+      tournamentId: registration.tournamentId,
+      category: registration.category,
+      department: registration.department,
+      teamName: registration.teamName,
+    },
+    {
+      teamName: registration.teamName,
+      department: registration.department,
+      sport,
+      sportName: registration.sportName || sportName,
+      sportId: registration.sportId,
+      tournamentId: registration.tournamentId,
+      tournamentName: registration.tournamentName || tournament.name,
+      category: registration.category,
+      captainName: registration.captainName,
+      captainRegNo: registration.captainRegNo,
+      captainEmail: registration.captainEmail,
+      captainPhone: registration.captainPhone,
+      contactNumber: registration.captainPhone,
+      email: registration.captainEmail,
+      members: registration.members || [],
+      logo: registration.teamLogo || "",
+      status: "approved",
+      submittedAt: registration.submittedAt,
+      reviewedBy: registration.reviewedBy || userId,
+      reviewedAt: registration.reviewedAt || new Date(),
+      rejectionReason: "",
+      registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  )));
 }
 
 function getNextWeekendDate(date) {
@@ -901,6 +949,14 @@ export async function generateFixtures(req, res) {
 
   const sportName = sportDoc.sportName || sportDoc.name || "";
   const sport = normalizeSport(sportName);
+  await syncApprovedRegistrationsForFixtureGeneration({
+    tournament,
+    sportDoc,
+    category,
+    sportName,
+    userId: req.user?.id,
+  });
+
   const teams = await Team.find({
     status: "approved",
     tournamentId: tournament._id,
