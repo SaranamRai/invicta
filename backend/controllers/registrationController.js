@@ -29,11 +29,11 @@ function getRegNoList(body) {
   const regNos = [normalizeRegNo(body.captainRegNo)];
   if (Array.isArray(body.members)) {
     for (const member of body.members) {
-      const no = normalizeRegNo(member.registrationNo || member.registrationNumber || "");
+      const no = normalizeRegNo(member.registrationNo || member.registrationNumber || member.regNo || "");
       if (no) regNos.push(no);
     }
   }
-  return [...new Set(regNos)].filter(Boolean);
+  return regNos.filter(Boolean);
 }
 
 function getRegistrationRegNos(registration) {
@@ -48,10 +48,11 @@ async function findUsedRegNos(regNos, options = {}) {
   if (normalizedRegNos.length === 0) return null;
 
   const registrationFilter = {
-    status: { $in: ["pending", "approved"] },
     $or: [
       { captainRegNo: { $in: normalizedRegNos } },
       { "members.registrationNo": { $in: normalizedRegNos } },
+      { "members.registrationNumber": { $in: normalizedRegNos } },
+      { "members.regNo": { $in: normalizedRegNos } },
     ],
   };
   if (options.excludeRegistrationId) {
@@ -59,7 +60,6 @@ async function findUsedRegNos(regNos, options = {}) {
   }
 
   const teamFilter = {
-    status: { $in: ["pending", "approved"] },
     $or: [
       { captainRegNo: { $in: normalizedRegNos } },
       { "members.registrationNo": { $in: normalizedRegNos } },
@@ -68,9 +68,10 @@ async function findUsedRegNos(regNos, options = {}) {
     ],
   };
 
-  const [registration, team] = await Promise.all([
-    TeamRegistration.findOne(registrationFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1 }).lean(),
-    Team.findOne(teamFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1 }).lean(),
+  const [registration, team, player] = await Promise.all([
+    TeamRegistration.findOne(registrationFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1, status: 1 }).lean(),
+    Team.findOne(teamFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1, status: 1 }).lean(),
+    Player.findOne({ registrationNo: { $in: normalizedRegNos } }, { registrationNo: 1, name: 1 }).lean(),
   ]);
 
   const sources = [registration, team].filter(Boolean);
@@ -84,6 +85,14 @@ async function findUsedRegNos(regNos, options = {}) {
         sportName: source.sportName || "",
       };
     }
+  }
+
+  if (player) {
+    return {
+      registrationNo: normalizeRegNo(player.registrationNo),
+      teamName: player.name || "",
+      sportName: "",
+    };
   }
 
   return null;
@@ -172,7 +181,7 @@ export async function submitRegistration(req, res) {
     const duplicateRegistration = await findUsedRegNos(allRegNos);
     if (duplicateRegistration) {
       return res.status(409).json({
-        message: `Registration number ${duplicateRegistration.registrationNo} is already registered in another team or sport.`,
+        message: `Cannot register. Registration number ${duplicateRegistration.registrationNo} is already registered.`,
       });
     }
 
@@ -274,7 +283,7 @@ export async function approveRegistration(req, res) {
     });
     if (duplicateRegistration) {
       return res.status(409).json({
-        message: `Registration number ${duplicateRegistration.registrationNo} is already registered in another team or sport.`,
+        message: `Cannot register. Registration number ${duplicateRegistration.registrationNo} is already registered.`,
       });
     }
 

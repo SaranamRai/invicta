@@ -10,6 +10,7 @@ import Gallery from "../models/Gallery.js";
 import Tournament from "../models/Tournament.js";
 import Team from "../models/Team.js";
 import TeamRegistration from "../models/TeamRegistration.js";
+import Player from "../models/Player.js";
 import mongoose from "mongoose";
 import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
 
@@ -173,34 +174,30 @@ async function resolveSport(req) {
   return sport;
 }
 
-async function assertRegistrationNumberLimit(registrationNumbers, sportId) {
+async function assertRegistrationNumbersUnused(registrationNumbers) {
   for (const registrationNumber of registrationNumbers) {
-    const teams = await Team.find({
-      status: { $in: ["pending", "approved"] },
-      $or: [
-        { captainRegNo: registrationNumber },
-        { "members.registrationNumber": registrationNumber },
-        { "members.regNo": registrationNumber },
-      ],
-    }).select("sportId").lean();
+    const [team, registration, player] = await Promise.all([
+      Team.findOne({
+        $or: [
+          { captainRegNo: registrationNumber },
+          { "members.registrationNo": registrationNumber },
+          { "members.registrationNumber": registrationNumber },
+          { "members.regNo": registrationNumber },
+        ],
+      }).select("_id").lean(),
+      TeamRegistration.findOne({
+        $or: [
+          { captainRegNo: registrationNumber },
+          { "members.registrationNo": registrationNumber },
+          { "members.registrationNumber": registrationNumber },
+          { "members.regNo": registrationNumber },
+        ],
+      }).select("_id").lean(),
+      Player.findOne({ registrationNo: registrationNumber }).select("_id").lean(),
+    ]);
 
-    const registrations = await TeamRegistration.find({
-      status: { $in: ["pending", "approved"] },
-      $or: [
-        { captainRegNo: registrationNumber },
-        { "members.registrationNo": registrationNumber },
-      ],
-    }).select("sportId").lean();
-
-    const sports = new Set(
-      [...teams, ...registrations]
-        .map((entry) => entry.sportId?.toString?.())
-        .filter(Boolean)
-    );
-    sports.add(sportId.toString());
-
-    if (sports.size > 2) {
-      const error = new Error("This student is already registered in maximum 2 sports.");
+    if (team || registration || player) {
+      const error = new Error(`Cannot register. Registration number ${registrationNumber} is already registered.`);
       error.status = 400;
       throw error;
     }
@@ -277,7 +274,7 @@ export async function registerPublicTeam(req, res) {
       });
     }
 
-    await assertRegistrationNumberLimit(registrationNumbers, sportDoc._id);
+    await assertRegistrationNumbersUnused(registrationNumbers);
 
     const duplicateTeam = await Team.findOne({
       department,
