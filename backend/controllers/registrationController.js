@@ -2,6 +2,12 @@ import TeamRegistration from "../models/TeamRegistration.js";
 import Sport from "../models/Sport.js";
 import Team from "../models/Team.js";
 import Tournament from "../models/Tournament.js";
+import Fixture from "../models/Fixture.js";
+import LiveFeed from "../models/LiveFeed.js";
+import LiveScore from "../models/LiveScore.js";
+import Player from "../models/Player.js";
+import Result from "../models/Result.js";
+import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 
 const VALID_IMAGE_PREFIXES = [
   "data:image/jpeg;base64,",
@@ -28,6 +34,59 @@ function getRegNoList(body) {
     }
   }
   return [...new Set(regNos)].filter(Boolean);
+}
+
+function getRegistrationRegNos(registration) {
+  return getRegNoList({
+    captainRegNo: registration.captainRegNo,
+    members: registration.members || [],
+  });
+}
+
+async function findUsedRegNos(regNos, options = {}) {
+  const normalizedRegNos = [...new Set(regNos.map(normalizeRegNo).filter(Boolean))];
+  if (normalizedRegNos.length === 0) return null;
+
+  const registrationFilter = {
+    status: { $in: ["pending", "approved"] },
+    $or: [
+      { captainRegNo: { $in: normalizedRegNos } },
+      { "members.registrationNo": { $in: normalizedRegNos } },
+    ],
+  };
+  if (options.excludeRegistrationId) {
+    registrationFilter._id = { $ne: options.excludeRegistrationId };
+  }
+
+  const teamFilter = {
+    status: { $in: ["pending", "approved"] },
+    $or: [
+      { captainRegNo: { $in: normalizedRegNos } },
+      { "members.registrationNo": { $in: normalizedRegNos } },
+      { "members.registrationNumber": { $in: normalizedRegNos } },
+      { "members.regNo": { $in: normalizedRegNos } },
+    ],
+  };
+
+  const [registration, team] = await Promise.all([
+    TeamRegistration.findOne(registrationFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1 }).lean(),
+    Team.findOne(teamFilter, { captainRegNo: 1, members: 1, teamName: 1, sportName: 1 }).lean(),
+  ]);
+
+  const sources = [registration, team].filter(Boolean);
+  for (const source of sources) {
+    const sourceRegNos = getRegistrationRegNos(source);
+    const duplicateRegNo = normalizedRegNos.find((regNo) => sourceRegNos.includes(regNo));
+    if (duplicateRegNo) {
+      return {
+        registrationNo: duplicateRegNo,
+        teamName: source.teamName || "",
+        sportName: source.sportName || "",
+      };
+    }
+  }
+
+  return null;
 }
 
 export async function submitRegistration(req, res) {
@@ -110,29 +169,11 @@ export async function submitRegistration(req, res) {
       return res.status(400).json({ message: "Team logo must be a JPEG, PNG, or WebP image" });
     }
 
-    // Check duplicates across pending and approved registrations in DB
-    const existingRegNos = await TeamRegistration.find(
-      { status: { $in: ["pending", "approved"] } },
-      { captainRegNo: 1, "members.registrationNo": 1 }
-    ).lean();
-
-    const usedRegNos = new Set();
-    for (const reg of existingRegNos) {
-      usedRegNos.add(normalizeRegNo(reg.captainRegNo));
-      if (Array.isArray(reg.members)) {
-        for (const m of reg.members) {
-          const no = normalizeRegNo(m.registrationNo);
-          if (no) usedRegNos.add(no);
-        }
-      }
-    }
-
-    for (const regNo of allRegNos) {
-      if (usedRegNos.has(regNo)) {
-        return res.status(409).json({
-          message: "This registration number is already registered in another team or sport.",
-        });
-      }
+    const duplicateRegistration = await findUsedRegNos(allRegNos);
+    if (duplicateRegistration) {
+      return res.status(409).json({
+        message: `Registration number ${duplicateRegistration.registrationNo} is already registered in another team or sport.`,
+      });
     }
 
     // Build members array for storage
@@ -225,18 +266,23 @@ export async function approveRegistration(req, res) {
     const { id } = req.params;
     const reviewedAt = new Date();
 
-    const registration = await TeamRegistration.findByIdAndUpdate(
-      id,
-      {
-        status: "approved",
-        reviewedBy: req.user.id,
-        reviewedAt,
-        rejectionReason: "",
-      },
-      { new: true }
-    );
+    const existingRegistration = await TeamRegistration.findById(id);
+    if (!existingRegistration) return res.status(404).json({ message: "Registration not found" });
 
-    if (!registration) return res.status(404).json({ message: "Registration not found" });
+    const duplicateRegistration = await findUsedRegNos(getRegistrationRegNos(existingRegistration), {
+      excludeRegistrationId: existingRegistration._id,
+    });
+    if (duplicateRegistration) {
+      return res.status(409).json({
+        message: `Registration number ${duplicateRegistration.registrationNo} is already registered in another team or sport.`,
+      });
+    }
+
+    existingRegistration.status = "approved";
+    existingRegistration.reviewedBy = req.user.id;
+    existingRegistration.reviewedAt = reviewedAt;
+    existingRegistration.rejectionReason = "";
+    const registration = await existingRegistration.save();
 
     const sportName = registration.sportName || "";
     await Team.findOneAndUpdate(
@@ -274,7 +320,29 @@ export async function approveRegistration(req, res) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    return res.json(registration);
+    let emailResult = { sent: false, skipped: true };
+    try {
+      emailResult = await sendTeamApprovedEmail({
+        teamName: registration.teamName,
+        captainName: registration.captainName,
+        email: registration.captainEmail,
+        sportName,
+        tournamentName: registration.tournamentName,
+      });
+    } catch (emailError) {
+      console.error("Team approval email error:", emailError);
+      return res.json({
+        ...registration.toObject(),
+        emailSent: false,
+        emailWarning: getEmailErrorMessage(emailError),
+      });
+    }
+
+    return res.json({
+      ...registration.toObject(),
+      emailSent: emailResult.sent,
+      emailSkipped: emailResult.skipped,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -302,6 +370,70 @@ export async function rejectRegistration(req, res) {
 
     if (!registration) return res.status(404).json({ message: "Registration not found" });
     return res.json(registration);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+export async function deleteApprovedRegistration(req, res) {
+  try {
+    const { id } = req.params;
+    const registration = await TeamRegistration.findById(id);
+
+    if (!registration) return res.status(404).json({ message: "Registration not found" });
+    if (registration.status !== "approved") {
+      return res.status(400).json({ message: "Only approved registrations can be deleted from this list" });
+    }
+
+    const teamQuery = {
+      sportId: registration.sportId,
+      category: registration.category,
+      department: registration.department,
+      teamName: registration.teamName,
+      ...(registration.tournamentId ? { tournamentId: registration.tournamentId } : {}),
+    };
+    let team = await Team.findOne(teamQuery);
+    if (!team) {
+      team = await Team.findOne({
+        sportId: registration.sportId,
+        category: registration.category,
+        department: registration.department,
+        captainRegNo: registration.captainRegNo,
+      });
+    }
+    if (!team) {
+      team = await Team.findOne({
+        sportId: registration.sportId,
+        category: registration.category,
+        department: registration.department,
+        teamName: new RegExp(`^${registration.teamName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+      });
+    }
+
+    let cancelledMatches = 0;
+    if (team) {
+      const fixtures = await Fixture.find({ $or: [{ teamA: team._id }, { teamB: team._id }] }).lean();
+      const fixtureIds = fixtures.map((fixture) => fixture._id);
+      cancelledMatches = fixtureIds.length;
+
+      await Promise.all([
+        fixtureIds.length ? LiveScore.deleteMany({ fixtureId: { $in: fixtureIds } }) : Promise.resolve(),
+        fixtureIds.length ? LiveFeed.deleteMany({ fixtureId: { $in: fixtureIds } }) : Promise.resolve(),
+        fixtureIds.length ? Result.deleteMany({ fixtureId: { $in: fixtureIds } }) : Promise.resolve(),
+        fixtureIds.length ? Fixture.deleteMany({ _id: { $in: fixtureIds } }) : Promise.resolve(),
+        Player.deleteMany({ teamId: team._id }),
+        Team.deleteOne({ _id: team._id }),
+      ]);
+    }
+
+    await TeamRegistration.deleteOne({ _id: registration._id });
+
+    return res.json({
+      message: cancelledMatches
+        ? `Team deleted successfully. ${cancelledMatches} related match${cancelledMatches === 1 ? "" : "es"} cancelled.`
+        : "Team deleted successfully.",
+      cancelledMatches,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

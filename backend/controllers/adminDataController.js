@@ -7,6 +7,9 @@ import Player from "../models/Player.js";
 import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
 import Announcement from "../models/Announcement.js";
+import LiveScore from "../models/LiveScore.js";
+import LiveFeed from "../models/LiveFeed.js";
+import Result from "../models/Result.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -113,6 +116,7 @@ function mapFixture(fixture) {
     endTime: fixture.endTime,
     fullMatchSeconds: fixture.fullMatchSeconds || 90 * 60,
     matchGapMinutes: fixture.matchGapMinutes || 0,
+    round: fixture.round || "",
     venue: fixture.venue,
     status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "scheduled",
     scoreA: fixture.scoreA || 0,
@@ -239,23 +243,29 @@ function hasFixtureClash(payload, existingFixtures) {
   });
 }
 
-function buildRoundRobinPairs(teams) {
-  const pairs = [];
-  for (let i = 0; i < teams.length; i += 1) {
-    for (let j = i + 1; j < teams.length; j += 1) {
-      pairs.push([teams[i], teams[j]]);
-    }
-  }
-  return pairs;
+function getParticipantName(participant, fallback) {
+  return normalizeText(participant?.teamName || participant?.name || fallback);
 }
 
-function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, category, date, startMinutes, durationMinutes, gapMinutes, round, userId }) {
+function getParticipantId(participant) {
+  return participant?._id || undefined;
+}
+
+function getParticipantDepartment(participant) {
+  return normalizeText(participant?.department);
+}
+
+function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, category, date, startMinutes, durationMinutes, gapMinutes, round, matchNumber, userId }) {
   const endMinutes = startMinutes + durationMinutes;
   const startTime = getDateTime(date, startMinutes);
   const endTime = getDateTime(date, endMinutes);
   const dateString = toDateInputValue(date);
   const timeString = formatMinutesAsTime(startMinutes);
   const sportName = sportDoc.sportName || sportDoc.name || "Sport";
+  const teamAName = getParticipantName(teamA, "Team A");
+  const teamBName = getParticipantName(teamB, "Team B");
+  const teamAId = getParticipantId(teamA);
+  const teamBId = getParticipantId(teamB);
 
   return {
     tournamentId: tournament._id,
@@ -264,13 +274,13 @@ function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, ca
     sportName,
     sportId: sportDoc._id,
     category,
-    matchTitle: `${teamA.teamName} vs ${teamB.teamName}`,
-    teamA: teamA._id,
-    teamB: teamB._id,
-    teamAName: teamA.teamName,
-    teamBName: teamB.teamName,
-    departmentA: teamA.department,
-    departmentB: teamB.department,
+    matchTitle: `${teamAName} vs ${teamBName}`,
+    ...(teamAId ? { teamA: teamAId } : {}),
+    ...(teamBId ? { teamB: teamBId } : {}),
+    teamAName,
+    teamBName,
+    departmentA: getParticipantDepartment(teamA),
+    departmentB: getParticipantDepartment(teamB),
     venue: venueName,
     date: dateString,
     time: timeString,
@@ -278,10 +288,141 @@ function buildFixturePayload({ teamA, teamB, sportDoc, tournament, venueName, ca
     endTime,
     fullMatchSeconds: durationMinutes * 60,
     matchGapMinutes: gapMinutes,
-    round,
+    round: matchNumber ? `${round} - Match ${matchNumber}` : round,
     status: "upcoming",
     createdBy: userId,
   };
+}
+
+function getBracketSize(teamCount) {
+  let size = 2;
+  while (size < Math.max(2, teamCount)) size *= 2;
+  return size;
+}
+
+function distributeTeamsIntoGroups(teams) {
+  if (teams.length <= 4) return [teams];
+  const groupCount = Math.ceil(teams.length / 4);
+  const baseSize = Math.floor(teams.length / groupCount);
+  let extra = teams.length % groupCount;
+  let cursor = 0;
+
+  return Array.from({ length: groupCount }, () => {
+    const size = baseSize + (extra > 0 ? 1 : 0);
+    extra -= 1;
+    const group = teams.slice(cursor, cursor + size);
+    cursor += size;
+    return group;
+  }).filter((group) => group.length > 0);
+}
+
+function getGroupName(index) {
+  return `Group ${String.fromCharCode(65 + index)}`;
+}
+
+function getRoundName(groupName, participantCount, isGroupStage) {
+  if (participantCount <= 2) return isGroupStage ? `${groupName} Final` : "Tournament Final";
+  if (participantCount <= 4) return isGroupStage ? `${groupName} Semi Final` : "Tournament Semi Final";
+  if (participantCount <= 8) return isGroupStage ? `${groupName} Quarter Final` : "Tournament Quarter Final";
+  return isGroupStage ? `${groupName} Round of ${participantCount}` : `Tournament Round of ${participantCount}`;
+}
+
+function makeWinnerParticipant(matchNumber) {
+  return { name: `Winner Match ${matchNumber}` };
+}
+
+function buildKnockoutMatches(participants, roundPrefix, matchCounterRef, isGroupStage) {
+  const seededParticipants = [
+    ...participants,
+    ...Array.from({ length: getBracketSize(participants.length) - participants.length }, () => null),
+  ];
+  const fixtures = [];
+  let currentRound = seededParticipants;
+
+  while (currentRound.length > 1) {
+    const nextRound = [];
+    const roundName = getRoundName(roundPrefix, currentRound.length, isGroupStage);
+
+    for (let index = 0; index < currentRound.length; index += 2) {
+      const teamA = currentRound[index];
+      const teamB = currentRound[index + 1];
+
+      if (teamA && teamB) {
+        const matchNumber = matchCounterRef.value;
+        matchCounterRef.value += 1;
+        fixtures.push({ teamA, teamB, round: roundName, matchNumber });
+        nextRound.push(makeWinnerParticipant(matchNumber));
+      } else if (teamA || teamB) {
+        nextRound.push(teamA || teamB);
+      }
+    }
+
+    currentRound = nextRound;
+  }
+
+  return {
+    fixtures,
+    winner: currentRound[0],
+  };
+}
+
+function buildTournamentBracketFixtures(teams) {
+  const matchCounterRef = { value: 1 };
+  const groups = distributeTeamsIntoGroups(teams);
+  const fixtures = [];
+  const groupWinners = [];
+
+  groups.forEach((group, index) => {
+    const result = buildKnockoutMatches(group, getGroupName(index), matchCounterRef, true);
+    fixtures.push(...result.fixtures);
+    if (result.winner) groupWinners.push(result.winner);
+  });
+
+  if (groupWinners.length > 1) {
+    const result = buildKnockoutMatches(groupWinners, "Tournament", matchCounterRef, false);
+    fixtures.push(...result.fixtures);
+  }
+
+  return fixtures;
+}
+
+function getCompetitionSportKey(value) {
+  return normalizeSport(value).replace(/[^a-z]/g, "");
+}
+
+function usesTwoGroupRoundRobin(sportName) {
+  return ["football", "volleyball"].includes(getCompetitionSportKey(sportName));
+}
+
+function splitTeamsIntoTwoGroups(teams) {
+  if (teams.length < 3) return [teams];
+  const groups = [[], []];
+  teams.forEach((team, index) => {
+    groups[index % 2].push(team);
+  });
+  return groups.filter((group) => group.length > 0);
+}
+
+function buildTwoGroupRoundRobinFixtures(teams) {
+  const fixtures = [];
+  let matchNumber = 1;
+
+  splitTeamsIntoTwoGroups(teams).forEach((group, groupIndex) => {
+    const groupName = getGroupName(groupIndex);
+    for (let teamAIndex = 0; teamAIndex < group.length; teamAIndex += 1) {
+      for (let teamBIndex = teamAIndex + 1; teamBIndex < group.length; teamBIndex += 1) {
+        fixtures.push({
+          teamA: group[teamAIndex],
+          teamB: group[teamBIndex],
+          round: `${groupName} Round Robin`,
+          matchNumber,
+        });
+        matchNumber += 1;
+      }
+    }
+  });
+
+  return fixtures;
 }
 
 function getNextWeekendDate(date) {
@@ -402,6 +543,43 @@ function requireObjectId(id, label) {
     error.status = 400;
     throw error;
   }
+}
+
+function getFixtureLabel(fixture) {
+  return normalizeText(fixture.matchTitle || `${fixture.teamAName || "Team A"} vs ${fixture.teamBName || "Team B"}`);
+}
+
+async function deleteFixtureDocuments(fixtures, req) {
+  const fixtureIds = fixtures.map((fixture) => fixture._id);
+  if (fixtureIds.length === 0) return { deletedCount: 0 };
+
+  await Promise.all([
+    LiveScore.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    LiveFeed.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    Result.deleteMany({ fixtureId: { $in: fixtureIds } }),
+    Fixture.deleteMany({ _id: { $in: fixtureIds } }),
+  ]);
+
+  const firstFixture = fixtures[0];
+  const sportName = firstFixture.sportName || firstFixture.sport || "Sport";
+  const tournamentName = firstFixture.tournamentName || "INVICTA";
+  const title = fixtures.length === 1
+    ? `${sportName} Fixture Cancelled`
+    : `${sportName} Fixtures Cancelled`;
+  const message = fixtures.length === 1
+    ? `${getFixtureLabel(firstFixture)} for ${tournamentName} has been cancelled and removed from the match schedule.`
+    : `${fixtures.length} ${sportName} fixture${fixtures.length === 1 ? "" : "s"} for ${tournamentName} have been cancelled and removed from the match schedule.`;
+
+  await Announcement.create({
+    title,
+    message,
+    priority: "urgent",
+    visibleToPublic: true,
+    postedBy: req.user?.id,
+    postedByRole: req.user?.role || "supercoordinator",
+  });
+
+  return { deletedCount: fixtureIds.length };
 }
 
 export async function listTeams(req, res) {
@@ -733,12 +911,11 @@ export async function generateFixtures(req, res) {
     ],
   }).sort({ teamName: 1 }).lean();
 
-  const byeFixtures = [];
-  let fixtureTeams = teams;
   if (teams.length === 0) {
     return res.status(400).json({ message: "At least one approved team is required to generate fixtures" });
   }
 
+  const byeFixtures = [];
   if (teams.length === 1) {
     byeFixtures.push(buildByeFixturePayload({
       team: teams[0],
@@ -750,30 +927,21 @@ export async function generateFixtures(req, res) {
       round: "Default Winner",
       userId: req.user?.id,
     }));
-  } else if (teams.length % 2 === 1) {
-    const byeTeam = teams[teams.length - 1];
-    fixtureTeams = teams.slice(0, -1);
-    byeFixtures.push(buildByeFixturePayload({
-      team: byeTeam,
-      sportDoc,
-      tournament,
-      venueName: selectedVenueName,
-      category,
-      date: startDate,
-      round: "Bye",
-      userId: req.user?.id,
-    }));
   }
 
-  const pairs = fixtureTeams.length > 1 ? buildRoundRobinPairs(fixtureTeams) : [];
+  const isRoundRobinSport = usesTwoGroupRoundRobin(sportName);
+  const competitionFixtures = teams.length > 1
+    ? isRoundRobinSport
+      ? buildTwoGroupRoundRobinFixtures(teams)
+      : buildTournamentBracketFixtures(teams)
+    : [];
   const existingFixtures = await Fixture.find({ status: { $ne: "cancelled" } }).lean();
   const scheduledFixtures = [...byeFixtures];
   const maxMatchesPerSportPerDay = 2;
   let cursorDate = new Date(startDate);
   let cursorMinutes = dayStartMinutes;
 
-  for (let pairIndex = 0; pairIndex < pairs.length; pairIndex += 1) {
-    const [teamA, teamB] = pairs[pairIndex];
+  for (const competitionFixture of competitionFixtures) {
     let placed = false;
 
     for (let dayOffset = 0; dayOffset < 365 && !placed; dayOffset += 1) {
@@ -796,8 +964,8 @@ export async function generateFixtures(req, res) {
       }
 
       const payload = buildFixturePayload({
-        teamA,
-        teamB,
+        teamA: competitionFixture.teamA,
+        teamB: competitionFixture.teamB,
         sportDoc,
         tournament,
         venueName: selectedVenueName,
@@ -806,7 +974,8 @@ export async function generateFixtures(req, res) {
         startMinutes: cursorMinutes,
         durationMinutes: matchDurationMinutes,
         gapMinutes,
-        round: `Round ${pairIndex + 1}`,
+        round: competitionFixture.round,
+        matchNumber: competitionFixture.matchNumber,
         userId: req.user?.id,
       });
 
@@ -825,7 +994,7 @@ export async function generateFixtures(req, res) {
 
     if (!placed) {
       return res.status(400).json({
-        message: `Could not place ${teamA.teamName} vs ${teamB.teamName} without a clash inside the next 365 weekend days.`,
+        message: `Could not place ${getParticipantName(competitionFixture.teamA, "Team A")} vs ${getParticipantName(competitionFixture.teamB, "Team B")} without a clash inside the next 365 weekend days.`,
       });
     }
   }
@@ -833,7 +1002,7 @@ export async function generateFixtures(req, res) {
   const createdFixtures = scheduledFixtures.length ? await Fixture.insertMany(scheduledFixtures) : [];
   if (createdFixtures.length > 0) {
     await Announcement.create({
-      title: `${sportName || "Sport"} Fixtures Published`,
+      title: `${category} ${sportName || "Sport"} Fixtures Published`,
       message: `${createdFixtures.length} ${category} ${sportName || "sport"} fixture${createdFixtures.length === 1 ? "" : "s"} for ${tournament.name} ${createdFixtures.length === 1 ? "has" : "have"} been published.`,
       priority: "important",
       visibleToPublic: true,
@@ -845,7 +1014,7 @@ export async function generateFixtures(req, res) {
   return res.status(201).json({
     message: teams.length === 1
       ? `${teams[0].teamName} marked as default winner.`
-      : `Generated ${createdFixtures.length} fixture${createdFixtures.length === 1 ? "" : "s"}${byeFixtures.length ? " including bye/default winner entries" : ""}.`,
+      : `Generated ${createdFixtures.length} ${isRoundRobinSport ? "two-group round robin" : "knockout"} fixture${createdFixtures.length === 1 ? "" : "s"}${byeFixtures.length ? " including bye/default winner entries" : ""}.`,
     totalMatches: createdFixtures.length,
     fixtures: createdFixtures.map(mapFixture),
   });
@@ -886,9 +1055,30 @@ export async function updateFixture(req, res) {
 
 export async function deleteFixture(req, res) {
   requireObjectId(req.params.id, "Fixture id");
-  const fixture = await Fixture.findByIdAndDelete(req.params.id);
+  const fixture = await Fixture.findById(req.params.id).lean();
   if (!fixture) return res.status(404).json({ message: "Fixture not found" });
-  return res.json({ message: "Fixture deleted successfully" });
+  const result = await deleteFixtureDocuments([fixture], req);
+  return res.json({ message: "Fixture cancelled and deleted successfully", ...result });
+}
+
+export async function deleteFixtures(req, res) {
+  const fixtureIds = Array.isArray(req.body.fixtureIds) ? req.body.fixtureIds : [];
+  const uniqueIds = [...new Set(fixtureIds.map((id) => String(id)))];
+
+  if (uniqueIds.length === 0) {
+    return res.status(400).json({ message: "At least one fixture id is required" });
+  }
+
+  uniqueIds.forEach((id) => requireObjectId(id, "Fixture id"));
+
+  const fixtures = await Fixture.find({ _id: { $in: uniqueIds } }).lean();
+  if (fixtures.length === 0) return res.status(404).json({ message: "Fixtures not found" });
+
+  const result = await deleteFixtureDocuments(fixtures, req);
+  return res.json({
+    message: `${result.deletedCount} fixture${result.deletedCount === 1 ? "" : "s"} cancelled and deleted successfully`,
+    ...result,
+  });
 }
 
 export async function listPlayers(_req, res) {

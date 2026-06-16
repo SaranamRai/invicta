@@ -9,9 +9,8 @@ function getTransporter() {
   const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.MAIL_PORT || 587);
   const user = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.MAIL_USER;
   const rawPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.MAIL_PASS;
-  const pass = host.includes("gmail.com") ? rawPass?.replace(/\s+/g, "") : rawPass;
-
   if (!host) return null;
+  const pass = host.includes("gmail.com") ? rawPass?.replace(/\s+/g, "") : rawPass;
 
   transporter = nodemailer.createTransport({
     host,
@@ -70,6 +69,44 @@ export async function sendAccountCreatedEmail({ name, email, role, assignedSport
   if (!transport) {
     console.warn("[EMAIL] SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and EMAIL_FROM in backend environment variables.");
     console.log(`[EMAIL] Would send to ${email}:`, { name, role: roleLabel, assignedSport, password });
+    return { sent: false, skipped: true };
+  }
+
+  await transport.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER || "noreply@invicta-sports.com",
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  console.log(`[EMAIL] Sent to ${email}, subject: "${subject}"`);
+  return { sent: true, skipped: false };
+}
+
+export async function sendTeamApprovedEmail({ teamName, captainName, email, sportName, tournamentName }) {
+  const subject = `INVICTA Team Approved - ${teamName}`;
+  const text = [
+    `Hello ${captainName || teamName},`,
+    "",
+    `Your team "${teamName}" has been approved for ${sportName || "the selected sport"}${tournamentName ? ` in ${tournamentName}` : ""}.`,
+    "The team is now registered in the INVICTA Sports Management System.",
+    "",
+    "Regards,",
+    "Sports Management Team",
+  ].join("\n");
+  const html =
+    `<h2>Team Registration Approved</h2>` +
+    `<p>Hello ${captainName || teamName},</p>` +
+    `<p>Your team <strong>${teamName}</strong> has been approved for <strong>${sportName || "the selected sport"}</strong>${tournamentName ? ` in <strong>${tournamentName}</strong>` : ""}.</p>` +
+    `<p>The team is now registered in the INVICTA Sports Management System.</p>` +
+    `<hr>` +
+    `<p style="color:#666;font-size:12px">Regards,<br>Sports Management Team</p>`;
+
+  const transport = getTransporter();
+  if (!transport) {
+    console.warn("[EMAIL] SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and EMAIL_FROM in backend environment variables.");
+    console.log(`[EMAIL] Would send approval to ${email}:`, { teamName, captainName, sportName, tournamentName });
     return { sent: false, skipped: true };
   }
 

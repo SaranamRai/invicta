@@ -380,7 +380,7 @@ function RegisterPageContent() {
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Team Members</h2>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Enter each player&apos;s details.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Enter each player&apos;s details. Registration no. is a unique player ID and cannot be used in another sport.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
                     {maxPlayers} slots
