@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Camera, Mail, PlayCircle, Share2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LiveSportsPanel } from "@/components/live-sports-panel";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { SportMark } from "@/components/sport-mark";
 
@@ -24,7 +23,6 @@ const sports = [
 export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
-      <LiveSportsPanel />
       <aside className="fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 lg:block">
         <div className="flex flex-col items-center gap-4 rounded-l-2xl border border-r-0 border-border bg-background/80 px-3 py-5 shadow-xl backdrop-blur">
           <span className="writing-mode-vertical text-[9px] font-black uppercase tracking-[0.24em] text-foreground/45 [writing-mode:vertical-rl]">

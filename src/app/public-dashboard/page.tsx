@@ -144,10 +144,16 @@ export default function PublicDashboard() {
     { label: "Staff", text: "Use role login for supercoordinator, coordinator, volunteer, or admin dashboards.", href: "/login", icon: LogIn },
   ];
 
+  const heroBackdropStyle: React.CSSProperties = {
+    backgroundImage: 'linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url("/msu-logo-transparent.png")',
+    backgroundPosition: "center, right 2rem center",
+    backgroundSize: "auto, 560px auto",
+  };
+
   return (
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
-        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url('/msu-logo-flat.png')] bg-[length:auto,620px_auto] bg-[position:center,right_2rem_center] bg-no-repeat" />
+        <div className="absolute inset-0 bg-no-repeat" style={heroBackdropStyle} />
         <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
