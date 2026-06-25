@@ -1,5 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const VERIFY_ID_CARD_TIMEOUT_MS = 50000;
+const BROWSER_OCR_INIT_TIMEOUT_MS = 25000;
+const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 30000;
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
@@ -1152,6 +1154,114 @@ export interface IdCardVerificationResponse {
   verificationToken?: string;
 }
 
+function normalizeRegistrationText(value: string) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function extractRegistrationNumberFromText(text: string, typedRegistrationNumber: string) {
+  const normalizedTyped = normalizeRegistrationText(typedRegistrationNumber);
+  if (!normalizedTyped) return "";
+  const compactText = normalizeRegistrationText(text);
+  if (compactText.includes(normalizedTyped)) return normalizedTyped;
+
+  const digitRuns = text.match(/\d[\d\s-]{5,}\d/g) || [];
+  const typedDigits = normalizedTyped.replace(/\D/g, "");
+  for (const run of digitRuns) {
+    const normalizedRun = normalizeRegistrationText(run);
+    if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
+      return normalizedTyped;
+    }
+  }
+  return "";
+}
+
+function withClientTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new ApiError(message, 408)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
+async function postClientOcrVerification(
+  payload: {
+    playerRole: "captain" | "member";
+    playerIndex: number;
+    typedRegistrationNumber: string;
+    idCardImage: File;
+  },
+  ocrText: string,
+  extractedRegistrationNumber: string,
+  confidence: number
+) {
+  const formData = new FormData();
+  formData.set("playerRole", payload.playerRole);
+  formData.set("playerIndex", String(payload.playerIndex));
+  formData.set("typedRegistrationNumber", payload.typedRegistrationNumber);
+  formData.set("ocrText", ocrText);
+  formData.set("extractedRegistrationNumber", extractedRegistrationNumber);
+  formData.set("idCardImage", payload.idCardImage);
+
+  const response = await fetch(`${API_BASE_URL}/registration/verify-id-card/client-ocr`, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+  const responseText = await response.text().catch(() => "");
+  let data: { message?: string; confidence?: number } | null = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    throw new ApiError(data?.message || "Could not verify ID card.", response.status);
+  }
+  return { ...(data as IdCardVerificationResponse), confidence: data?.confidence || confidence };
+}
+
+async function verifyRegistrationIdCardInBrowser(payload: {
+  playerRole: "captain" | "member";
+  playerIndex: number;
+  typedRegistrationNumber: string;
+  idCardImage: File;
+}) {
+  if (typeof window === "undefined") {
+    throw new ApiError("ID verification service is still starting. Please try again in a moment.", 503);
+  }
+
+  const { createWorker } = await import("tesseract.js");
+  let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+  try {
+    worker = await withClientTimeout(
+      createWorker("eng", 1),
+      BROWSER_OCR_INIT_TIMEOUT_MS,
+      "ID scan is taking too long. Please try again with a clearer, cropped image."
+    );
+    await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
+    const result = await withClientTimeout(
+      worker.recognize(payload.idCardImage),
+      BROWSER_OCR_RECOGNIZE_TIMEOUT_MS,
+      "ID scan is taking too long. Please try again with a clearer, cropped image."
+    );
+    const text = result?.data?.text || "";
+    const extractedRegistrationNumber = extractRegistrationNumberFromText(text, payload.typedRegistrationNumber);
+    if (!extractedRegistrationNumber) {
+      throw new ApiError("Could not read registration number from ID card. Please upload a clearer image.", 422);
+    }
+    return await postClientOcrVerification(
+      payload,
+      text,
+      extractedRegistrationNumber,
+      Math.round(Number(result?.data?.confidence || 0))
+    );
+  } finally {
+    await worker?.terminate().catch(() => {});
+  }
+}
+
 export async function verifyRegistrationIdCard(payload: {
   playerRole: "captain" | "member";
   playerIndex: number;
@@ -1176,7 +1286,7 @@ export async function verifyRegistrationIdCard(payload: {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiError("ID scan is taking too long. Please try again with a clearer, cropped image.", 408);
+      return verifyRegistrationIdCardInBrowser(payload);
     }
     throw error;
   } finally {
@@ -1191,6 +1301,9 @@ export async function verifyRegistrationIdCard(payload: {
     data = null;
   }
   if (!response.ok) {
+    if ([503, 504].includes(response.status)) {
+      return verifyRegistrationIdCardInBrowser(payload);
+    }
     const proxyFailure = responseText.includes("ECONNREFUSED") || responseText.includes("fetch failed");
     throw new ApiError(data?.message || (proxyFailure ? "Could not reach the verification service. Please try again in a moment." : "Could not verify ID card."), response.status);
   }

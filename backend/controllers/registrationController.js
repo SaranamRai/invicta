@@ -9,7 +9,12 @@ import Player from "../models/Player.js";
 import Result from "../models/Result.js";
 import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import { normalizeRegNo, isValidEmail } from "../utils/regNoHelper.js";
-import { buildVerifiedStatus, verifyIdCardRequest, verifyRegistrationToken } from "../utils/idVerification.js";
+import {
+  buildVerifiedStatus,
+  verifyClientOcrIdCardRequest,
+  verifyIdCardRequest,
+  verifyRegistrationToken,
+} from "../utils/idVerification.js";
 
 const VALID_IMAGE_PREFIXES = [
   "data:image/jpeg;base64,",
@@ -84,6 +89,16 @@ export async function verifyIdCard(req, res) {
     return res.status(result.statusCode).json(result.body);
   } catch (error) {
     console.error("ID card verification error:", error);
+    return res.status(error.status || 500).json({ success: false, message: error.message || "Could not verify ID card." });
+  }
+}
+
+export async function verifyClientOcrIdCard(req, res) {
+  try {
+    const result = await verifyClientOcrIdCardRequest(req);
+    return res.status(result.statusCode).json(result.body);
+  } catch (error) {
+    console.error("Browser ID card verification error:", error);
     return res.status(error.status || 500).json({ success: false, message: error.message || "Could not verify ID card." });
   }
 }

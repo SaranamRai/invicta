@@ -9,6 +9,7 @@ import {
   rejectRegistration,
   deleteApprovedRegistration,
   exportApprovedExcel,
+  verifyClientOcrIdCard,
   verifyIdCard,
 } from "../controllers/registrationController.js";
 
@@ -34,6 +35,7 @@ function limitOcrAttempts(req, res, next) {
 
 // Public OCR check returns a backend-signed token used by final registration.
 router.post("/verify-id-card", limitOcrAttempts, verifyIdCard);
+router.post("/verify-id-card/client-ocr", limitOcrAttempts, verifyClientOcrIdCard);
 
 // All remaining registration routes require authentication
 router.use(authMiddleware);
