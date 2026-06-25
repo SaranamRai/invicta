@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${outfit.variable} ${inter.variable}`}>
       <body className="bg-background text-foreground antialiased selection:bg-accent selection:text-accent-foreground font-sans overflow-x-hidden">
         <AuthGuard>{children}</AuthGuard>
       </body>

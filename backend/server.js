@@ -14,12 +14,17 @@ import publicRoutes from "./routes/publicRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
+import registrationRoutes from "./routes/registrationRoutes.js";
 import Sport from "./models/Sport.js";
 import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
 dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 
 if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("JWT_SECRET is required in production.");
+    process.exit(1);
+  }
   console.warn("Warning: JWT_SECRET not set in environment - using temporary development secret");
   process.env.JWT_SECRET ||= "dev_secret_change_me";
 }
@@ -117,17 +122,22 @@ async function ensureLegacySportPlayerCounts() {
 console.log("CLIENT_URL:", process.env.CLIENT_URL);
 console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 
+const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
 const allowedOrigins = [
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
   process.env.FRONTEND_ORIGIN,
+  vercelUrl,
+  process.env.ALLOWED_ORIGINS,
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
 ]
   .filter(Boolean)
-  .map((origin) => origin.trim().replace(/\/$/, ""));
+  .flatMap((origin) => String(origin).split(","))
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter((origin, index, self) => origin && self.indexOf(origin) === index);
 
 console.log("Allowed origins:", allowedOrigins);
 
@@ -173,6 +183,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
+app.use("/api/registrations", registrationRoutes);
 
 app.use((error, _req, res, next) => {
   void next;

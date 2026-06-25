@@ -9,6 +9,10 @@ import PointsTable from "../models/PointsTable.js";
 import Gallery from "../models/Gallery.js";
 import Tournament from "../models/Tournament.js";
 import Team from "../models/Team.js";
+import TeamRegistration from "../models/TeamRegistration.js";
+import Player from "../models/Player.js";
+import mongoose from "mongoose";
+import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
 
 const publicModels = {
   sports: Sport,
@@ -38,12 +42,28 @@ function addQueryFilters(resource, req, filter) {
 export function listPublic(resource) {
   return async (req, res) => {
     const model = publicModels[resource];
-    const filter = addQueryFilters(resource, req, resource === "announcements" ? { visibleToPublic: true } : {});
+    const filter = addQueryFilters(resource, req, resource === "announcements"
+      ? { visibleToPublic: true }
+      : resource === "rules"
+      ? { $or: [{ status: "approved" }, { status: { $exists: false } }] }
+      : resource === "teams"
+      ? { status: "approved" }
+      : {});
 
-    let query = model.find(filter).sort({ createdAt: -1 });
+    let query = model.find(filter);
+    
+    if (resource === "fixtures") {
+      query = query.sort({ date: 1, time: 1 });
+    } else {
+      query = query.sort({ createdAt: -1 });
+    }
+
+    if (resource === "sports") {
+      query = model.find({ status: "active" }).sort({ sportName: 1, name: 1 });
+    }
 
     if (resource === "fixtures") {
-      query = query.populate("sportId", "name").populate("teamA", "teamName department").populate("teamB", "teamName department");
+      query = query.populate("sportId", "sportName name type").populate("teamA", "teamName department category").populate("teamB", "teamName department category");
     }
 
     if (resource === "live-feeds") {
@@ -51,31 +71,24 @@ export function listPublic(resource) {
     }
 
     if (resource === "teams") {
-      query = query.populate("sportId", "name");
+      query = query.populate("sportId", "sportName name");
     }
 
-    const data = await query.lean();
+    let data = await query.lean();
+    if (resource === "sports") {
+      data = data.map(withPlayerCountFallback);
+      // Deduplicate by normalized sport name to prevent duplicate cards
+      const seen = new Set();
+      data = data.filter((s) => {
+        const key = String(s.sportName || s.name || "").trim().toLowerCase().replace(/\s+/g, "-");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
     return res.json(data);
   };
 }
-
-const sportNames = {
-  football: "Football",
-  cricket: "Cricket",
-  volleyball: "Volleyball",
-  badminton: "Badminton",
-  "table-tennis": "Table Tennis",
-  chess: "Chess",
-};
-
-const playerCountsBySport = {
-  football: 11,
-  cricket: 11,
-  volleyball: 6,
-  badminton: 2,
-  "table-tennis": 2,
-  chess: 1,
-};
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -85,121 +98,380 @@ function normalizeSport(value) {
   return normalizeText(value).toLowerCase();
 }
 
-function getSportName(sport) {
-  return sportNames[sport] || normalizeText(sport) || "General";
+function normalizeRegNo(value) {
+  return normalizeText(value).toUpperCase();
 }
 
-async function getOrCreateSport(sport) {
-  const normalizedSport = normalizeSport(sport);
-  const name = getSportName(normalizedSport);
-  let sportDoc = await Sport.findOne({ name });
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
 
-  if (!sportDoc) {
-      sportDoc = await Sport.create({
-        sportName: name,
-        name,
-        category: "Inter-Department",
-        status: "active",
-    });
+function normalizeMember(member) {
+  if (typeof member === "string") {
+    return {
+      fullName: normalizeText(member),
+      registrationNumber: "",
+      department: "",
+      semester: "",
+      gender: "",
+      email: "",
+      phone: "",
+    };
   }
 
-  return sportDoc;
+  return {
+    fullName: normalizeText(member?.fullName || member?.name),
+    registrationNumber: normalizeRegNo(member?.registrationNumber || member?.regNo),
+    department: normalizeText(member?.department),
+    semester: normalizeText(member?.semester),
+    gender: normalizeText(member?.gender),
+    email: normalizeText(member?.email).toLowerCase(),
+    phone: normalizeText(member?.phone),
+  };
+}
+
+async function resolveSport(req) {
+  const sportId = req.body.sportId;
+  const sportText = normalizeText(req.body.sportName || req.body.sport);
+
+  if (sportId) {
+    if (!mongoose.Types.ObjectId.isValid(sportId)) {
+      const error = new Error("Sport is invalid");
+      error.status = 400;
+      throw error;
+    }
+
+    const sport = await Sport.findById(sportId);
+    if (!sport || sport.status !== "active") {
+      const error = new Error("Sport is not available for registration");
+      error.status = 400;
+      throw error;
+    }
+    return sport;
+  }
+
+  if (!sportText) {
+    const error = new Error("Sport is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const escaped = sportText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sport = await Sport.findOne({
+    status: "active",
+    $or: [
+      { sportName: new RegExp(`^${escaped}$`, "i") },
+      { name: new RegExp(`^${escaped}$`, "i") },
+    ],
+  });
+
+  if (!sport) {
+    const error = new Error("Sport is not available for registration");
+    error.status = 400;
+    throw error;
+  }
+
+  return sport;
+}
+
+async function assertRegistrationNumbersUnused(registrationNumbers) {
+  for (const registrationNumber of registrationNumbers) {
+    const [team, registration, player] = await Promise.all([
+      Team.findOne({
+        $or: [
+          { captainRegNo: registrationNumber },
+          { "members.registrationNo": registrationNumber },
+          { "members.registrationNumber": registrationNumber },
+          { "members.regNo": registrationNumber },
+        ],
+      }).select("_id").lean(),
+      TeamRegistration.findOne({
+        $or: [
+          { captainRegNo: registrationNumber },
+          { "members.registrationNo": registrationNumber },
+          { "members.registrationNumber": registrationNumber },
+          { "members.regNo": registrationNumber },
+        ],
+      }).select("_id").lean(),
+      Player.findOne({ registrationNo: registrationNumber }).select("_id").lean(),
+    ]);
+
+    if (team || registration || player) {
+      const error = new Error(`Cannot register. Registration number ${registrationNumber} is already registered.`);
+      error.status = 400;
+      throw error;
+    }
+  }
 }
 
 export async function registerPublicTeam(req, res) {
   try {
     const department = normalizeText(req.body.department).toUpperCase();
-    const sport = normalizeSport(req.body.sport);
+    const teamName = normalizeText(req.body.teamName || req.body.name || department);
+    const sportDoc = await resolveSport(req);
+    const tournamentId = req.body.tournamentId;
+    const tournamentName = normalizeText(req.body.tournamentName);
+    const sportName = sportDoc.sportName || sportDoc.name;
+    const sport = normalizeSport(sportName);
+    const category = normalizeText(req.body.category || "Male");
     const captainName = normalizeText(req.body.captainName);
-    const email = normalizeText(req.body.email);
-    const phone = normalizeText(req.body.phone || req.body.contactNumber).replace(/\D/g, "");
+    const captainRegNo = normalizeRegNo(req.body.captainRegNo || req.body.captainRegistrationNumber);
+    const email = normalizeText(req.body.captainEmail || req.body.email).toLowerCase();
+    const phone = normalizeText(req.body.captainPhone || req.body.phone || req.body.contactNumber).replace(/\D/g, "");
 
-    if (!department || !sport || !captainName || !email || !phone) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!department || !teamName || !captainName || !captainRegNo || !email || !phone) {
+      return res.status(400).json({ message: "Department, team, captain registration number, captain email, and phone are required" });
+    }
+
+    if (!["Male", "Female"].includes(category)) {
+      return res.status(400).json({ message: "Category must be either Male or Female" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Captain email is invalid" });
     }
 
     if (phone.length !== 10) {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
     }
 
-    const expectedPlayerCount = playerCountsBySport[sport];
-    if (expectedPlayerCount === undefined) {
-      return res.status(400).json({ message: "Invalid sport selected" });
-    }
-
     const members = Array.isArray(req.body.members)
-      ? req.body.members.map((member) => {
-        if (typeof member === "object" && member !== null) {
-          return normalizeText(member.fullName || member.name || member.playerName);
-        }
-        return normalizeText(member);
-      }).filter(Boolean)
+      ? req.body.members.map(normalizeMember).filter((member) => member.fullName || member.registrationNumber)
       : [];
 
-    if (members.length !== expectedPlayerCount) {
-      return res.status(400).json({
-        message: `Exactly ${expectedPlayerCount} players are required for ${getSportName(sport)}`
+    const sportWithFallback = withPlayerCountFallback(sportDoc.toObject ? sportDoc.toObject() : sportDoc);
+    const minPlayers = Number(sportWithFallback.minPlayers || 1);
+    const maxPlayers = Number(sportWithFallback.maxPlayers || minPlayers);
+    if (members.length < minPlayers || members.length > maxPlayers) {
+      return res.status(400).json({ message: `${sportName} requires ${minPlayers} to ${maxPlayers} players.` });
+    }
+
+    if (members.some((member) => !member.fullName || !member.registrationNumber)) {
+      return res.status(400).json({ message: "Each team member must include full name and registration number." });
+    }
+
+    const memberRegNos = members.map((member) => member.registrationNumber).filter(Boolean);
+    const memberRegNoSet = new Set(memberRegNos);
+    if (memberRegNoSet.size !== memberRegNos.length) {
+      return res.status(400).json({ message: "Same registration number should not be added twice in the same team." });
+    }
+    const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
+
+    if (!memberRegNos.includes(captainRegNo)) {
+      members.unshift({
+        fullName: captainName,
+        registrationNumber: captainRegNo,
+        department,
+        semester: normalizeText(req.body.captainSemester),
+        gender: category === "Male" ? "Male" : "Female",
+        email,
+        phone,
+        isCaptain: true,
+      });
+    } else {
+      members.forEach((member) => {
+        if (member.registrationNumber === captainRegNo) member.isCaptain = true;
       });
     }
 
-    // Count existing teams for this department and sport
-    const existingTeamsCount = await Team.countDocuments({
+    await assertRegistrationNumbersUnused(registrationNumbers);
+
+    const duplicateTeam = await Team.findOne({
       department,
-      sport,
-    });
-
-    if (existingTeamsCount >= 2) {
-      return res.status(400).json({
-        message: `Only 2 teams from ${department} are allowed to register for ${getSportName(sport)}.`
-      });
-    }
-
-    const sportDoc = await getOrCreateSport(sport);
-    const tournamentId = normalizeText(req.body.tournamentId);
-    const tournamentName = normalizeText(req.body.tournamentName);
-    const category = normalizeText(req.body.category || req.body.gender);
-
-    const team = await Team.create({
-      teamName: department, // teamName will be department name
-      department,
-      sport,
-      sportName: sportDoc.name,
       sportId: sportDoc._id,
       ...(tournamentId ? { tournamentId } : {}),
-      ...(tournamentName ? { tournamentName } : {}),
-      ...(category ? { category } : {}),
+      category,
+      status: { $in: ["pending", "approved"] },
+    });
+
+    const duplicateRegistration = await TeamRegistration.findOne({
+      department,
+      sportId: sportDoc._id,
+      ...(tournamentId ? { tournamentId } : {}),
+      category,
+      status: { $in: ["pending", "approved"] },
+    });
+
+    if (duplicateTeam || duplicateRegistration) {
+      return res.status(400).json({
+        message: "This department already submitted a team for this sport and category."
+      });
+    }
+
+    const registration = await TeamRegistration.create({
+      teamName,
+      department,
+      sportName,
+      sportId: sportDoc._id,
+      tournamentId: tournamentId || undefined,
+      tournamentName,
+      category,
       captainName,
-      contactNumber: phone,
-      email,
-      members,
-      status: "approved", // auto approved
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      points: 0,
-      registeredAt: Date.now(),
-      playerRegisteredAt: members.map(() => Date.now()),
+      captainRegNo,
+      captainEmail: email,
+      captainPhone: phone,
+      members: members.map((member) => ({
+        fullName: member.fullName,
+        registrationNo: member.registrationNumber,
+        department: member.department || department,
+        semester: member.semester || "",
+        gender: member.gender || category,
+        email: member.email || "",
+        phone: member.phone || "",
+      })),
+      status: "pending",
+      submittedAt: new Date(),
     });
 
     // map team response (matching the API client structure)
     return res.status(201).json({
-      id: team._id.toString(),
-      name: team.teamName,
-      department: team.department,
-      sport: team.sport,
-      members: team.members || [],
-      coachCaptain: team.captainName || "",
-      contactNumber: team.contactNumber || "",
-      email: team.email || "",
-      status: team.status,
-      wins: team.wins || 0,
-      losses: team.losses || 0,
-      draws: team.draws || 0,
-      points: team.points || 0,
-      registeredAt: team.registeredAt,
+      id: registration._id.toString(),
+      name: registration.teamName,
+      department: registration.department,
+      sport,
+      sportId: registration.sportId,
+      sportName: registration.sportName,
+      tournamentId: registration.tournamentId,
+      tournamentName: registration.tournamentName,
+      category: registration.category,
+      members: registration.members || [],
+      coachCaptain: registration.captainName || "",
+      captainRegNo: registration.captainRegNo || "",
+      contactNumber: registration.captainPhone || "",
+      email: registration.captainEmail || "",
+      status: registration.status,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      points: 0,
+      registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
     });
   } catch (error) {
     console.error("Public team registration failed:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+function extractMemberName(member) {
+  if (typeof member === "string") return member;
+  return member?.fullName || member?.name || "";
+}
+
+function extractMemberRegNo(member) {
+  if (typeof member === "string") return "";
+  return member?.registrationNumber || member?.regNo || member?.registrationNo || "";
+}
+
+export async function getSportDetailView(req, res) {
+  try {
+    const { sportId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(sportId)) {
+      return res.status(400).json({ message: "Invalid sport ID" });
+    }
+
+    const sport = await Sport.findById(sportId).lean();
+    if (!sport || sport.status !== "active") {
+      return res.status(404).json({ message: "Sport not found" });
+    }
+
+    // Collect approved teams from both models
+    const teamModelTeams = await Team.find({ sportId, status: "approved" }).lean();
+    const registrationTeams = await TeamRegistration.find({ sportId, status: "approved" }).lean();
+
+    // Deduplicate by teamName+department+category, prefer TeamRegistration
+    const seen = new Set();
+    const allTeams = [];
+
+    for (const t of registrationTeams) {
+      const key = `${t.teamName}|${t.department}|${t.category}`;
+      seen.add(key);
+      allTeams.push(t);
+    }
+
+    for (const t of teamModelTeams) {
+      const key = `${t.teamName || ""}|${t.department || ""}|${t.category || "Male"}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allTeams.push(t);
+      }
+    }
+
+    const maleTeams = allTeams.filter((t) => (t.category || "Male") === "Male");
+    const femaleTeams = allTeams.filter((t) => (t.category || "Male") === "Female");
+
+    function buildMemberList(teams, category) {
+      return teams.flatMap((team) =>
+        (team.members || []).map((m) => ({
+          fullName: extractMemberName(m),
+          registrationNo: extractMemberRegNo(m),
+          department: team.department || "",
+          teamName: team.teamName || "",
+          tournamentId: team.tournamentId?.toString?.() || "",
+          tournamentName: team.tournamentName || "",
+          category,
+          role: typeof m === "object" ? m?.role || m?.position || "" : "",
+          position: typeof m === "object" ? m?.position || m?.role || "" : "",
+          profilePhoto: typeof m === "object" ? m?.profilePhoto || m?.photo || m?.image || "" : "",
+        }))
+      );
+    }
+
+    const maleMembers = buildMemberList(maleTeams, "Male");
+    const femaleMembers = buildMemberList(femaleTeams, "Female");
+
+    const fixtures = await Fixture.find({ sportId }).lean();
+    const maleFixtures = fixtures.filter((f) => (f.category || "Male") === "Male");
+    const femaleFixtures = fixtures.filter((f) => (f.category || "Male") === "Female");
+
+    function mapTeam(t) {
+      return {
+        _id: t._id,
+        teamName: t.teamName || "",
+        tournamentId: t.tournamentId?.toString?.() || "",
+        tournamentName: t.tournamentName || "",
+        department: t.department || "",
+        category: t.category || "Male",
+        captainName: t.captainName || "",
+        membersCount: (t.members || []).length,
+        members: buildMemberList([t], t.category || "Male"),
+        status: t.status || "approved",
+      };
+    }
+
+    return res.json({
+      sport: {
+        _id: sport._id,
+        sportName: sport.sportName || sport.name,
+        name: sport.name,
+        type: sport.type,
+        categories: sport.categories,
+        minPlayers: sport.minPlayers,
+        maxPlayers: sport.maxPlayers,
+      },
+      stats: {
+        totalTeams: allTeams.length,
+        totalMembers: maleMembers.length + femaleMembers.length,
+        maleTeams: maleTeams.length,
+        femaleTeams: femaleTeams.length,
+        maleMembers: maleMembers.length,
+        femaleMembers: femaleMembers.length,
+      },
+      teams: {
+        male: maleTeams.map(mapTeam),
+        female: femaleTeams.map(mapTeam),
+      },
+      members: {
+        male: maleMembers,
+        female: femaleMembers,
+      },
+      fixtures: {
+        male: maleFixtures,
+        female: femaleFixtures,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching sport detail:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

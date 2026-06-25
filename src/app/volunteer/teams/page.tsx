@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Calendar, ChevronDown, Search, Trophy, User, UsersRound } from "lucide-react";
+import { Calendar, ChevronDown, Search, Shield, ShieldOff, Trophy, User, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
-import { getVolunteerTeams } from "@/lib/api";
-import { sports } from "@/lib/mock-data";
+import { getVolunteerTeams, getTeamApprovedRegistrations, TeamRegistrationPayload } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getRoleAccount } from "@/lib/role-auth";
 
@@ -18,32 +18,36 @@ function normalizeSportValue(value?: string) {
 function getSportDisplayName(sportId?: string, sportName?: string) {
   const name = sportName?.trim();
   if (name) return name;
-
-  const normalizedSport = normalizeSportValue(sportId);
-  const sport = sports.find((item) => item.id === normalizedSport || normalizeSportValue(item.name) === normalizedSport);
-  return sport?.name || sportId || "Assigned sport";
+  return sportId || "Assigned sport";
 }
 
 function formatDate(value?: number) {
-  if (!value) {
-    return "Not recorded";
-  }
-
+  if (!value) return "Not recorded";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Not recorded";
-  }
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
+  const gender = label.startsWith("Male") ? "Male" : label.startsWith("Female") ? "Female" : "";
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
+          {gender ? <GenderMark gender={gender} className="h-4 w-4" /> : <Icon size={14} />}
+        </div>
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
+      </div>
+      {children}
+    </div>
+  );
 }
 
 export default function VolunteerTeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedSport, setSelectedSport] = useState(allSportsLabel);
+  const [selectedTournament, setSelectedTournament] = useState("all");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"Teams" | "Members">("Teams");
   const [searchQuery, setSearchQuery] = useState("");
   const account = getRoleAccount();
@@ -74,11 +78,20 @@ export default function VolunteerTeamsPage() {
   }, [assignedSport]);
 
   const sportOptions = useMemo(() => {
-    const registeredSports = assignedSport ? [assignedSport] : sports.map((sport) => sport.id);
+    const registeredSports = assignedSport ? [assignedSport] : [...new Set(teams.map((t) => t.sport))];
     return assignedSport ? registeredSports : [allSportsLabel, ...registeredSports];
-  }, [assignedSport]);
+  }, [assignedSport, teams]);
 
   const effectiveSelectedSport = assignedSport || selectedSport;
+  const tournamentOptions = useMemo(() => {
+    return Array.from(
+      new Map(
+        teams
+          .filter((team) => team.tournamentId || team.tournamentName)
+          .map((team) => [team.tournamentId || team.tournamentName, team.tournamentName || "Tournament"])
+      ).entries()
+    );
+  }, [teams]);
 
   const teamCountBySport = useMemo(() => {
     return teams.reduce((counts, team) => {
@@ -87,36 +100,43 @@ export default function VolunteerTeamsPage() {
     }, {} as Record<string, number>);
   }, [teams]);
 
-  const sportNameById = useMemo(
-    () => Object.fromEntries(sports.map((sport) => [sport.id, sport.name])),
-    []
-  );
-
   const filteredTeams = teams.filter((team) => {
     const query = searchQuery.trim().toLowerCase();
     const matchesSport = effectiveSelectedSport === allSportsLabel || team.sport === effectiveSelectedSport;
+    const matchesTournament = selectedTournament === "all" || team.tournamentId === selectedTournament || (!team.tournamentId && team.tournamentName === selectedTournament);
     const matchesSearch =
       !query ||
       team.name.toLowerCase().includes(query) ||
       (team.department || "").toLowerCase().includes(query) ||
       (team.coachCaptain || "").toLowerCase().includes(query) ||
-      (team.members || []).some((member) => member.toLowerCase().includes(query));
+      (team.members || []).some((member) => String(member).toLowerCase().includes(query));
 
-    return matchesSport && matchesSearch;
+    return matchesSport && matchesTournament && matchesSearch;
   });
 
-  const members = filteredTeams.flatMap((team) =>
+  const maleTeams = filteredTeams.filter((t) => (t.category || "Male") === "Male");
+  const femaleTeams = filteredTeams.filter((t) => (t.category || "Male") === "Female");
+
+  const allMembers = filteredTeams.flatMap((team) =>
     (team.members || []).map((member, index) => ({
-      member,
+      member: String(member),
       teamName: team.name,
       department: team.department || team.name,
       sport: team.sport,
       sportName: team.sportName,
+      category: team.category || "Male",
       registeredAt: team.playerRegisteredAt?.[index] || team.registeredAt,
     }))
   );
 
+  const maleMembers = allMembers.filter((m) => m.category === "Male");
+  const femaleMembers = allMembers.filter((m) => m.category === "Female");
+
   const totalMembers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
+  const maleTeamsCount = teams.filter((t) => (t.category || "Male") === "Male").length;
+  const femaleTeamsCount = teams.filter((t) => (t.category || "Male") === "Female").length;
+  const maleMembersCount = teams.filter((t) => (t.category || "Male") === "Male").reduce((s, t) => s + (t.members?.length || 0), 0);
+  const femaleMembersCount = teams.filter((t) => (t.category || "Male") === "Female").reduce((s, t) => s + (t.members?.length || 0), 0);
 
   return (
     <div className="space-y-8">
@@ -148,37 +168,71 @@ export default function VolunteerTeamsPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-accent">
-              <Trophy size={22} />
+      {/* Stats */}
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent">
+              <Trophy size={18} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Registered Teams</p>
-              <p className="text-3xl font-black text-foreground">{teams.length}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Teams</p>
+              <p className="text-xl font-black text-foreground">{teams.length}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500">
-              <UsersRound size={22} />
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500">
+              <UsersRound size={18} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Members</p>
-              <p className="text-3xl font-black text-foreground">{totalMembers}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Members</p>
+              <p className="text-xl font-black text-foreground">{totalMembers}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500">
-              <UsersRound size={22} />
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+              <Shield size={18} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Currently Showing</p>
-              <p className="text-3xl font-black text-foreground">{activeTab === "Teams" ? filteredTeams.length : members.length}</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Male Teams</p>
+              <p className="text-xl font-black text-foreground">{maleTeamsCount}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400">
+              <ShieldOff size={18} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Female Teams</p>
+              <p className="text-xl font-black text-foreground">{femaleTeamsCount}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
+              <User size={18} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Male Members</p>
+              <p className="text-xl font-black text-foreground">{maleMembersCount}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400">
+              <User size={18} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Female Members</p>
+              <p className="text-xl font-black text-foreground">{femaleMembersCount}</p>
             </div>
           </div>
         </Card>
@@ -203,7 +257,7 @@ export default function VolunteerTeamsPage() {
           >
             {sportOptions.map((sport) => (
               <option key={sport} value={sport} className="bg-background text-foreground">
-                {sport === allSportsLabel ? sport : `${sport === assignedSport ? assignedSportName : sportNameById[sport] || sport} (${teamCountBySport[sport] || 0})`}
+                {sport === allSportsLabel ? sport : `${sport === assignedSport ? assignedSportName : getSportDisplayName(sport)} (${teamCountBySport[sport] || 0})`}
               </option>
             ))}
           </select>
@@ -212,87 +266,192 @@ export default function VolunteerTeamsPage() {
             className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-accent-foreground"
           />
         </div>
+
+        {tournamentOptions.length > 0 && (
+          <div className="relative w-full lg:w-72">
+            <select
+              value={selectedTournament}
+              onChange={(event) => {
+                setSelectedTournament(event.target.value);
+                setExpandedTeamId(null);
+              }}
+              className="h-11 w-full appearance-none rounded-xl border border-border bg-background px-4 pr-11 text-[10px] font-black uppercase tracking-widest text-foreground outline-none transition-all hover:border-accent focus:border-accent"
+            >
+              <option value="all">All Tournaments</option>
+              {tournamentOptions.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+            <ChevronDown
+              size={16}
+              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+          </div>
+        )}
       </div>
 
       {activeTab === "Teams" ? (
         filteredTeams.length > 0 ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            {filteredTeams.map((team) => (
-              <Card key={team.id} className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
-                    {team.name.slice(0, 2)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <h2 className="truncate text-lg font-black uppercase tracking-wide text-foreground">{team.name}</h2>
-                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                          {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
-                        </p>
-                      </div>
-                      <span className="w-fit rounded-full bg-secondary px-3 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                        {team.members?.length || 0} members
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid gap-2 text-xs font-bold text-muted-foreground sm:grid-cols-2">
-                      <p>Captain: <span className="text-foreground">{team.coachCaptain || "Not listed"}</span></p>
-                      <p>Phone: <span className="text-foreground">{team.contactNumber || "Not listed"}</span></p>
-                      <p className="flex items-center gap-1.5">
-                        <Calendar size={13} />
-                        Registered: <span className="text-foreground">{formatDate(team.registeredAt)}</span>
-                      </p>
-                    </div>
-
-                    {team.members?.length ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {team.members.slice(0, 6).map((member, index) => (
-                          <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                            {member}
-                          </span>
-                        ))}
-                        {team.members.length > 6 && (
-                          <span className="rounded-lg bg-accent/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-accent">
-                            +{team.members.length - 6} more
-                          </span>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
+          <div className="space-y-8">
+            <CategorySection label="Male Teams" icon={Shield}>
+              {maleTeams.length > 0 ? (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {maleTeams.map((team) => (
+                    <TeamCard
+                      key={team.id}
+                      team={team}
+                      expanded={expandedTeamId === team.id}
+                      onToggle={() => setExpandedTeamId((current) => current === team.id ? null : team.id)}
+                    />
+                  ))}
                 </div>
-              </Card>
-            ))}
+              ) : (
+                <p className="text-sm font-semibold text-muted-foreground italic py-4 text-center border border-dashed border-white/10 rounded-xl">
+                  No Male teams found.
+                </p>
+              )}
+            </CategorySection>
+
+            <CategorySection label="Female Teams" icon={ShieldOff}>
+              {femaleTeams.length > 0 ? (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {femaleTeams.map((team) => (
+                    <TeamCard
+                      key={team.id}
+                      team={team}
+                      expanded={expandedTeamId === team.id}
+                      onToggle={() => setExpandedTeamId((current) => current === team.id ? null : team.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm font-semibold text-muted-foreground italic py-4 text-center border border-dashed border-white/10 rounded-xl">
+                  No Female teams found.
+                </p>
+              )}
+            </CategorySection>
           </div>
         ) : (
           <EmptyState label="No teams found" />
         )
-      ) : members.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {members.map((item, index) => (
-            <Card key={`${item.teamName}-${item.member}-${index}`} className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-accent">
-                  <User size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{item.member}</p>
-                  <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    {getSportDisplayName(item.sport, item.sportName)} / {item.department} / {item.teamName}
-                  </p>
-                  <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    <Calendar size={11} />
-                    {formatDate(item.registeredAt)}
-                  </p>
-                </div>
+      ) : allMembers.length > 0 ? (
+        <div className="space-y-8">
+          <CategorySection label="Male Members" icon={Shield}>
+            {maleMembers.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {maleMembers.map((item, index) => (
+                  <MemberCard key={`male-${item.teamName}-${item.member}-${index}`} item={item} />
+                ))}
               </div>
-            </Card>
-          ))}
+            ) : (
+              <p className="text-sm font-semibold text-muted-foreground italic py-4 text-center border border-dashed border-white/10 rounded-xl">
+                No Male members found.
+              </p>
+            )}
+          </CategorySection>
+
+          <CategorySection label="Female Members" icon={ShieldOff}>
+            {femaleMembers.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {femaleMembers.map((item, index) => (
+                  <MemberCard key={`female-${item.teamName}-${item.member}-${index}`} item={item} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-muted-foreground italic py-4 text-center border border-dashed border-white/10 rounded-xl">
+                No Female members found.
+              </p>
+            )}
+          </CategorySection>
         </div>
       ) : (
         <EmptyState label="No members found" />
       )}
     </div>
+  );
+}
+
+function TeamCard({ team, expanded, onToggle }: { team: Team; expanded: boolean; onToggle: () => void }) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
+          {team.name.slice(0, 2)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-black uppercase tracking-wide text-foreground">{team.name}</h2>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {getSportDisplayName(team.sport, team.sportName)} / {team.department || "Department"}
+              </p>
+              {team.tournamentName && (
+                <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">{team.tournamentName}</p>
+              )}
+            </div>
+            <span className="w-fit rounded-full bg-secondary px-3 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+              {team.members?.length || 0} members
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-2 text-xs font-bold text-muted-foreground sm:grid-cols-2">
+            <p>Captain: <span className="text-foreground">{team.coachCaptain || "Not listed"}</span></p>
+            <p>Phone: <span className="text-foreground">{team.contactNumber || "Not listed"}</span></p>
+            <p className="flex items-center gap-1.5">
+              <Calendar size={13} />
+              Registered: <span className="text-foreground">{formatDate(team.registeredAt)}</span>
+            </p>
+            {team.category && (
+              <p>Category: <span className="text-foreground">{team.category}</span></p>
+            )}
+          </div>
+
+          {team.members?.length ? (
+            <>
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={expanded}
+                className="mt-4 h-10 w-full rounded-xl border border-border bg-secondary/60 text-[10px] font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent hover:text-accent"
+              >
+                {expanded ? "Hide Players" : "View Players"}
+              </button>
+              {expanded && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {team.members.map((member, index) => (
+                    <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground">
+                      {String(member)}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MemberCard({ item }: { item: { member: string; teamName: string; department: string; sport: string; sportName?: string; category: string; registeredAt?: number } }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-accent">
+          <User size={18} />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{item.member}</p>
+          <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            {getSportDisplayName(item.sport, item.sportName)} / {item.department} / {item.teamName}
+          </p>
+          <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <Calendar size={11} />
+            {formatDate(item.registeredAt)}
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 

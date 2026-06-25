@@ -1,4 +1,17 @@
-export type MatchPeriod = "First Half" | "Half Time" | "Second Half" | "Full Time";
+export type MatchPeriod = "First Half" | "Half Time" | "Second Half" | "Full Time" | "Set 1" | "Set 2" | "Set 3" | "Result";
+
+export interface VolleyballSet {
+  setNumber: number;
+  scoreA: number;
+  scoreB: number;
+  winner: "A" | "B";
+  winnerName: string;
+  startedAt?: number;
+  finishedAt?: number;
+  durationSeconds?: number;
+  fullTime?: string;
+  timestamp: number;
+}
 
 export interface ScoreEvent {
   id: string;
@@ -39,6 +52,9 @@ export interface MatchData {
   pausePeriods?: { reason: string; pausedAt: number; resumedAt?: number; elapsedSeconds?: number }[];
   elapsedSeconds?: number;
   fullMatchSeconds?: number;
+  scheduledFullMatchSeconds?: number;
+  extraTimeSeconds?: number;
+  matchGapMinutes?: number;
   clockRunning?: boolean;
   period?: MatchPeriod;
   timer?: string;
@@ -46,6 +62,9 @@ export interface MatchData {
   foulsB?: number;
   announcements?: string[];
   scoreEvents?: ScoreEvent[];
+  volleyballSets?: VolleyballSet[];
+  winner?: "A" | "B" | "";
+  winnerName?: string;
   imageUrl?: string;
 }
 

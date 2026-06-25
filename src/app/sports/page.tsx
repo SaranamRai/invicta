@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, Loader2, Trophy } from "lucide-react";
 import Link from "next/link";
 import { getPublicSports, MongoSport } from "@/lib/api";
+import { SportMark } from "@/components/sport-mark";
 
 
 export default function SportsPage() {
@@ -56,7 +57,7 @@ export default function SportsPage() {
                 
                 <div className="relative flex h-full flex-col items-center justify-center space-y-6">
                   <div className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] bg-secondary/50 border border-border shadow-inner transition-all group-hover:scale-110 group-hover:rotate-3">
-                    <Trophy size={40} className="text-accent opacity-50" />
+                    <SportMark name={sport.sportName || sport.name || ""} className="h-14 w-14 text-accent opacity-80" />
                   </div>
                   <div className="text-center px-6">
                     <h3 className="text-3xl font-black sport-heading tracking-wide uppercase">{sport.sportName || sport.name}</h3>

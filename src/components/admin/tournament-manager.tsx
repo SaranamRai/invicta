@@ -2,10 +2,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Download, MapPin, Plus, Trophy, Calendar, AlignLeft } from "lucide-react";
+import { Download, MapPin, Plus, Trophy, Calendar, AlignLeft, Activity, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
-import { createAdminTournament, createAdminVenue, deleteAdminTournament, getAdminTournamentReport, getAdminTournaments, getAdminVenues, toggleAdminTournamentRegistration, getStoredSession, VenuePayload } from "@/lib/api";
+import {
+  createAdminSport,
+  createAdminTournament,
+  createAdminVenue,
+  deleteAdminSport,
+  deleteAdminTournament,
+  getAdminSports,
+  getAdminTournamentReport,
+  getAdminTournaments,
+  getAdminVenues,
+  toggleAdminTournamentRegistration,
+  getStoredSession,
+  MongoSport,
+  VenuePayload,
+} from "@/lib/api";
 
 export interface Tournament {
   id: string;
@@ -36,6 +50,11 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [venues, setVenues] = useState<VenuePayload[]>([]);
+  const [sportRecords, setSportRecords] = useState<MongoSport[]>([]);
+  const [sportName, setSportName] = useState("");
+  const [sportType, setSportType] = useState<"indoor" | "outdoor">("outdoor");
+  const [sportStatus, setSportStatus] = useState<"active" | "inactive">("active");
+  const [sportCategories, setSportCategories] = useState<("Male" | "Female")[]>(["Male", "Female"]);
   const [venueName, setVenueName] = useState("");
   const [venueLocation, setVenueLocation] = useState("");
   const [venueSportType, setVenueSportType] = useState("both");
@@ -51,14 +70,18 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
     let isMounted = true;
 
     async function loadTournaments() {
-      const nextTournaments = await getAdminTournaments();
-      const nextVenues = await getAdminVenues().catch(() => []);
+      const [nextTournaments, nextVenues, nextSports] = await Promise.all([
+        getAdminTournaments(),
+        getAdminVenues().catch(() => []),
+        getAdminSports().catch(() => []),
+      ]);
       if (!isMounted) return;
       setTournaments(nextTournaments.map((tournament) => ({
         ...tournament,
         id: String(tournament.id || tournament._id || ""),
       })));
       setVenues(nextVenues);
+      setSportRecords(nextSports);
     }
 
     void loadTournaments();
@@ -111,7 +134,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
         return;
       }
       const session = getStoredSession();
-      if (!session?.token) {
+      if (!session) {
         setErrorMessage("Admin login required to change registration portal state.");
         setTimeout(() => setErrorMessage(null), 4000);
         return;
@@ -154,6 +177,42 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
     setVenueCapacity("");
     setSuccessMessage("Venue created successfully.");
     setTimeout(() => setSuccessMessage(null), 4000);
+  };
+
+  const handleCreateSport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!sportName.trim()) {
+      setErrorMessage("Sport name is required.");
+      setTimeout(() => setErrorMessage(null), 4000);
+      return;
+    }
+    if (sportCategories.length === 0) {
+      setErrorMessage("Select at least one category for this sport.");
+      setTimeout(() => setErrorMessage(null), 4000);
+      return;
+    }
+
+    const savedSport = await createAdminSport({
+      sportName: sportName.trim(),
+      categories: sportCategories,
+      type: sportType,
+      status: sportStatus,
+    });
+
+    setSportRecords((current) => [savedSport, ...current.filter((item) => item._id !== savedSport._id)]);
+    setSportName("");
+    setSportType("outdoor");
+    setSportStatus("active");
+    setSportCategories(["Male", "Female"]);
+    setSuccessMessage("Sport created successfully.");
+    setTimeout(() => setSuccessMessage(null), 4000);
+  };
+
+  const handleDeleteSport = async (id?: string) => {
+    if (!id) return;
+    if (!confirm("Remove this sport from setup?")) return;
+    await deleteAdminSport(id);
+    setSportRecords((current) => current.filter((item) => item._id !== id));
   };
 
   const handleDownloadReport = async (tournament: Tournament) => {
@@ -336,6 +395,87 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
           </CardContent>
         </Card>
       )}
+
+      <Card className="bg-slate-900/60 border border-white/5 text-white">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Activity className="text-accent" size={20} />
+            Sport Creation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateSport} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_150px_150px_220px_auto]">
+            <input
+              type="text"
+              value={sportName}
+              onChange={(event) => setSportName(event.target.value)}
+              placeholder="Sport name"
+              className="h-12 rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+            />
+            <select
+              value={sportType}
+              onChange={(event) => setSportType(event.target.value as "indoor" | "outdoor")}
+              className="h-12 rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm font-bold text-white outline-none focus:border-accent"
+            >
+              <option value="outdoor">Outdoor</option>
+              <option value="indoor">Indoor</option>
+            </select>
+            <select
+              value={sportStatus}
+              onChange={(event) => setSportStatus(event.target.value as "active" | "inactive")}
+              className="h-12 rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm font-bold text-white outline-none focus:border-accent"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <div className="flex min-h-12 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/60 px-3">
+              {(["Male", "Female"] as const).map((category) => (
+                <label key={category} className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={sportCategories.includes(category)}
+                    onChange={(event) => {
+                      setSportCategories((current) =>
+                        event.target.checked
+                          ? [...new Set([...current, category])]
+                          : current.filter((item) => item !== category)
+                      );
+                    }}
+                    className="accent-accent"
+                  />
+                  {category}
+                </label>
+              ))}
+            </div>
+            <button className="h-12 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground">
+              Save Sport
+            </button>
+          </form>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {sportRecords.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-white/10 p-4 text-sm font-bold text-slate-500">No sports created yet.</p>
+            ) : sportRecords.map((item) => (
+              <div key={item._id || item.sportName || item.name} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-wide text-white">{item.sportName || item.name}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {(item.categories || []).join(" / ") || "No categories"} / {item.type || "type"} / {item.status || "active"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSport(item._id)}
+                  className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-red-400 transition-colors hover:bg-red-500/20"
+                  aria-label="Delete sport"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="bg-slate-900/60 border border-white/5 text-white">
         <CardHeader>

@@ -2,11 +2,15 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck, LayoutDashboard } from "lucide-react";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -44,28 +48,20 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-6 sm:py-8">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative z-10 w-full max-w-xl"
       >
         <div className="mb-5 sm:mb-7">
-          <div className="mb-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex h-16 w-40 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-44">
-              <img
-                src="/msu-logo-transparent.png"
-                alt="Medhavi Skills University"
-                className="h-auto w-full object-contain"
-              />
-            </div>
-            <span className="hidden h-14 w-px shrink-0 bg-slate-300 sm:block" aria-hidden="true" />
-            <div className="flex w-full min-w-0 flex-1 items-center justify-center gap-3 sm:gap-5">
-              <span className="h-[1.5px] w-10 bg-accent sm:w-20" />
-              <span className="text-[22px] font-bold uppercase tracking-[0.2em] text-slate-900 font-serif italic sm:text-[28px]">Invicta</span>
-              <span className="h-[1.5px] w-10 bg-accent sm:w-20" />
-            </div>
+          <div className="mb-4 flex flex-col items-center gap-3">
+            <MedhaviLogo className="h-16 w-56 sm:h-18 sm:w-72" />
+            <InvictaLogo className="h-20 w-72 sm:h-24 sm:w-96" />
           </div>
-          <p className="text-center text-xs font-bold uppercase tracking-widest text-slate-500">Choose a role and open the right dashboard</p>
+          <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">Choose a role and open the right dashboard</p>
         </div>
 
         <div className="w-full">
@@ -154,6 +150,14 @@ export default function LoginPage() {
             <ShieldCheck size={16} className="text-accent" />
             Public users can browse without login
           </div>
+
+          <Link
+            href="/public-dashboard"
+            className="mt-3 flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 transition-all hover:border-accent hover:text-slate-950"
+          >
+            <LayoutDashboard size={14} className="text-accent" />
+            Back to Public Dashboard
+          </Link>
         </div>
         </div>
       </motion.div>

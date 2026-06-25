@@ -8,13 +8,16 @@ import { cn } from "@/lib/utils";
 import { MatchData, LiveFeedPost } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
-import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
+import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, getPublicTournaments, mapMongoFixture, TournamentPayload } from "@/lib/api";
 
 const tabs = ["All Matches", "Live", "Paused", "Upcoming", "Finished"];
 
 export default function MatchesPage() {
   const [activeTab, setActiveTab] = useState("All Matches");
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("");
+  const [selectedSport, setSelectedSport] = useState("All Sports");
   const [liveFeeds, setLiveFeeds] = useState<LiveFeedPost[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -26,15 +29,18 @@ export default function MatchesPage() {
     let isMounted = true;
 
     async function loadMatches() {
-      const [fixtures, liveScores, feeds] = await Promise.all([
+      const [fixtures, liveScores, feeds, publicTournaments] = await Promise.all([
         getPublicFixtures(),
         getPublicLiveScores(),
         getPublicLiveFeeds(),
+        getPublicTournaments(),
       ]);
 
       if (!isMounted) return;
 
       const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setTournaments(publicTournaments);
+      setSelectedTournamentId((current) => current || publicTournaments[0]?._id || "");
       setMatchesData(
         fixtures
           .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
@@ -55,7 +61,9 @@ export default function MatchesPage() {
     }
 
     void loadMatches();
-    const interval = window.setInterval(loadMatches, 1000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void loadMatches();
+    }, 5000);
 
     return () => {
       isMounted = false;
@@ -68,10 +76,30 @@ export default function MatchesPage() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const filteredMatches = matchesData.filter(match => {
+  const tournamentFilteredMatches = selectedTournamentId
+    ? matchesData.filter((match) => match.tournamentId === selectedTournamentId)
+    : matchesData;
+
+  const sportOptions = React.useMemo(() => {
+    const sports = tournamentFilteredMatches
+      .map((match) => match.sport)
+      .filter((sport): sport is string => Boolean(sport));
+    return ["All Sports", ...Array.from(new Set(sports)).sort((a, b) => a.localeCompare(b))];
+  }, [tournamentFilteredMatches]);
+
+  const filteredMatches = tournamentFilteredMatches.filter(match => {
+    if (selectedSport !== "All Sports" && match.sport !== selectedSport) return false;
     if (activeTab === "All Matches") return true;
     return match.status === activeTab;
   });
+
+  const selectedMatch = selectedMatchId
+    ? matchesData.find((match) => match.id === selectedMatchId) || null
+    : null;
+
+  const selectedMatchFeeds = selectedMatchId
+    ? liveFeeds.filter((feed) => feed.matchId === selectedMatchId)
+    : [];
 
   const formatMonth = (date: Date) =>
     date.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase();
@@ -202,22 +230,63 @@ export default function MatchesPage() {
         </div>
       </header>
 
+      <section className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
+          <h2 className="mt-1 text-xl font-black sport-heading text-foreground">Select Tournament</h2>
+        </div>
+        <select
+          value={selectedTournamentId}
+          onChange={(event) => {
+            setSelectedTournamentId(event.target.value);
+            setSelectedSport("All Sports");
+            setSelectedMatchId(null);
+          }}
+          className="mt-4 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
+        >
+          {tournaments.length === 0 ? (
+            <option value="">No tournaments available</option>
+          ) : (
+            tournaments.map((tournament) => (
+              <option key={tournament._id} value={tournament._id}>{tournament.name}</option>
+            ))
+          )}
+        </select>
+      </section>
+
       {/* Navigation Tabs */}
-      <div className="flex gap-4 p-1 bg-secondary/50 rounded-2xl w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all",
-              activeTab === tab
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "text-muted-foreground hover:text-primary hover:bg-white/50"
-            )}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex w-fit flex-wrap gap-4 rounded-2xl bg-secondary/50 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all",
+                activeTab === tab
+                  ? "bg-primary text-primary-foreground shadow-lg"
+                  : "text-muted-foreground hover:text-primary hover:bg-white/50"
+              )}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <label className="flex w-full flex-col gap-2 sm:max-w-xs">
+          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Sport</span>
+          <select
+            value={selectedSport}
+            onChange={(event) => {
+              setSelectedSport(event.target.value);
+              setSelectedMatchId(null);
+            }}
+            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
           >
-            {tab}
-          </button>
-        ))}
+            {sportOptions.map((sport) => (
+              <option key={sport} value={sport}>{sport}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* Two-column layout: Matches (left) + Live Feed (right) */}
@@ -387,10 +456,25 @@ export default function MatchesPage() {
               </span>
               <h2 className="text-xl font-black tracking-wider uppercase sport-heading">Volunteer Updates</h2>
             </div>
+            {selectedMatch && (
+              <div className="rounded-2xl border border-border bg-card px-4 py-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Selected Match</p>
+                <p className="mt-1 text-sm font-black uppercase text-foreground">{selectedMatch.teamA} vs {selectedMatch.teamB}</p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">{selectedMatch.sport}</p>
+              </div>
+            )}
 
             <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
               <AnimatePresence initial={false}>
-                {liveFeeds.length > 0 ? liveFeeds.map((feed) => (
+                {!selectedMatchId ? (
+                  <div className="text-center py-16 border border-dashed border-border rounded-2xl">
+                    <Radio size={32} className="mx-auto text-slate-600 mb-4" />
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                      Select a match
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">Open a match to see only its volunteer updates.</p>
+                  </div>
+                ) : selectedMatchFeeds.length > 0 ? selectedMatchFeeds.map((feed) => (
                   <motion.div
                     key={feed.id}
                     initial={{ opacity: 0, y: -16, scale: 0.97 }}
@@ -422,9 +506,9 @@ export default function MatchesPage() {
                   <div className="text-center py-16 border border-dashed border-border rounded-2xl">
                     <Radio size={32} className="mx-auto text-slate-600 mb-4" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-                      No updates posted yet
+                      No updates for this match
                     </p>
-                    <p className="mt-1 text-xs font-medium text-slate-600">Short match notes and photos from volunteers will appear here.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-600">Volunteer notes and photos for the opened match will appear here.</p>
                   </div>
                 )}
               </AnimatePresence>

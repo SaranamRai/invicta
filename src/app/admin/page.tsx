@@ -3,120 +3,625 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AdminOverview } from "@/components/admin/admin-overview";
-import { TeamManager } from "@/components/admin/team-manager";
-import { FixtureGenerator } from "@/components/admin/fixture-generator";
+import { AutomaticFixtureGenerator } from "@/components/admin/automatic-fixture-generator";
 import { FixtureViewer } from "@/components/admin/fixture-viewer";
 import { TournamentManager } from "@/components/admin/tournament-manager";
 import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
-import { LogOut } from "lucide-react";
-import { clearPortalSession, getRoleAccount } from "@/lib/role-auth";
-import { sports } from "@/lib/mock-data";
+import { Download, LogOut, CheckCircle, Trash2, XCircle } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
+import { GenderMark } from "@/components/gender-mark";
+import { getRoleAccount, logoutPortalSession } from "@/lib/role-auth";
 import {
-  createAdminAnnouncement,
-  createAdminTeam,
   deleteAdminFixture,
-  deleteAdminTeam,
+  deleteAdminFixtures,
   getAdminFixtures,
   getAdminTeams,
-  replaceAdminFixtures,
   updateAdminFixture,
   updateAdminTeam,
+  getAdminSports,
+  getAdminTournaments,
+  getTeamPendingRegistrations,
+  getTeamApprovedRegistrations,
+  approveTeamRegistration,
+  rejectTeamRegistration,
+  deleteTeamRegistration,
+  MongoSport,
+  TeamRegistrationPayload,
+  TournamentPayload,
+  downloadApprovedRegistrationsExcel,
 } from "@/lib/api";
 
 type AdminTab =
   | "dashboard"
   | "teams"
-  | "fixtures"
+  | "generate-fixtures"
   | "schedule"
   | "tournaments"
   | "leaderboard"
   | "rules"
-  | "users";
+  | "users"
+  | "approvals";
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function DownloadApprovedRegistrationsButton({ compact = false, filters }: { compact?: boolean; filters?: Record<string, string | undefined> }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleDownload() {
+    setIsDownloading(true);
+    setMessage("");
+
+    try {
+      const filename = await downloadApprovedRegistrationsExcel(filters);
+      setMessage(`Downloaded ${filename}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not download approved registrations.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className={`inline-flex items-center gap-2 rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-widest text-accent-foreground transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "py-2" : "py-2.5"}`}
+      >
+        <Download size={compact ? 14 : 16} />
+        {isDownloading ? "Downloading..." : compact ? "Export Excel" : "Download Approved Registrations (Excel)"}
+      </button>
+      {message && <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>}
+    </div>
+  );
 }
 
-function getSportName(sportId: string) {
-  return sports.find((sport) => sport.id === sportId)?.name || sportId;
+function ApprovalsPanel() {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [sports, setSports] = useState<MongoSport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionMsg, setActionMsg] = useState("");
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [selectedTournament, setSelectedTournament] = useState("");
+  const [selectedSport, setSelectedSport] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+
+  useEffect(() => {
+    loadRegistrations();
+  }, []);
+
+  async function loadRegistrations() {
+    setLoading(true);
+    try {
+      const [data, setupTournaments, setupSports] = await Promise.all([
+        getTeamPendingRegistrations(),
+        getAdminTournaments().catch(() => []),
+        getAdminSports().catch(() => []),
+      ]);
+      setRegistrations(data);
+      setTournaments(setupTournaments);
+      setSports(setupSports);
+    } catch {
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApprove(id: string) {
+    try {
+      await approveTeamRegistration(id);
+      setActionMsg("Registration approved successfully.");
+      void loadRegistrations();
+    } catch (error) {
+      setActionMsg(error instanceof Error ? error.message : "Approval failed");
+    }
+  }
+
+  async function handleReject(id: string) {
+    if (!rejectReason.trim()) return;
+    try {
+      await rejectTeamRegistration(id, rejectReason.trim());
+      setActionMsg("Registration rejected.");
+      setRejectId(null);
+      setRejectReason("");
+      void loadRegistrations();
+    } catch (error) {
+      setActionMsg(error instanceof Error ? error.message : "Rejection failed");
+    }
+  }
+
+  const tournamentOptions = Array.from(
+    new Map(
+      [
+        ...tournaments.map((tournament) => [tournament._id || tournament.id || tournament.name, tournament.name] as const),
+        ...registrations
+          .filter((reg) => reg.tournamentId || reg.tournamentName)
+          .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"] as const),
+      ].filter(([id]) => Boolean(id))
+    ).entries()
+  );
+  const sportOptions = Array.from(
+    new Map(
+      [
+        ...sports
+          .filter((sport) => sport.status !== "inactive")
+          .map((sport) => [sport._id, sport.sportName || sport.name || "Sport"] as const),
+        ...registrations.map((reg) => [reg.sportId, reg.sportName] as const),
+      ].filter(([id]) => Boolean(id))
+    ).entries()
+  );
+  const filteredRegistrations = registrations.filter((reg) => {
+    const matchesTournament = !selectedTournament || reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament);
+    const matchesSport = !selectedSport || reg.sportId === selectedSport;
+    const matchesCategory = !selectedCategory || reg.category === selectedCategory;
+    return matchesTournament && matchesSport && matchesCategory;
+  });
+  const selectedTournamentName = tournamentOptions.find(([id]) => id === selectedTournament)?.[1] || "";
+  const selectedSportName = sportOptions.find(([id]) => id === selectedSport)?.[1] || "";
+  const exportFilters = {
+    tournamentId: selectedTournament || undefined,
+    tournamentName: selectedTournamentName || undefined,
+    sportId: selectedSport || undefined,
+    sportName: selectedSportName || undefined,
+    category: selectedCategory || undefined,
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Pending Approvals</h2>
+          <p className="text-sm text-muted-foreground">Review team registrations by tournament, sport, and category before they enter Mongo team data.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => void loadRegistrations()}
+            className="rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
+          >
+            Refresh
+          </button>
+          <DownloadApprovedRegistrationsButton compact filters={exportFilters} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-accent">Approval Filters</p>
+          <p className="text-sm font-semibold text-muted-foreground">Choose a sport or keep all sports, then filter Male/Female.</p>
+        </div>
+        <select
+          value={selectedTournament}
+          onChange={(event) => setSelectedTournament(event.target.value)}
+          className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
+        >
+          <option value="">All Tournaments</option>
+          {tournamentOptions.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+        <select
+          value={selectedSport}
+          onChange={(event) => setSelectedSport(event.target.value)}
+          className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
+        >
+          <option value="">All Sports</option>
+          {sportOptions.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+        <select
+          value={selectedCategory}
+          onChange={(event) => setSelectedCategory(event.target.value)}
+          className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
+        >
+          <option value="">Male and Female</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+      </div>
+
+      {actionMsg && (
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+          {actionMsg}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : filteredRegistrations.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">No pending registrations match these filters</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredRegistrations.map((reg) => (
+            <div key={reg._id} className="rounded-xl border border-border bg-card p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-black text-foreground">{reg.teamName}</h3>
+                    <span className="rounded-full bg-accent/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-accent">{reg.sportName}</span>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${reg.category === "Female" ? "bg-pink-500/10 text-pink-500" : "bg-blue-500/10 text-blue-500"}`}>
+                      <GenderMark gender={reg.category} className="h-3.5 w-3.5" />
+                      {reg.category}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {reg.department} &middot; Captain: {reg.captainName} ({reg.captainRegNo}) &middot; {reg.captainEmail}
+                  </p>
+                  {reg.members && reg.members.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {reg.members.map((m, i) => (
+                        <span key={i} className="rounded-lg bg-secondary px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                          {m.fullName} ({m.registrationNo})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {reg.teamLogo && (
+                    <div className="mt-2">
+                      <img src={reg.teamLogo} alt="Team logo" className="h-12 w-12 rounded-lg object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    onClick={() => handleApprove(reg._id)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-emerald-600"
+                  >
+                    <CheckCircle size={14} />
+                    Approve
+                  </button>
+                  {rejectId === reg._id ? (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Rejection reason..."
+                        className="h-9 rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-medium text-red-700 outline-none placeholder:text-red-300"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleReject(reg._id)}
+                          disabled={!rejectReason.trim()}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => { setRejectId(null); setRejectReason(""); }}
+                          className="rounded-lg bg-secondary px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setRejectId(reg._id); setRejectReason(""); }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-600 transition-colors hover:bg-red-100"
+                    >
+                      <XCircle size={14} />
+                      Reject
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-function getTeamName(teamId: string, teams: Team[]) {
-  return teams.find((team) => team.id === teamId)?.name || teamId;
+function formatDate(value?: string) {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not recorded";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function buildFixtureFlowchartDoc(fixtures: Fixture[], teams: Team[]) {
-  const groupedFixtures = [...fixtures].sort((a, b) => `${a.date}${a.time}${a.sport}`.localeCompare(`${b.date}${b.time}${b.sport}`));
-  const rows = groupedFixtures.map((fixture, index) => {
-    const teamA = escapeHtml(getTeamName(fixture.teamA, teams));
-    const teamB = escapeHtml(getTeamName(fixture.teamB, teams));
-    const sport = escapeHtml(getSportName(fixture.sport));
-    const venue = escapeHtml(fixture.venue);
-    const date = escapeHtml(fixture.date);
-    const time = escapeHtml(fixture.time);
+function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: TeamRegistrationPayload) => void }) {
+  const [registrations, setRegistrations] = useState<TeamRegistrationPayload[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [sports, setSports] = useState<MongoSport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [selectedTournament, setSelectedTournament] = useState("");
+  const [selectedSport, setSelectedSport] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("");
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
 
-    return `
-      <tr>
-        <td class="step">${index + 1}</td>
-        <td>
-          <div class="match-card">
-            <div class="meta">${date} at ${time} | ${venue}</div>
-            <div class="title">${teamA} vs ${teamB}</div>
-            <div class="sport">${sport}</div>
+  useEffect(() => {
+    loadApprovedTeams();
+  }, []);
+
+  async function loadApprovedTeams() {
+    setLoading(true);
+    setMessage("");
+    try {
+      const [data, setupTournaments, setupSports] = await Promise.all([
+        getTeamApprovedRegistrations(),
+        getAdminTournaments().catch(() => []),
+        getAdminSports().catch(() => []),
+      ]);
+      setRegistrations(data);
+      setTournaments(setupTournaments);
+      setSports(setupSports);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load approved teams.");
+      setRegistrations([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tournamentOptions = Array.from(
+    new Map(
+      [
+        ...tournaments.map((tournament) => [tournament._id || tournament.id || tournament.name, tournament.name] as const),
+        ...registrations
+          .filter((reg) => reg.tournamentId || reg.tournamentName)
+          .map((reg) => [reg.tournamentId || reg.tournamentName, reg.tournamentName || "Tournament"] as const),
+      ].filter(([id]) => Boolean(id))
+    ).entries()
+  );
+  const registrationsInTournament = registrations.filter((reg) =>
+    selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament))
+  );
+  const sportOptions = Array.from(
+    new Map(
+      [
+        ...registrationsInTournament.map((reg) => [reg.sportId, reg.sportName] as const),
+        ...sports
+          .filter((sport) => sport.status !== "inactive")
+          .map((sport) => [sport._id, sport.sportName || sport.name || "Sport"] as const),
+      ].filter(([id]) => Boolean(id))
+    ).entries()
+  );
+  const teamOptions = registrations.filter((reg) => {
+    const matchesTournament = selectedTournament && (reg.tournamentId === selectedTournament || (!reg.tournamentId && reg.tournamentName === selectedTournament));
+    const matchesSport = !selectedSport || reg.sportId === selectedSport;
+    const matchesCategory = !selectedCategory || reg.category === selectedCategory;
+    return matchesTournament && matchesSport && matchesCategory;
+  });
+  const visibleRegistrations = selectedTournament
+    ? teamOptions.filter((reg) => !selectedTeam || reg._id === selectedTeam)
+    : [];
+  const selectedTournamentName = tournamentOptions.find(([id]) => id === selectedTournament)?.[1] || "";
+  const selectedSportName = sportOptions.find(([id]) => id === selectedSport)?.[1] || "";
+  const exportFilters = {
+    tournamentId: selectedTournament || undefined,
+    tournamentName: selectedTournamentName || undefined,
+    sportId: selectedSport || undefined,
+    sportName: selectedSportName || undefined,
+    category: selectedCategory || undefined,
+    teamId: selectedTeam || undefined,
+  };
+
+  async function handleDeleteTeam(reg: TeamRegistrationPayload) {
+    const confirmed = window.confirm(
+      `Delete ${reg.teamName}? This will remove the team and cancel/delete its related matches from public dashboards.`
+    );
+    if (!confirmed) return;
+
+    setDeletingTeamId(reg._id);
+    setMessage("");
+    try {
+      const result = await deleteTeamRegistration(reg._id);
+      setMessage(result.message || "Team deleted successfully.");
+      setRegistrations((current) => current.filter((item) => item._id !== reg._id));
+      onTeamDeleted?.(reg);
+      if (selectedTeam === reg._id) setSelectedTeam("");
+      if (expandedTeamId === reg._id) setExpandedTeamId(null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete team.");
+    } finally {
+      setDeletingTeamId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Approved Teams</h2>
+          <p className="text-sm text-muted-foreground">Download by tournament for all sports, or narrow to one sport and Male/Female category.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={loadApprovedTeams}
+            className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
+          >
+            Refresh
+          </button>
+          <DownloadApprovedRegistrationsButton compact filters={exportFilters} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</p>
+            <p className="text-sm font-semibold text-muted-foreground">Select tournament, then choose all sports or one sport.</p>
           </div>
-          ${index < groupedFixtures.length - 1 ? '<div class="connector">then</div>' : ""}
-        </td>
-      </tr>
-    `;
-  }).join("");
+          <select
+            value={selectedTournament}
+            onChange={(event) => {
+              setSelectedTournament(event.target.value);
+              setSelectedSport("");
+              setSelectedCategory("");
+              setSelectedTeam("");
+              setExpandedTeamId(null);
+            }}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent"
+          >
+            <option value="">{tournamentOptions.length ? "Select tournament..." : "No tournaments available"}</option>
+            {tournamentOptions.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={selectedSport}
+            onChange={(event) => {
+              setSelectedSport(event.target.value);
+              setSelectedTeam("");
+            }}
+            disabled={!selectedTournament}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50"
+          >
+            <option value="">{selectedTournament ? "All Sports" : "Select tournament first"}</option>
+            {sportOptions.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={selectedCategory}
+            onChange={(event) => {
+              setSelectedCategory(event.target.value);
+              setSelectedTeam("");
+            }}
+            disabled={!selectedTournament}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50"
+          >
+            <option value="">All Categories</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <select
+            value={selectedTeam}
+            onChange={(event) => setSelectedTeam(event.target.value)}
+            disabled={!selectedTournament || !selectedSport}
+            className="h-11 rounded-xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none focus:border-accent disabled:opacity-50 lg:col-start-2"
+          >
+            <option value="">All Teams</option>
+            {teamOptions.map((reg) => (
+              <option key={reg._id} value={reg._id}>{reg.teamName} / {reg.sportName} / {reg.category}</option>
+            ))}
+          </select>
+      </div>
 
-  return `
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: Arial, sans-serif; color: #111827; }
-          h1 { color: #0f172a; margin-bottom: 4px; }
-          .subtitle { color: #64748b; margin-bottom: 24px; }
-          table { width: 100%; border-collapse: collapse; }
-          td { vertical-align: top; padding: 8px; }
-          .step {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: #facc15;
-            color: #0f172a;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-          }
-          .match-card {
-            border: 2px solid #e2e8f0;
-            border-left: 8px solid #facc15;
-            border-radius: 10px;
-            padding: 14px 16px;
-            background: #f8fafc;
-          }
-          .meta { font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; }
-          .title { margin-top: 6px; font-size: 18px; font-weight: bold; color: #020617; }
-          .sport { margin-top: 4px; font-size: 12px; font-weight: bold; color: #b45309; text-transform: uppercase; }
-          .connector { margin: 8px 0 0 18px; color: #64748b; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-        </style>
-      </head>
-      <body>
-        <h1>Invicta Fixture Flowchart</h1>
-        <div class="subtitle">Generated schedule. Teams from the same department are not scheduled at the same date and time.</div>
-        <table>${rows}</table>
-      </body>
-    </html>
-  `;
+      {message && (
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : !selectedTournament ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
+        </div>
+      ) : visibleRegistrations.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for these filters</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {visibleRegistrations.map((reg) => {
+            const isExpanded = expandedTeamId === reg._id;
+            return (
+              <div
+                key={reg._id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setExpandedTeamId(isExpanded ? null : reg._id)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  setExpandedTeamId(isExpanded ? null : reg._id);
+                }}
+                aria-expanded={isExpanded}
+                className="rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-accent hover:shadow-sm"
+              >
+                <div className="flex items-start gap-4">
+                  {reg.teamLogo ? (
+                    <img src={reg.teamLogo} alt="" className="h-14 w-14 rounded-xl border border-border bg-background object-contain" />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-lg font-black uppercase text-accent">
+                      {reg.teamName.slice(0, 2)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-lg font-black text-foreground">{reg.teamName}</h3>
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-emerald-500">Approved</span>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      {reg.sportName} / {reg.category} / {reg.department}
+                    </p>
+                    {reg.tournamentName && (
+                      <p className="mt-1 text-xs font-semibold text-accent">{reg.tournamentName}</p>
+                    )}
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                      Captain: {reg.captainName} ({reg.captainRegNo})
+                    </p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-accent">
+                      Approved Date: {formatDate(reg.reviewedAt)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleDeleteTeam(reg);
+                    }}
+                    disabled={deletingTeamId === reg._id}
+                    className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 text-[10px] font-black uppercase tracking-widest text-red-500 transition-colors hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label={`Delete ${reg.teamName}`}
+                  >
+                    <Trash2 size={14} />
+                    {deletingTeamId === reg._id ? "Deleting" : "Delete"}
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="mt-5 border-t border-border pt-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      Members ({reg.members?.length || 0})
+                    </p>
+                    {reg.members && reg.members.length > 0 ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {reg.members.map((member, index) => (
+                          <div key={`${reg._id}-${member.registrationNo}-${index}`} className="rounded-lg border border-border bg-secondary/60 px-3 py-2">
+                            <p className="text-sm font-black text-foreground">{member.fullName}</p>
+                            <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+                              {member.registrationNo} / {member.semester || "Semester N/A"} / {member.gender || reg.category}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm font-semibold text-muted-foreground">No members recorded for this team.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
@@ -152,25 +657,6 @@ export default function AdminDashboard() {
       isMounted = false;
     };
   }, []);
-
-  // Add team handler
-  const handleAddTeam = async (team: Team) => {
-    const savedTeam = await createAdminTeam(team);
-    setTeams((currentTeams) => [savedTeam as Team, ...currentTeams]);
-  };
-
-  // Remove team handler
-  const handleRemoveTeam = async (teamId: string) => {
-    await deleteAdminTeam(teamId);
-    setTeams((currentTeams) => currentTeams.filter((team) => team.id !== teamId));
-    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.teamA !== teamId && fixture.teamB !== teamId));
-  };
-
-  // Update team handler
-  const handleUpdateTeam = async (updatedTeam: Team) => {
-    const savedTeam = await updateAdminTeam(updatedTeam);
-    setTeams((currentTeams) => currentTeams.map((team) => team.id === savedTeam.id ? savedTeam as Team : team));
-  };
 
   // Recalculate team standings (wins/losses) based on completed fixtures
   const recalculateStandings = (allFixtures = fixtures) => {
@@ -210,32 +696,24 @@ export default function AdminDashboard() {
     setTeams(updatedTeams);
   };
 
-  // Save fixtures to Firestore so user and volunteer dashboards update in real time.
-  const handleGenerateFixtures = async (newFixtures: Fixture[]) => {
-    const savedFixtures = await replaceAdminFixtures(newFixtures);
-    setFixtures(savedFixtures as Fixture[]);
+  const handleAutomaticFixturesGenerated = async () => {
+    const nextFixtures = await getAdminFixtures();
+    setFixtures(nextFixtures as Fixture[]);
+  };
 
-    if (newFixtures.length > 0) {
-      const scheduleDocumentHtml = buildFixtureFlowchartDoc(newFixtures, teams);
-
-      await createAdminAnnouncement({
-        title: "Fixtures Published",
-        message: `${newFixtures.length} tournament fixture${newFixtures.length === 1 ? "" : "s"} published. Download the flowchart schedule from Announcements.`,
-        visibleToPublic: true,
-        attachmentName: "invicta-fixture-flowchart.doc",
-        attachmentType: "application/msword",
-        attachmentHtml: scheduleDocumentHtml,
-      });
-    }
-    // Reset standings count
-    recalculateStandings(newFixtures);
+  const handleDeleteFixtureGroup = async (fixtureIds: string[]) => {
+    await deleteAdminFixtures(fixtureIds);
+    const nextFixtures = await getAdminFixtures();
+    setFixtures(nextFixtures as Fixture[]);
+    recalculateStandings(nextFixtures as Fixture[]);
   };
 
   // Delete single fixture
   const handleDeleteFixture = async (fixtureId: string) => {
     await deleteAdminFixture(fixtureId);
-    setFixtures((currentFixtures) => currentFixtures.filter((fixture) => fixture.id !== fixtureId));
-    recalculateStandings(fixtures.filter((fixture) => fixture.id !== fixtureId));
+    const nextFixtures = await getAdminFixtures();
+    setFixtures(nextFixtures as Fixture[]);
+    recalculateStandings(nextFixtures as Fixture[]);
   };
 
   // Update fixture handler
@@ -246,8 +724,8 @@ export default function AdminDashboard() {
     recalculateStandings(nextFixtures);
   };
 
-  const handleLogout = () => {
-    clearPortalSession();
+  const handleLogout = async () => {
+    await logoutPortalSession();
     router.replace("/login");
   };
 
@@ -267,20 +745,15 @@ export default function AdminDashboard() {
     <div className="dashboard-surface min-h-screen bg-background text-foreground pb-12">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-            <div className="flex h-16 w-48 shrink-0 items-center justify-start overflow-hidden sm:h-20 sm:w-60">
-              <img
-                src="/msu-logo-transparent.png"
-                alt="Medhavi Skills University"
-                className="h-auto w-full object-contain"
-              />
-            </div>
-            <div className="space-y-1">
-              <h1 className="sport-heading text-2xl font-black sm:text-3xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
+            <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
+            <div className="space-y-0.5 sm:space-y-1">
+              <h1 className="sport-heading text-lg font-black sm:text-3xl">
                 {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}
               </h1>
-              <p className="max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+              <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
                 {canManageSetup
                   ? "Set up tournaments, add sport teams, publish fixtures, and manage sport-level coordinators and volunteers."
                   : "View system role accounts, coordinator hierarchy, volunteers, teams, fixtures, and tournament permissions."}
@@ -288,13 +761,14 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <button
               onClick={handleLogout}
-              className="group relative flex items-center gap-2 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:px-6"
+              className="group relative flex items-center gap-1.5 overflow-hidden rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-red-500 transition-all hover:bg-red-500 hover:text-white active:scale-95 cursor-pointer sm:gap-2 sm:px-6 sm:py-3"
             >
-              <LogOut size={18} />
-              <span className="text-xs font-black uppercase tracking-[0.2em]">
+              <LogOut size={16} className="sm:size-[18px]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] sm:text-xs sm:tracking-[0.2em]">
                 Sign Out
               </span>
             </button>
@@ -303,17 +777,18 @@ export default function AdminDashboard() {
 
         {/* Navigation Tabs */}
         <div className="border-t border-border flex">
-          <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
+          <div className="mx-auto flex w-full max-w-7xl gap-0.5 overflow-x-auto px-3 sm:gap-1 sm:px-6">
             {(canManageSetup
               ? [
                   { id: "dashboard" as const, label: "Overview" },
                   { id: "tournaments" as const, label: "Sports Setup" },
-                  { id: "teams" as const, label: "Teams" },
-                  { id: "fixtures" as const, label: "Create Fixtures" },
+                  { id: "teams" as const, label: "Approved Teams" },
+                  { id: "generate-fixtures" as const, label: "Generate Fixtures" },
                   { id: "schedule" as const, label: "Match Schedule" },
                   { id: "leaderboard" as const, label: "League Tables" },
                   { id: "rules" as const, label: "Rules" },
                   { id: "users" as const, label: "System Users" },
+                  { id: "approvals" as const, label: "Approvals" },
                 ]
               : [
                   { id: "dashboard" as const, label: "Overview" },
@@ -325,7 +800,7 @@ export default function AdminDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap border-b-2 px-4 py-4 text-xs font-black uppercase tracking-[0.1em] transition-all cursor-pointer sm:px-6 sm:text-sm ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:px-6 sm:py-4 sm:text-sm sm:tracking-[0.1em] ${
                   activeTab === tab.id
                     ? "border-accent text-accent"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -341,13 +816,19 @@ export default function AdminDashboard() {
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {activeTab === "dashboard" && (
-          <AdminOverview
-            teams={teams}
-            fixtures={fixtures}
-            setActiveTab={setActiveTab}
-            onUpdateTeam={handleUpdateTeam}
-            canManageSetup={canManageSetup}
-          />
+          <>
+            {canManageSetup && (
+              <div className="mb-6 flex justify-end">
+                <DownloadApprovedRegistrationsButton />
+              </div>
+            )}
+            <AdminOverview
+              teams={teams}
+              fixtures={fixtures}
+              setActiveTab={setActiveTab}
+              canManageSetup={canManageSetup}
+            />
+          </>
         )}
 
         {activeTab === "tournaments" && canManageSetup && (
@@ -355,18 +836,35 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "teams" && canManageSetup && (
-          <TeamManager
-            teams={teams}
-            onAddTeam={handleAddTeam}
-            onRemoveTeam={handleRemoveTeam}
-            onUpdateTeam={handleUpdateTeam}
+          <ApprovedTeamsPanel
+            onTeamDeleted={(registration) => {
+              setTeams((currentTeams) =>
+                currentTeams.filter((team) => {
+                  const mongoTeam = team as Team & { sportId?: string; captainRegNo?: string };
+                  const sameRegistration = (
+                    mongoTeam.sportId === registration.sportId &&
+                    team.category === registration.category &&
+                    team.department === registration.department &&
+                    team.name === registration.teamName
+                  );
+                  const sameCaptain = (
+                    mongoTeam.sportId === registration.sportId &&
+                    team.category === registration.category &&
+                    team.department === registration.department &&
+                    mongoTeam.captainRegNo === registration.captainRegNo
+                  );
+                  return !sameRegistration && !sameCaptain;
+                })
+              );
+            }}
           />
         )}
 
-        {activeTab === "fixtures" && canManageSetup && (
-          <FixtureGenerator
-            teams={teams}
-            onGenerateFixtures={handleGenerateFixtures}
+        {activeTab === "generate-fixtures" && canManageSetup && (
+          <AutomaticFixtureGenerator
+            fixtures={fixtures}
+            onGenerated={handleAutomaticFixturesGenerated}
+            onDeleteFixtureGroup={handleDeleteFixtureGroup}
           />
         )}
 
@@ -389,7 +887,19 @@ export default function AdminDashboard() {
 
         {activeTab === "rules" && <RulesViewer />}
 
-        {activeTab === "users" && <UsersViewer teams={teams} canManageAccounts={canManageSetup} />}
+        {activeTab === "users" && (
+          <UsersViewer
+            teams={teams}
+            canManageAccounts={canManageSetup}
+            onTeamUpdated={(updatedTeam) => {
+              setTeams((currentTeams) => currentTeams.map((team) => team.id === updatedTeam.id ? updatedTeam : team));
+            }}
+          />
+        )}
+
+        {activeTab === "approvals" && canManageSetup && (
+          <ApprovalsPanel />
+        )}
       </div>
     </div>
   );

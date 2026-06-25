@@ -1,8 +1,13 @@
 import mongoose from "mongoose";
 
 export async function connectDB() {
-  const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/sports_management";
+  const mongoUri = process.env.MONGO_URI;
   const dbName = process.env.MONGO_DB_NAME || "sports_management";
+
+  if (!mongoUri) {
+    console.error("MONGO_URI is required. Configure it with your MongoDB Atlas connection string.");
+    process.exit(1);
+  }
 
   try {
     const connection = await mongoose.connect(mongoUri, {

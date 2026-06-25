@@ -1,4 +1,4 @@
-import { AuthSession, clearSession, getStoredSession, storeSession } from "@/lib/api";
+import { AuthSession, clearSession, getStoredSession, logoutRoleAccount, storeSession } from "@/lib/api";
 
 export type PortalRole = "admin" | "supercoordinator" | "volunteer" | "coordinator";
 
@@ -16,9 +16,9 @@ export interface RoleAccount {
 }
 
 export const roleHomePath: Record<PortalRole, string> = {
-  admin: "/admin",
+  admin: "/admin-dashboard",
   supercoordinator: "/admin",
-  volunteer: "/volunteer",
+  volunteer: "/volunteer-dashboard",
   coordinator: "/coordinator-dashboard",
 };
 
@@ -46,10 +46,10 @@ export function clearPortalSession() {
   clearSession();
 }
 
-export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
-  if (requiredRole === "admin") {
-    return accountRole === "admin" || accountRole === "supercoordinator";
-  }
+export async function logoutPortalSession() {
+  await logoutRoleAccount();
+}
 
-  return accountRole === requiredRole;
+export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
+  return accountRole === "admin" || accountRole === "supercoordinator" || accountRole === requiredRole;
 }

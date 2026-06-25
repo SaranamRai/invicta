@@ -40,9 +40,11 @@ export default function PublicRegisterPage() {
   const [phone, setPhone] = useState("");
   const [captainRegNo, setCaptainRegNo] = useState("");
   const [department, setDepartment] = useState("");
+  const [tournamentId, setTournamentId] = useState("");
   const [sportId, setSportId] = useState("");
   const [category, setCategory] = useState<"Male" | "Female">("Male");
   const [members, setMembers] = useState<MemberInput[]>([]);
+  const [tournamentOptions, setTournamentOptions] = useState<TournamentPayload[]>([]);
   const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -52,6 +54,10 @@ export default function PublicRegisterPage() {
   const selectedSport = useMemo(
     () => sportOptions.find((sport) => sport._id === sportId),
     [sportId, sportOptions]
+  );
+  const selectedTournament = useMemo(
+    () => tournamentOptions.find((tournament) => tournament._id === tournamentId),
+    [tournamentId, tournamentOptions]
   );
   const minPlayers = Math.max(1, Number(selectedSport?.minPlayers || 1));
   const maxPlayers = Math.max(minPlayers, Number(selectedSport?.maxPlayers || minPlayers));
@@ -81,8 +87,13 @@ export default function PublicRegisterPage() {
       .filter((tournament) => tournament.startTime > nowTime)
       .sort((a, b) => a.startTime - b.startTime)[0] || null;
 
+    setTournamentOptions(validOpenTournaments);
     setRegistrationOpen(Boolean(activeTournament));
     setNextTournament(upcomingTournament);
+    setTournamentId((current) => {
+      if (current && validOpenTournaments.some((tournament) => tournament._id === current)) return current;
+      return activeTournament?._id || validOpenTournaments[0]?._id || "";
+    });
   };
 
   const formatDate = (value: string) => {
@@ -138,7 +149,7 @@ export default function PublicRegisterPage() {
     const cleanPhone = normalizePhone(phone);
     const cleanCaptainRegNo = normalizeRegNo(captainRegNo);
 
-    if (!captainName.trim() || !cleanCaptainRegNo || !email.trim() || !phone.trim() || !cleanDepartment || !sportId) {
+    if (!captainName.trim() || !cleanCaptainRegNo || !email.trim() || !phone.trim() || !cleanDepartment || !tournamentId || !sportId) {
       setStatus("error");
       setMessage("Please fill all required team contact details.");
       return;
@@ -169,7 +180,8 @@ export default function PublicRegisterPage() {
         name: cleanDepartment,
         teamName: cleanDepartment,
         department: cleanDepartment,
-        sport: (selectedSport?.sportName || selectedSport?.name || sportId).trim().toLowerCase().replace(/\s+/g, "-"),
+        tournamentId,
+        tournamentName: selectedTournament?.name || "",
         sportId,
         sportName: selectedSport?.sportName || selectedSport?.name,
         category,
@@ -270,6 +282,13 @@ export default function PublicRegisterPage() {
                 </Field>
                 <Field label="Department *">
                   <input value={department} onChange={(event) => setDepartment(event.target.value)} required className="input-light uppercase" placeholder="CSE, Management, Applied Sciences" />
+                </Field>
+                <Field label="Tournament *">
+                  <select value={tournamentId} onChange={(event) => setTournamentId(event.target.value)} className="input-light" required>
+                    {tournamentOptions.map((item) => (
+                      <option key={item._id} value={item._id}>{item.name}</option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="Sport *">
                   <select value={sportId} onChange={(event) => { setSportId(event.target.value); setMembers([]); }} className="input-light" required>

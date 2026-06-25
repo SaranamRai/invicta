@@ -2,10 +2,10 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MatchData, MatchPeriod, ScoreEvent } from "@/lib/types";
+import { MatchData, MatchPeriod, ScoreEvent, VolleyballSet } from "@/lib/types";
 import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, Flag, Loader2, Pause, Play, Save, Square } from "lucide-react";
+import { ChevronLeft, Flag, Loader2, Pause, Play, Plus, Save, Square } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +15,7 @@ import {
   getMatchElapsedSeconds,
   getMatchFullTimeSeconds,
   getMatchPeriod,
+  getScheduledFullTimeSeconds,
   parseMatchClock,
 } from "@/lib/match-clock";
 import { getRoleAccount } from "@/lib/role-auth";
@@ -36,10 +37,19 @@ export default function LiveMatchEditPanel() {
   const [status, setStatus] = useState<MatchData['status']>("Upcoming");
   const [timer, setTimer] = useState("");
   const [fullMatchTimer, setFullMatchTimer] = useState("90:00");
+  const [extraTimeMinutes, setExtraTimeMinutes] = useState(5);
   const [announcement, setAnnouncement] = useState("");
   const [pauseReason, setPauseReason] = useState("Timeout");
+  const [currentSetScoreA, setCurrentSetScoreA] = useState(0);
+  const [currentSetScoreB, setCurrentSetScoreB] = useState(0);
+  const [volleyballSets, setVolleyballSets] = useState<VolleyballSet[]>([]);
+  const [winner, setWinner] = useState<"A" | "B" | "">("");
   const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
   const pauseReasons = ["Fault", "Player exchange", "Injury", "Timeout", "Referee issue", "Technical delay"];
+  const sportKey = (match?.sportName || match?.sport || assignedSport || "").trim().toLowerCase().replace(/\s+/g, "-");
+  const isFootball = sportKey.includes("football");
+  const isVolleyball = sportKey.includes("volleyball");
+  const isUntimedSport = !isFootball;
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -65,7 +75,9 @@ export default function LiveMatchEditPanel() {
         setScoreB(data.scoreB || 0);
         setStatus(data.status || "Upcoming");
         setTimer(data.timer || "");
-        setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(data)));
+        setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(data)));
+        setVolleyballSets(data.volleyballSets || []);
+        setWinner(data.winner || "");
         setLoading(false);
       }
     }
@@ -85,7 +97,7 @@ export default function LiveMatchEditPanel() {
   };
 
   useEffect(() => {
-    if (!match || saving || autoStoppingRef.current || match.status !== "Live" || !match.clockRunning) return;
+    if (!isFootball || !match || saving || autoStoppingRef.current || match.status !== "Live" || !match.clockRunning) return;
 
     const elapsedSeconds = getMatchElapsedSeconds(match, now || Date.now());
     const stopState = getClockStopState(elapsedSeconds, getMatchPeriod(match), getMatchFullTimeSeconds(match));
@@ -112,7 +124,7 @@ export default function LiveMatchEditPanel() {
         await logActivity(matchId, `Auto stopped at ${stopState.period} (${timer})`, email);
         setStatus(stopState.status);
         setTimer(timer);
-        setFullMatchTimer(formatMatchClock(getMatchFullTimeSeconds(match)));
+        setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(match)));
         showMessage(stopState.status === "Finished" ? "Match ended automatically at full time." : "Clock stopped automatically at half time.", "success");
       } catch (error) {
         console.error(error);
@@ -124,7 +136,7 @@ export default function LiveMatchEditPanel() {
     };
 
     void stopClock();
-  }, [match, matchId, now, saving]);
+  }, [isFootball, match, matchId, now, saving]);
 
   const persistClockState = async (
     period: MatchPeriod,
@@ -138,11 +150,8 @@ export default function LiveMatchEditPanel() {
     try {
       const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
-      const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
-      const nextFullMatchSeconds = enteredFullMatchSeconds || getMatchFullTimeSeconds(match);
       const elapsedSeconds = elapsedSecondsOverride ?? getMatchElapsedSeconds(match, now || currentNow);
       const timer = formatMatchClock(elapsedSeconds);
-      const nextFullMatchTimer = formatMatchClock(nextFullMatchSeconds);
 
       await updateMatchDetails(matchId, {
         status: nextStatus,
@@ -152,14 +161,13 @@ export default function LiveMatchEditPanel() {
         startedAt: elapsedSecondsOverride === 0 ? currentNow : match.startedAt || currentNow,
         endedAt: nextStatus === "Finished" ? currentNow : match.endedAt || 0,
         elapsedSeconds,
-        fullMatchSeconds: nextFullMatchSeconds,
         timer,
       });
 
       await logActivity(matchId, `${period}: ${clockRunning ? "clock started" : "clock paused"} at ${timer}`, email);
       setStatus(nextStatus);
       setTimer(timer);
-      setFullMatchTimer(nextFullMatchTimer);
+      setFullMatchTimer(formatMatchClock(getScheduledFullTimeSeconds(match)));
       showMessage(nextStatus === "Finished" ? "Match ended and synced to dashboard." : "Clock updated.", "success");
     } catch (error) {
       console.error(error);
@@ -251,6 +259,40 @@ export default function LiveMatchEditPanel() {
     }
   };
 
+  const handleAddExtraTime = async () => {
+    if (!match || match.status === "Upcoming") return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const minutesToAdd = Math.max(1, Math.floor(extraTimeMinutes || 0));
+      const nextExtraTimeSeconds = Math.max(0, match.extraTimeSeconds || 0) + minutesToAdd * 60;
+      const elapsedSeconds = getMatchElapsedSeconds(match, now || Date.now());
+      const nextStatus = match.status === "Finished" ? "Live" : match.status;
+      const nextPeriod = match.period === "Full Time" ? "Second Half" : getMatchPeriod(match);
+
+      await updateMatchDetails(matchId, {
+        status: nextStatus,
+        period: nextPeriod,
+        clockRunning: false,
+        timerStartedAt: 0,
+        endedAt: 0,
+        elapsedSeconds,
+        timer: formatMatchClock(elapsedSeconds),
+        extraTimeSeconds: nextExtraTimeSeconds,
+      });
+
+      await logActivity(matchId, `Added ${minutesToAdd} minute${minutesToAdd === 1 ? "" : "s"} extra time`, email);
+      setStatus(nextStatus);
+      showMessage(`${minutesToAdd} minute${minutesToAdd === 1 ? "" : "s"} extra time added. Start the clock when ready.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to add extra time.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const recordScore = async (team: "A" | "B", points: number) => {
     if (!match || match.status === "Finished") return;
 
@@ -258,8 +300,8 @@ export default function LiveMatchEditPanel() {
     try {
       const email = getRoleAccount()?.email || "volunteer";
       const currentNow = Date.now();
-      const elapsedSeconds = getMatchElapsedSeconds(match, now || currentNow);
-      const matchTime = formatMatchClock(elapsedSeconds);
+      const elapsedSeconds = isFootball ? getMatchElapsedSeconds(match, now || currentNow) : 0;
+      const matchTime = isFootball ? formatMatchClock(elapsedSeconds) : "No time limit";
       const nextScoreA = team === "A" ? scoreA + points : scoreA;
       const nextScoreB = team === "B" ? scoreB + points : scoreB;
       const teamName = team === "A" ? match.teamA : match.teamB;
@@ -270,7 +312,7 @@ export default function LiveMatchEditPanel() {
         points,
         scoreA: nextScoreA,
         scoreB: nextScoreB,
-        period: getMatchPeriod(match),
+        period: isFootball ? getMatchPeriod(match) : "Result",
         matchTime,
         elapsedSeconds,
         timestamp: currentNow,
@@ -283,16 +325,215 @@ export default function LiveMatchEditPanel() {
       await updateMatchDetails(matchId, {
         scoreA: nextScoreA,
         scoreB: nextScoreB,
-        status: "Live",
+        status: status === "Upcoming" ? "Live" : status,
         elapsedSeconds,
         timer: matchTime,
+        clockRunning: isFootball ? match.clockRunning : false,
         scoreEvents: [scoreEvent, ...(match.scoreEvents || [])].slice(0, 100),
       });
-      await logActivity(matchId, `${teamName} +${points} at ${matchTime} (${scoreEvent.period}). Score ${nextScoreA}-${nextScoreB}`, email);
-      showMessage("Point recorded with match time.", "success");
+      await logActivity(matchId, `${teamName} +${points}${isFootball ? ` at ${matchTime}` : ""} (${scoreEvent.period}). Score ${nextScoreA}-${nextScoreB}`, email);
+      showMessage(isFootball ? "Point recorded with match time." : "Point recorded.", "success");
     } catch (error) {
       console.error(error);
       showMessage("Failed to record point.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getSetWins = (sets: VolleyballSet[]) => ({
+    A: sets.filter((set) => set.winner === "A").length,
+    B: sets.filter((set) => set.winner === "B").length,
+  });
+
+  const getNextVolleyballSetNumber = (sets: VolleyballSet[]) => Math.min(sets.length + 1, 3);
+  const isVolleyballSetRunning = () => {
+    const nextSetNumber = getNextVolleyballSetNumber(volleyballSets);
+    return match?.status === "Live" && match.startedAt && match.period === (`Set ${nextSetNumber}` as MatchPeriod);
+  };
+
+  const handleStartVolleyballSet = async () => {
+    if (!match || match.status === "Finished") return;
+    if (volleyballSets.length >= 3) {
+      showMessage("All three volleyball sets have already been played.", "error");
+      return;
+    }
+    if (isVolleyballSetRunning()) {
+      showMessage(`Set ${getNextVolleyballSetNumber(volleyballSets)} is already running.`, "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const currentNow = Date.now();
+      const nextSetNumber = getNextVolleyballSetNumber(volleyballSets);
+      const nextPeriod = `Set ${nextSetNumber}` as MatchPeriod;
+
+      await updateMatchDetails(matchId, {
+        status: "Live",
+        period: nextPeriod,
+        startedAt: currentNow,
+        elapsedSeconds: 0,
+        timer: "00:00",
+        clockRunning: false,
+      });
+      await logActivity(matchId, `Volleyball set ${nextSetNumber} begins`, email);
+
+      setStatus("Live");
+      setTimer("00:00");
+      setMatch((current) => current ? {
+        ...current,
+        status: "Live",
+        period: nextPeriod,
+        startedAt: currentNow,
+        elapsedSeconds: 0,
+        timer: "00:00",
+        clockRunning: false,
+      } : current);
+      showMessage(`Set ${nextSetNumber} started.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to start volleyball set.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const recordVolleyballSet = async (nextSetWinner: "A" | "B") => {
+    if (!match || match.status === "Finished") return;
+    if (!isVolleyballSetRunning()) {
+      showMessage(`Start set ${getNextVolleyballSetNumber(volleyballSets)} before finishing it.`, "error");
+      return;
+    }
+    if (currentSetScoreA === currentSetScoreB) {
+      showMessage("A volleyball set cannot end tied.", "error");
+      return;
+    }
+    if ((nextSetWinner === "A" && currentSetScoreA < currentSetScoreB) || (nextSetWinner === "B" && currentSetScoreB < currentSetScoreA)) {
+      showMessage("The set winner must have the higher set score.", "error");
+      return;
+    }
+    if (volleyballSets.length >= 3) {
+      showMessage("All three sets have already been played.", "error");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const currentNow = Date.now();
+      const setStartedAt = match.startedAt || currentNow;
+      const durationSeconds = Math.max(0, Math.floor((currentNow - setStartedAt) / 1000));
+      const setFullTime = formatMatchClock(durationSeconds);
+      const nextSet: VolleyballSet = {
+        setNumber: volleyballSets.length + 1,
+        scoreA: currentSetScoreA,
+        scoreB: currentSetScoreB,
+        winner: nextSetWinner,
+        winnerName: nextSetWinner === "A" ? match.teamA : match.teamB,
+        startedAt: setStartedAt,
+        finishedAt: currentNow,
+        durationSeconds,
+        fullTime: setFullTime,
+        timestamp: currentNow,
+      };
+      const nextSets = [...volleyballSets, nextSet];
+      const setWins = getSetWins(nextSets);
+      const matchWinner: "A" | "B" | "" = setWins.A >= 2 ? "A" : setWins.B >= 2 ? "B" : "";
+      const nextStatus: MatchData["status"] = matchWinner ? "Finished" : "Live";
+      const scoreEvent: ScoreEvent = {
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${currentNow}-set-${nextSet.setNumber}`,
+        team: nextSetWinner,
+        teamName: nextSet.winnerName,
+        points: 1,
+        scoreA: setWins.A,
+        scoreB: setWins.B,
+        period: `Set ${nextSet.setNumber}` as MatchPeriod,
+        matchTime: "No time limit",
+        elapsedSeconds: 0,
+        timestamp: currentNow,
+        volunteerEmail: email,
+      };
+
+      await updateMatchDetails(matchId, {
+        scoreA: setWins.A,
+        scoreB: setWins.B,
+        status: nextStatus,
+        clockRunning: false,
+        startedAt: 0,
+        endedAt: matchWinner ? currentNow : 0,
+        elapsedSeconds: durationSeconds,
+        timer: setFullTime,
+        period: matchWinner ? "Result" : (`Set ${Math.min(nextSet.setNumber + 1, 3)}` as MatchPeriod),
+        volleyballSets: nextSets,
+        winner: matchWinner,
+        winnerName: matchWinner ? (matchWinner === "A" ? match.teamA : match.teamB) : "",
+        scoreEvents: [scoreEvent, ...(match.scoreEvents || [])].slice(0, 100),
+      });
+
+      await logActivity(
+        matchId,
+        `Volleyball set ${nextSet.setNumber} finished in ${setFullTime}: ${match.teamA} ${currentSetScoreA}-${currentSetScoreB} ${match.teamB}. ${nextSet.winnerName} won the set${matchWinner ? " and the match" : `. Set ${nextSet.setNumber + 1} begins next`}.`,
+        email
+      );
+      setVolleyballSets(nextSets);
+      setScoreA(setWins.A);
+      setScoreB(setWins.B);
+      setWinner(matchWinner);
+      setStatus(nextStatus);
+      setCurrentSetScoreA(0);
+      setCurrentSetScoreB(0);
+      setTimer(setFullTime);
+      setMatch((current) => current ? {
+        ...current,
+        scoreA: setWins.A,
+        scoreB: setWins.B,
+        status: nextStatus,
+        period: matchWinner ? "Result" : (`Set ${Math.min(nextSet.setNumber + 1, 3)}` as MatchPeriod),
+        volleyballSets: nextSets,
+        winner: matchWinner,
+        winnerName: matchWinner ? (matchWinner === "A" ? match.teamA : match.teamB) : "",
+        startedAt: 0,
+        endedAt: matchWinner ? currentNow : 0,
+        elapsedSeconds: durationSeconds,
+        timer: setFullTime,
+        clockRunning: false,
+      } : current);
+      showMessage(matchWinner ? `${matchWinner === "A" ? match.teamA : match.teamB} won the match.` : `Set ${nextSet.setNumber} saved. Start set ${nextSet.setNumber + 1} when ready.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to record volleyball set.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectMatchWinner = async (nextWinner: "A" | "B") => {
+    if (!match) return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const winnerName = nextWinner === "A" ? match.teamA : match.teamB;
+      await updateMatchDetails(matchId, {
+        scoreA,
+        scoreB,
+        status: "Finished",
+        clockRunning: false,
+        elapsedSeconds: 0,
+        timer: "",
+        period: "Result",
+        winner: nextWinner,
+        winnerName,
+      });
+      await logActivity(matchId, `Winner selected: ${winnerName}. Final score ${scoreA}-${scoreB}`, email);
+      setWinner(nextWinner);
+      setStatus("Finished");
+      showMessage(`${winnerName} marked as winner.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to save winner.", "error");
     } finally {
       setSaving(false);
     }
@@ -303,11 +544,27 @@ export default function LiveMatchEditPanel() {
     setSaving(true);
     try {
       const email = getRoleAccount()?.email || "volunteer";
-      const enteredElapsedSeconds = parseMatchClock(timer);
-      const enteredFullMatchSeconds = parseMatchClock(fullMatchTimer);
-      const nextFullMatchSeconds = match
-        ? enteredFullMatchSeconds || getMatchFullTimeSeconds(match)
-        : enteredFullMatchSeconds;
+      if (isUntimedSport) {
+        const winnerName = winner ? (winner === "A" ? match?.teamA : match?.teamB) || "" : "";
+        await updateMatchDetails(matchId, {
+          scoreA,
+          scoreB,
+          status,
+          clockRunning: false,
+          elapsedSeconds: 0,
+          timer: "",
+          period: isVolleyball ? (`Set ${Math.min(volleyballSets.length + 1, 3)}` as MatchPeriod) : "Result",
+          volleyballSets: isVolleyball ? volleyballSets : undefined,
+          winner,
+          winnerName,
+        });
+        await logActivity(matchId, `Updated match status to ${status}. Score: ${scoreA}-${scoreB}${winnerName ? `. Winner: ${winnerName}` : ""}`, email);
+        showMessage("Match details updated successfully!", "success");
+        return;
+      }
+
+      const enteredElapsedSeconds = match ? getMatchElapsedSeconds(match, now || Date.now()) : parseMatchClock(timer);
+      const nextFullMatchSeconds = match ? getMatchFullTimeSeconds(match) : parseMatchClock(fullMatchTimer);
       const stopState = match ? getClockStopState(enteredElapsedSeconds, getMatchPeriod(match), nextFullMatchSeconds) : null;
       const nextElapsedSeconds = stopState?.elapsedSeconds ?? enteredElapsedSeconds;
       const nextTimer = formatMatchClock(nextElapsedSeconds);
@@ -323,7 +580,6 @@ export default function LiveMatchEditPanel() {
         period: nextPeriod,
         timer: nextTimer,
         elapsedSeconds: nextElapsedSeconds,
-        fullMatchSeconds: nextFullMatchSeconds,
         clockRunning: stopState || nextStatus === "Finished" ? false : match?.clockRunning || false,
         timerStartedAt: stopState || nextStatus === "Finished" || !match?.clockRunning ? 0 : currentNow,
         endedAt: nextStatus === "Finished" ? currentNow : match?.endedAt || 0,
@@ -331,7 +587,7 @@ export default function LiveMatchEditPanel() {
       
       setStatus(nextStatus);
       setTimer(nextTimer);
-      setFullMatchTimer(nextFullMatchTimer);
+      setFullMatchTimer(formatMatchClock(match ? getScheduledFullTimeSeconds(match) : nextFullMatchSeconds));
 
       let actionLog = `Updated match status to ${nextStatus}. Score: ${scoreA}-${scoreB}`;
       if (nextTimer) actionLog += `. Timer: ${nextTimer}`;
@@ -377,6 +633,12 @@ export default function LiveMatchEditPanel() {
     );
   }
 
+  const activeVolleyballSetNumber = getNextVolleyballSetNumber(volleyballSets);
+  const volleyballSetRunning = Boolean(isVolleyballSetRunning());
+  const volleyballSetClock = volleyballSetRunning && match.startedAt
+    ? formatMatchClock(Math.max(0, Math.floor(((now || match.startedAt) - match.startedAt) / 1000)))
+    : timer || match.timer || "00:00";
+
   return (
     <div className="space-y-10">
       <div className="flex items-center gap-4">
@@ -403,6 +665,7 @@ export default function LiveMatchEditPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Controls */}
         <div className="lg:col-span-2 space-y-8">
+          {isFootball && (
           <Card className="bg-white/5 border-white/10 p-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -480,6 +743,7 @@ export default function LiveMatchEditPanel() {
               </div>
             </div>
           </Card>
+          )}
 
           <Card className="bg-white/5 border-white/10 p-8">
             <h2 className="text-xl font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-6">
@@ -488,7 +752,7 @@ export default function LiveMatchEditPanel() {
             
             <form onSubmit={handleSave} className="space-y-8">
               {/* Status & Timer */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`grid grid-cols-1 gap-6 ${isFootball ? "md:grid-cols-3" : !isVolleyball ? "md:grid-cols-2" : ""}`}>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Status</label>
                   <select 
@@ -501,29 +765,159 @@ export default function LiveMatchEditPanel() {
                     <option value="Finished">Finished</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Timer</label>
-                  <input 
-                    type="text" 
-                    value={timer}
-                    onChange={(e) => setTimer(e.target.value)}
-                    placeholder="00:00"
-                    className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Full Match Time</label>
-                  <input
-                    type="text"
-                    value={fullMatchTimer}
-                    onChange={(e) => setFullMatchTimer(e.target.value)}
-                    placeholder="90:00"
-                    className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white"
-                  />
-                </div>
+                {isFootball ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Timer</label>
+                      <input
+                        type="text"
+                        value={getMatchClockText(match, now)}
+                        readOnly
+                        placeholder="00:00"
+                        className="w-full h-14 bg-black/30 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight text-slate-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Full Match Time</label>
+                      <input
+                        type="text"
+                        value={fullMatchTimer}
+                        readOnly
+                        className="w-full h-14 bg-black/30 border border-white/10 rounded-2xl px-4 text-sm font-bold tracking-tight text-slate-300"
+                      />
+                    </div>
+                  </>
+                ) : !isVolleyball ? (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Winner</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => selectMatchWinner("A")}
+                        disabled={saving}
+                        className={`h-14 rounded-2xl border px-3 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                          winner === "A" ? "border-accent bg-accent text-accent-foreground" : "border-white/10 bg-black/30 text-white hover:border-accent"
+                        }`}
+                      >
+                        {match.teamA}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => selectMatchWinner("B")}
+                        disabled={saving}
+                        className={`h-14 rounded-2xl border px-3 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                          winner === "B" ? "border-accent bg-accent text-accent-foreground" : "border-white/10 bg-black/30 text-white hover:border-accent"
+                        }`}
+                      >
+                        {match.teamB}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
+              {isFootball && (
+              <div className="grid gap-4 rounded-2xl border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_auto] md:items-end">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Extra Time Added</label>
+                    <div className="mt-2 h-12 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm font-black text-accent">
+                      {formatMatchClock(match.extraTimeSeconds || 0)}
+                    </div>
+                  </div>
+                  <label className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Add Minutes</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={extraTimeMinutes}
+                      onChange={(e) => setExtraTimeMinutes(Math.max(1, Number(e.target.value) || 1))}
+                      className="h-12 w-full rounded-xl border border-white/10 bg-black/40 px-4 text-sm font-bold text-white outline-none focus:border-accent"
+                    />
+                  </label>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stop Time</p>
+                    <p className="mt-2 h-12 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm font-black text-white">
+                      {formatMatchClock(getMatchFullTimeSeconds(match))}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddExtraTime}
+                  disabled={saving || match.status === "Upcoming"}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+                >
+                  <Plus size={15} /> Add Extra Time
+                </button>
+              </div>
+              )}
+
               {/* Score Editor */}
+              {isVolleyball ? (
+                <div className="space-y-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Set {activeVolleyballSetNumber} Score
+                      </p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        Match sets: {scoreA}-{scoreB} / Set time: {volleyballSetClock}
+                      </p>
+                    </div>
+                    {winner && (
+                      <span className="rounded-full bg-accent/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
+                        Winner: {winner === "A" ? match.teamA : match.teamB}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid gap-3 rounded-xl border border-white/10 bg-black/30 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-white">
+                        {volleyballSetRunning ? `Set ${activeVolleyballSetNumber} running` : winner ? "Match finished" : `Ready for set ${activeVolleyballSetNumber}`}
+                      </p>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        Start the set first. Finish it after entering the final set score.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleStartVolleyballSet}
+                      disabled={saving || volleyballSetRunning || match.status === "Finished"}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                    >
+                      <Play size={15} /> Start Set {activeVolleyballSetNumber}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-6 items-center">
+                    <div className="space-y-4 text-center">
+                      <label className="text-sm font-black uppercase tracking-widest text-white">{match.teamA}</label>
+                      <div className="flex items-center justify-center gap-4">
+                        <button type="button" onClick={() => setCurrentSetScoreA(Math.max(0, currentSetScoreA - 1))} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold disabled:opacity-50">-</button>
+                        <span className="text-4xl font-black text-white w-16">{currentSetScoreA}</span>
+                        <button type="button" onClick={() => setCurrentSetScoreA(currentSetScoreA + 1)} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
+                      </div>
+                      <button type="button" onClick={() => recordVolleyballSet("A")} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
+                        Finish Set
+                      </button>
+                    </div>
+
+                    <div className="text-center text-slate-500 font-bold text-2xl">VS</div>
+
+                    <div className="space-y-4 text-center">
+                      <label className="text-sm font-black uppercase tracking-widest text-white">{match.teamB}</label>
+                      <div className="flex items-center justify-center gap-4">
+                        <button type="button" onClick={() => setCurrentSetScoreB(Math.max(0, currentSetScoreB - 1))} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 text-xl font-bold disabled:opacity-50">-</button>
+                        <span className="text-4xl font-black text-white w-16">{currentSetScoreB}</span>
+                        <button type="button" onClick={() => setCurrentSetScoreB(currentSetScoreB + 1)} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-12 w-12 rounded-xl bg-accent text-accent-foreground hover:scale-105 text-xl font-bold disabled:opacity-50">+</button>
+                      </div>
+                      <button type="button" onClick={() => recordVolleyballSet("B")} disabled={!volleyballSetRunning || saving || match.status === "Finished"} className="h-10 w-full rounded-xl bg-white/10 px-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 disabled:opacity-50">
+                        Finish Set
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-3 gap-6 items-center">
                 <div className="space-y-4 text-center">
                   <label className="text-sm font-black uppercase tracking-widest text-white">{match.teamA}</label>
@@ -545,6 +939,7 @@ export default function LiveMatchEditPanel() {
                   </div>
                 </div>
               </div>
+              )}
 
               <div className="pt-4">
                 <button 
@@ -562,6 +957,34 @@ export default function LiveMatchEditPanel() {
 
         {/* Sidebar Controls */}
         <div className="space-y-8">
+          {isVolleyball && (
+          <Card className="bg-white/5 border-white/10 p-6">
+            <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
+              Set History
+            </h2>
+            <div className="space-y-3">
+              {volleyballSets.length > 0 ? volleyballSets.map((set) => (
+                <div key={set.setNumber} className="rounded-xl border border-white/5 bg-black/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-black uppercase tracking-wide text-white">Set {set.setNumber}</p>
+                    <span className="font-mono text-xs font-black text-accent">{set.scoreA}-{set.scoreB}</span>
+                  </div>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    Winner: {set.winnerName}
+                  </p>
+                  {set.fullTime && (
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      Full time: {set.fullTime}
+                    </p>
+                  )}
+                </div>
+              )) : (
+                <p className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Completed sets will appear here</p>
+              )}
+            </div>
+          </Card>
+          )}
+
           <Card className="bg-white/5 border-white/10 p-6">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
               Scoring Timeline

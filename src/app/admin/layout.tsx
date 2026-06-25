@@ -5,5 +5,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <ProtectedRoute allowedRole="admin">{children}</ProtectedRoute>;
+  return <ProtectedRoute allowedRole={["admin", "supercoordinator"]}>{children}</ProtectedRoute>;
 }

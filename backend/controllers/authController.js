@@ -5,6 +5,10 @@ import Admin from "../models/Admin.js";
 import Volunteer from "../models/Volunteer.js";
 import Coordinator from "../models/Coordinator.js";
 import SuperCoordinator from "../models/SuperCoordinator.js";
+import { getEmailErrorMessage, sendAccountCreatedEmail } from "../utils/emailService.js";
+
+const AUTH_COOKIE_NAME = "sportsAuthToken";
+const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const roleModels = [
   { role: "admin", model: Admin },
@@ -32,51 +36,28 @@ function signToken(account, role) {
   );
 }
 
-async function sendRoleAccountEmail({ account, role, password }) {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || smtpUser;
-  const loginLink = process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:3000/login";
+function getCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
+  };
+}
 
-  if (!smtpHost || !smtpUser || !smtpPass || !from) {
-    return { sent: false, skipped: true };
-  }
-
-  try {
-    const nodemailer = await import("nodemailer");
-    const transporter = nodemailer.default.createTransport({
-      host: smtpHost,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: String(process.env.SMTP_SECURE || "false") === "true",
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-    const roleLabel = role === "coordinator" ? "Coordinator" : role === "volunteer" ? "Volunteer" : role;
-    const assignedSport = account.assignedSport || "your assigned sport";
-
-    await transporter.sendMail({
-      from,
-      to: account.email,
-      subject: `INVlCTA ${roleLabel} Account`,
-      text: [
-        `Hello ${account.name},`,
-        "",
-        `You have been selected as ${roleLabel} for ${assignedSport} in INVlCTA Sports Management System.`,
-        "",
-        `Name: ${account.name}`,
-        `Email/Username: ${account.email}`,
-        `Role: ${roleLabel}`,
-        `Assigned sport: ${assignedSport}`,
-        `Password: ${password}`,
-        `Login link: ${loginLink}`,
-      ].join("\n"),
-    });
-
-    return { sent: true };
-  } catch (error) {
-    console.error(`Failed to send ${role} account email:`, error);
-    return { sent: false, error };
-  }
+function toSession(account, role, token) {
+  return {
+    ...(token ? { token } : {}),
+    role,
+    name: account.name,
+    id: account._id || account.id,
+    email: account.email,
+    department: account.department || "",
+    assignedSport: account.assignedSport?.toString?.() || account.assignedSport || "",
+    assignedSportId: account.assignedSportId?.toString?.() || account.assignedSportId || "",
+    assignedSportName: account.assignedSportName || "",
+  };
 }
 
 export async function login(req, res) {
@@ -97,18 +78,39 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    return res.json({
-      token: signToken(account, role),
-      role,
-      name: account.name,
-      id: account._id,
-      email: account.email,
-      department: account.department || "",
-      assignedSport: account.assignedSport?.toString?.() || "",
-    });
+    const token = signToken(account, role);
+    res.cookie(AUTH_COOKIE_NAME, token, getCookieOptions());
+    return res.json(toSession(account, role));
   }
 
   return res.status(403).json({ message: "Access denied" });
+}
+
+export function currentSession(req, res) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Login required" });
+  }
+
+  return res.json({
+    role: req.user.role,
+    name: req.user.name,
+    id: req.user.id,
+    email: req.user.email,
+    department: req.user.department || "",
+    assignedSport: req.user.assignedSport || "",
+    assignedSportId: req.user.assignedSportId || "",
+    assignedSportName: req.user.assignedSportName || "",
+  });
+}
+
+export function logout(_req, res) {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+  return res.json({ message: "Logged out" });
 }
 
 export async function createRoleAccount(model, role, req, res) {
@@ -119,9 +121,10 @@ export async function createRoleAccount(model, role, req, res) {
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
-  const exists = await Promise.any(
-    roleModels.map(({ model: roleModel }) => roleModel.findOne({ email: normalizedEmail }))
-  ).catch(() => null);
+  const existingAccounts = await Promise.all(
+    roleModels.map(({ model: roleModel }) => roleModel.findOne({ email: normalizedEmail }).lean())
+  );
+  const exists = existingAccounts.find(Boolean);
 
   if (exists) {
     return res.status(409).json({ message: "An account with this email already exists" });
@@ -140,9 +143,24 @@ export async function createRoleAccount(model, role, req, res) {
     createdByRole: req.user?.role,
   });
 
-  const emailResult = role === "coordinator" || role === "volunteer"
-    ? await sendRoleAccountEmail({ account, role, password })
-    : { sent: false, skipped: true };
+  const shouldSendDutyEmail = role === "coordinator" || role === "volunteer";
+  let emailResult = { sent: false, skipped: !shouldSendDutyEmail };
+  let emailErrorMessage = "";
+  if (shouldSendDutyEmail) {
+    try {
+      emailResult = await sendAccountCreatedEmail({
+        name: account.name,
+        email: account.email,
+        role,
+        assignedSport: account.assignedSportName || account.assignedSport || "",
+        password,
+      });
+    } catch (error) {
+      console.error(`Failed to send ${role} account email:`, error);
+      emailErrorMessage = getEmailErrorMessage(error);
+      emailResult = { sent: false, skipped: false };
+    }
+  }
 
   return res.status(201).json({
     id: account._id,
@@ -152,8 +170,9 @@ export async function createRoleAccount(model, role, req, res) {
     assignedSport: account.assignedSport || "",
     registrationNumber: account.registrationNumber || "",
     phone: account.phone || "",
-    message: emailResult.sent || emailResult.skipped
+    emailSent: emailResult.sent,
+    message: emailResult.sent || !shouldSendDutyEmail
       ? "Account created successfully."
-      : "Account created, but email could not be sent.",
+      : `Account created, but ${emailErrorMessage}`,
   });
 }

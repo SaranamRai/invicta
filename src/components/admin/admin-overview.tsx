@@ -10,14 +10,14 @@ import {
 } from "lucide-react";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPublicSports, MongoSport } from "@/lib/api";
+import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import { getAdminRoleAccounts, RoleAccountPayload } from "@/lib/api";
 
 interface AdminOverviewProps {
   teams: Team[];
   fixtures: Fixture[];
-  setActiveTab: (tab: "dashboard" | "teams" | "fixtures" | "schedule" | "users") => void;
-  onUpdateTeam: (team: Team) => void;
+  setActiveTab: (tab: "dashboard" | "teams" | "generate-fixtures" | "schedule" | "tournaments" | "leaderboard" | "rules" | "users" | "approvals") => void;
   canManageSetup?: boolean;
 }
 
@@ -50,8 +50,7 @@ export function AdminOverview({
   teams,
   fixtures,
   setActiveTab,
-  onUpdateTeam,
-  canManageSetup = true,
+  canManageSetup = false,
 }: AdminOverviewProps) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -61,20 +60,32 @@ export function AdminOverview({
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
-  const [sportsList, setSportsList] = useState<MongoSport[]>([]);
-
-  useEffect(() => {
-    getPublicSports().then(setSportsList).catch(() => {});
-  }, []);
+  const [roleAccounts, setRoleAccounts] = useState<RoleAccountPayload[]>([]);
+  const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
+  const [apiStatus, setApiStatus] = useState("Checking");
+  const [pageLoadMs, setPageLoadMs] = useState<number | null>(null);
 
   // Calculate stats
   const totalTeams = teams.length;
   const totalPlayers = teams.reduce((sum, team) => sum + (team.members?.length || 0), 0);
-  const totalSports = sportsList.length || teams.reduce((acc, t) => { acc.add(t.sport); return acc; }, new Set<string>()).size;
+  const totalSports = sports.length;
 
   const upcomingMatches = fixtures.filter(f => f.status === "scheduled");
   const ongoingMatches = fixtures.filter(f => f.status === "live");
   const completedMatches = fixtures.filter(f => f.status === "completed");
+  const recentMatchHistory = [...fixtures]
+    .filter((fixture) => fixture.status === "completed" || fixture.status === "live")
+    .sort((a, b) => `${b.date || ""}${b.time || ""}`.localeCompare(`${a.date || ""}${a.time || ""}`))
+    .slice(0, 6);
+  const teamsBySport = teams.reduce((acc, team) => {
+    const sportName = sports.find((sport) => sport.id === team.sport)?.name || team.sport || "Unassigned";
+    acc[sportName] = (acc[sportName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const roleCounts = roleAccounts.reduce((acc, account) => {
+    acc[account.role] = (acc[account.role] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   const totalMatches = fixtures.length;
   const completionRate = totalMatches > 0 ? Math.round((completedMatches.length / totalMatches) * 100) : 0;
@@ -86,11 +97,10 @@ export function AdminOverview({
 
     // Add recent activities based on teams
     teams.slice(-3).forEach(team => {
-      const sportName = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === team.sport)?.sportName || team.sport : team.sport;
       actList.push({
         id: `act-team-${team.id}`,
         type: "team",
-        message: `New team "${team.name}" was registered for ${sportName}.`,
+        message: `New team "${team.name}" was registered for ${sports.find(s => s.id === team.sport)?.name || team.sport}.`,
         timestamp: "Recently"
       });
     });
@@ -104,7 +114,7 @@ export function AdminOverview({
         timestamp: "Tournament Setup"
       });
     } else {
-      notifList.push("No fixtures have been published yet. Open Create Fixtures to build the match schedule.");
+      notifList.push("No fixtures have been published yet. Open Generate Fixtures to build the match schedule.");
     }
 
     // Check completed matches
@@ -120,6 +130,46 @@ export function AdminOverview({
     setActivities(actList);
     setNotifications(notifList);
   }, [teams, fixtures, completedMatches.length]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSystemHealth() {
+      try {
+        const accounts = await getAdminRoleAccounts();
+        if (isMounted) setRoleAccounts(accounts);
+      } catch {
+        if (isMounted) setRoleAccounts([]);
+      }
+
+      const start = Date.now();
+      try {
+        const response = await fetch("/api/health", { cache: "no-store" });
+        const latency = Date.now() - start;
+        if (!isMounted) return;
+        setApiLatencyMs(latency);
+        setApiStatus(response.ok ? "Online" : `HTTP ${response.status}`);
+      } catch {
+        if (!isMounted) return;
+        setApiLatencyMs(null);
+        setApiStatus("Offline");
+      }
+
+      if (typeof window !== "undefined") {
+        const navigation = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+        const loadTime = navigation ? Math.round(navigation.loadEventEnd - navigation.startTime) : Math.round(window.performance.now());
+        if (isMounted && loadTime > 0) setPageLoadMs(loadTime);
+      }
+    }
+
+    void loadSystemHealth();
+    const interval = window.setInterval(loadSystemHealth, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // Calendar dates generation
   const getDaysInMonth = () => {
@@ -164,14 +214,10 @@ export function AdminOverview({
   };
 
   // Sports breakdown for stats graph
-  const matchesPerSport = (sportsList.length > 0 ? sportsList.map(s => ({ id: normalizeSportValue(s.sportName || s.name || ""), name: s.sportName || s.name || "" })) : []).map(sport => {
+  const matchesPerSport = sports.map(sport => {
     const count = fixtures.filter(f => f.sport === sport.id).length;
     return { name: sport.name, count };
   });
-
-  function normalizeSportValue(value: string) {
-    return value.trim().toLowerCase().replace(/\s+/g, "-");
-  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -180,41 +226,25 @@ export function AdminOverview({
         <div>
           <div className="admin-hero-accent flex items-center gap-2">
             <Sparkles size={18} />
-          <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">
-            {canManageSetup ? "Supercoordinator Overview" : "Admin Overview"}
-          </span>
-        </div>
-          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">
-            {canManageSetup ? "Start here to run the event" : "System visibility and permissions"}
-          </h2>
+            <span className="text-xs font-black uppercase tracking-[0.2em] sport-heading">Admin Overview</span>
+          </div>
+          <h2 className="text-xl font-black uppercase mt-1 text-white tracking-wide">Start here to run the event</h2>
           <p className="text-sm text-slate-300 max-w-xl mt-1">
-            {canManageSetup
-              ? "First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress."
-              : "Review supercoordinators, coordinators, volunteers, registered teams, and match activity without changing tournament setup."}
+            First review registered teams, then create fixtures, then use the schedule and standings pages to track match progress.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManageSetup ? (
-            <button
-              onClick={() => setActiveTab("teams")}
-              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
-            >
-              <Plus size={14} /> Add Team
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveTab("users")}
-              className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
-            >
-              <Users size={14} /> View Users
-            </button>
-          )}
           <button
-            onClick={() => setActiveTab("fixtures")}
-            disabled={!canManageSetup}
+            onClick={() => setActiveTab("teams")}
+            className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-accent text-accent-foreground hover:scale-[1.02] active:scale-95 shadow-lg shadow-accent/15 transition-all flex items-center gap-2"
+          >
+            <Plus size={14} /> Add Team
+          </button>
+          <button
+            onClick={() => setActiveTab("generate-fixtures")}
             className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-white border border-white/20 text-slate-950 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
-            Create Fixtures <ArrowRight size={14} />
+            Generate Fixtures <ArrowRight size={14} />
           </button>
         </div>
       </div>
@@ -244,6 +274,71 @@ export function AdminOverview({
             </Card>
           );
         })}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <Card className="bg-slate-900/60 border-white/5 text-white">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldAlert size={18} className="text-accent" />
+              System Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {["admin", "supercoordinator", "coordinator", "volunteer"].map((role) => (
+              <div key={role} className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-950/50 px-3 py-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{role}</span>
+                <span className="scoreboard-number text-xl font-black text-white">{roleCounts[role] || 0}</span>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setActiveTab("users")}
+              className="w-full rounded-xl bg-accent px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-accent-foreground"
+            >
+              Manage System Users
+            </button>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/60 border-white/5 text-white">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users size={18} className="text-accent" />
+              Teams Snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Object.entries(teamsBySport).slice(0, 5).map(([sportName, count]) => (
+              <div key={sportName} className="flex items-center justify-between rounded-xl border border-white/5 bg-slate-950/50 px-3 py-2">
+                <span className="truncate text-xs font-bold text-slate-300">{sportName}</span>
+                <span className="text-sm font-black text-accent">{count}</span>
+              </div>
+            ))}
+            {Object.keys(teamsBySport).length === 0 && <p className="py-8 text-center text-xs font-semibold text-slate-500">No teams recorded yet.</p>}
+            <button
+              type="button"
+              onClick={() => setActiveTab("teams")}
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white"
+            >
+              View Teams
+            </button>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/60 border-white/5 text-white xl:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer size={18} className="text-accent" />
+              Website Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <PerformanceTile label="API Status" value={apiStatus} tone={apiStatus === "Online" ? "good" : "bad"} />
+            <PerformanceTile label="API Latency" value={apiLatencyMs === null ? "N/A" : `${apiLatencyMs} ms`} tone={apiLatencyMs !== null && apiLatencyMs < 500 ? "good" : "warn"} />
+            <PerformanceTile label="Page Load" value={pageLoadMs === null ? "N/A" : `${pageLoadMs} ms`} tone={pageLoadMs !== null && pageLoadMs < 2500 ? "good" : "warn"} />
+          </CardContent>
+        </Card>
       </div>
 
       {/* ====== LIVE MATCHES RIGHT NOW ====== */}
@@ -299,7 +394,7 @@ export function AdminOverview({
             {ongoingMatches.map((match) => {
               const teamAName = teams.find(t => t.id === match.teamA)?.name || match.teamA;
               const teamBName = teams.find(t => t.id === match.teamB)?.name || match.teamB;
-              const sportLabel = sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport;
+              const sportLabel = sports.find(s => s.id === match.sport)?.name || match.sport;
               const scoreA = match.scoreA ?? "-";
               const scoreB = match.scoreB ?? "-";
               return (
@@ -472,6 +567,54 @@ export function AdminOverview({
         </Card>
       </div>
 
+      <Card className="bg-slate-900/60 border-white/5 text-white">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock size={18} className="text-accent" />
+            Match History
+          </CardTitle>
+          <button
+            type="button"
+            onClick={() => setActiveTab("schedule")}
+            className="text-[10px] font-black uppercase tracking-widest text-accent"
+          >
+            Open Schedule
+          </button>
+        </CardHeader>
+        <CardContent>
+          {recentMatchHistory.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 py-10 text-center text-sm font-semibold text-slate-500">
+              Live and completed matches will appear here.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {recentMatchHistory.map((match) => {
+                const teamAName = teams.find((team) => team.id === match.teamA)?.name || match.teamA;
+                const teamBName = teams.find((team) => team.id === match.teamB)?.name || match.teamB;
+                return (
+                  <div key={match.id} className="rounded-xl border border-white/5 bg-slate-950/50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-accent">{match.sport}</span>
+                      <span className={cn(
+                        "rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-widest",
+                        match.status === "live" ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"
+                      )}>
+                        {match.status}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm font-black uppercase text-white">{teamAName} vs {teamBName}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-400">{match.date || "Date TBD"} / {match.time || "Time TBD"} / {match.venue || "Venue TBD"}</p>
+                    {match.status === "completed" && (
+                      <p className="mt-2 font-mono text-lg font-black text-accent">{match.scoreA ?? 0} - {match.scoreB ?? 0}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Match Calendar section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Card */}
@@ -577,7 +720,7 @@ export function AdminOverview({
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-black uppercase tracking-wider text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded">
-                          {sportsList.length > 0 ? sportsList.find(s => normalizeSportValue(s.sportName || s.name || "") === match.sport)?.sportName || match.sport : match.sport}
+                          {sports.find(s => s.id === match.sport)?.name || match.sport}
                         </span>
                         <span className="text-xs text-slate-400 font-medium">{match.time} • {match.venue}</span>
                       </div>
@@ -610,6 +753,21 @@ export function AdminOverview({
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function PerformanceTile({ label, value, tone }: { label: string; value: string; tone: "good" | "warn" | "bad" }) {
+  const toneClass = tone === "good"
+    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+    : tone === "warn"
+      ? "border-amber-500/20 bg-amber-500/10 text-amber-300"
+      : "border-red-500/20 bg-red-500/10 text-red-300";
+
+  return (
+    <div className={`rounded-xl border p-4 ${toneClass}`}>
+      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{label}</p>
+      <p className="mt-2 text-xl font-black">{value}</p>
     </div>
   );
 }
