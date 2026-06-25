@@ -8,6 +8,8 @@ import LiveScore from "../models/LiveScore.js";
 import Player from "../models/Player.js";
 import Result from "../models/Result.js";
 import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
+import { normalizeRegNo, isValidEmail } from "../utils/regNoHelper.js";
+import { buildVerifiedStatus, verifyIdCardRequest, verifyRegistrationToken } from "../utils/idVerification.js";
 
 const VALID_IMAGE_PREFIXES = [
   "data:image/jpeg;base64,",
@@ -21,10 +23,6 @@ function isAllowedImage(value) {
   return VALID_IMAGE_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
-function normalizeRegNo(value) {
-  return String(value || "").trim().replace(/\s+/g, "").toUpperCase();
-}
-
 function getRegNoList(body) {
   const regNos = [normalizeRegNo(body.captainRegNo)];
   if (Array.isArray(body.members)) {
@@ -34,6 +32,60 @@ function getRegNoList(body) {
     }
   }
   return regNos.filter(Boolean);
+}
+
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVerification, members }) {
+  return [
+    {
+      name: captainName,
+      email: captainEmail,
+      registrationNumber: captainRegNo,
+      role: "captain",
+      idVerified: Boolean(captainIdVerification?.verified),
+      idVerificationStatus: captainIdVerification?.status || "pending",
+    },
+    ...(members || []).map((member) => ({
+      name: member.fullName,
+      email: member.email || "",
+      registrationNumber: member.registrationNo,
+      role: "member",
+      idVerified: Boolean(member.idVerification?.verified),
+      idVerificationStatus: member.idVerification?.status || "pending",
+    })),
+  ];
+}
+
+function getApprovalBlockMessage(registration) {
+  const players = Array.isArray(registration.allPlayers) ? registration.allPlayers : [];
+  if (players.length === 0) return "";
+  if (players.some((player) => player.idVerificationStatus === "mismatch")) {
+    return "Cannot approve team. One or more players have ID mismatch.";
+  }
+  if (players.some((player) => player.idVerificationStatus === "manual_review")) {
+    return "One or more players require manual ID verification.";
+  }
+  if (players.some((player) => !player.idVerified || player.idVerificationStatus !== "verified")) {
+    return "Cannot approve team. ID verification is required for every player.";
+  }
+  return "";
+}
+
+function getVerifiedStatusOrError({ token, registrationNumber, playerRole, playerIndex }) {
+  const payload = verifyRegistrationToken(token, { registrationNumber, playerRole, playerIndex });
+  if (!payload) {
+    return { error: "ID verification is required for every player." };
+  }
+  return { value: buildVerifiedStatus(payload) };
+}
+
+export async function verifyIdCard(req, res) {
+  try {
+    const result = await verifyIdCardRequest(req);
+    return res.status(result.statusCode).json(result.body);
+  } catch (error) {
+    console.error("ID card verification error:", error);
+    return res.status(error.status || 500).json({ success: false, message: error.message || "Could not verify ID card." });
+  }
 }
 
 function getRegistrationRegNos(registration) {
@@ -113,6 +165,7 @@ export async function submitRegistration(req, res) {
       captainRegNo: rawCaptainRegNo,
       captainEmail,
       captainPhone,
+      captainVerificationToken,
       members: rawMembers,
     } = req.body;
 
@@ -134,7 +187,18 @@ export async function submitRegistration(req, res) {
     if (!trimmedCaptainName) return res.status(400).json({ message: "Captain name is required" });
     if (!cleanCaptainRegNo) return res.status(400).json({ message: "Captain registration number is required" });
     if (!trimmedCaptainEmail) return res.status(400).json({ message: "Captain email is required" });
+    if (!isValidEmail(trimmedCaptainEmail)) return res.status(400).json({ message: "Captain email is invalid" });
     if (!trimmedCaptainPhone) return res.status(400).json({ message: "Captain phone is required" });
+
+    const captainVerification = getVerifiedStatusOrError({
+      token: captainVerificationToken,
+      registrationNumber: cleanCaptainRegNo,
+      playerRole: "captain",
+      playerIndex: 0,
+    });
+    if (captainVerification.error) {
+      return res.status(400).json({ message: captainVerification.error });
+    }
 
     // Validate sport exists
     const [sport, tournament] = await Promise.all([
@@ -153,6 +217,13 @@ export async function submitRegistration(req, res) {
     const sportName = rawSportName || sport.sportName || sport.name || "";
     const tournamentName = rawTournamentName || tournament.name || "";
     const members = Array.isArray(rawMembers) ? rawMembers : [];
+    const minPlayers = Math.max(1, Number(sport.minPlayers || 1));
+    const maxPlayers = Math.max(minPlayers, Number(sport.maxPlayers || minPlayers));
+    const minMembers = Math.max(0, minPlayers - 1);
+    const maxMembers = Math.max(minMembers, maxPlayers - 1);
+    if (members.length < minMembers || members.length > maxMembers) {
+      return res.status(400).json({ message: `${sportName} requires ${minPlayers} to ${maxPlayers} total players including the captain.` });
+    }
 
     // Validate members
     for (let i = 0; i < members.length; i++) {
@@ -164,6 +235,22 @@ export async function submitRegistration(req, res) {
       if (!regNo) {
         return res.status(400).json({ message: `Member ${i + 1} registration number is required` });
       }
+      const memberEmail = String(member.email || "").trim().toLowerCase();
+      if (!memberEmail) {
+        return res.status(400).json({ message: `Member ${i + 1} email is required` });
+      }
+      if (!isValidEmail(memberEmail)) {
+        return res.status(400).json({ message: `Member ${i + 1} email is invalid` });
+      }
+      const memberVerification = getVerifiedStatusOrError({
+        token: member.verificationToken,
+        registrationNumber: regNo,
+        playerRole: "member",
+        playerIndex: i,
+      });
+      if (memberVerification.error) {
+        return res.status(400).json({ message: memberVerification.error });
+      }
     }
 
     // Check duplicate registration numbers within the same submission
@@ -171,6 +258,11 @@ export async function submitRegistration(req, res) {
     const uniqueRegNos = new Set(allRegNos);
     if (uniqueRegNos.size !== allRegNos.length) {
       return res.status(400).json({ message: "Duplicate registration number found in the same team submission" });
+    }
+
+    const emails = [trimmedCaptainEmail, ...members.map((member) => String(member.email || "").trim().toLowerCase()).filter(Boolean)];
+    if (new Set(emails).size !== emails.length) {
+      return res.status(400).json({ message: "This email is already used by another player." });
     }
 
     // Validate team logo
@@ -186,7 +278,7 @@ export async function submitRegistration(req, res) {
     }
 
     // Build members array for storage
-    const storedMembers = members.map((member) => ({
+    const storedMembers = members.map((member, index) => ({
       fullName: String(member.fullName || "").trim(),
       registrationNo: normalizeRegNo(member.registrationNo || member.registrationNumber || ""),
       department: String(member.department || trimmedDept).trim(),
@@ -194,7 +286,21 @@ export async function submitRegistration(req, res) {
       gender: member.gender || category,
       email: String(member.email || "").trim().toLowerCase(),
       phone: String(member.phone || "").trim(),
+      idVerification: getVerifiedStatusOrError({
+        token: member.verificationToken,
+        registrationNumber: member.registrationNo || member.registrationNumber || "",
+        playerRole: "member",
+        playerIndex: index,
+      }).value,
     }));
+    const captainIdVerification = captainVerification.value;
+    const allPlayers = buildAllPlayers({
+      captainName: trimmedCaptainName,
+      captainEmail: trimmedCaptainEmail,
+      captainRegNo: cleanCaptainRegNo,
+      captainIdVerification,
+      members: storedMembers,
+    });
 
     const registration = await TeamRegistration.create({
       sportId,
@@ -209,7 +315,9 @@ export async function submitRegistration(req, res) {
       captainRegNo: cleanCaptainRegNo,
       captainEmail: trimmedCaptainEmail,
       captainPhone: trimmedCaptainPhone,
+      captainIdVerification,
       members: storedMembers,
+      allPlayers,
       status: "pending",
       submittedAt: new Date(),
     });
@@ -278,6 +386,11 @@ export async function approveRegistration(req, res) {
     const existingRegistration = await TeamRegistration.findById(id);
     if (!existingRegistration) return res.status(404).json({ message: "Registration not found" });
 
+    const approvalBlockMessage = getApprovalBlockMessage(existingRegistration);
+    if (approvalBlockMessage) {
+      return res.status(400).json({ message: approvalBlockMessage });
+    }
+
     const duplicateRegistration = await findUsedRegNos(getRegistrationRegNos(existingRegistration), {
       excludeRegistrationId: existingRegistration._id,
     });
@@ -330,14 +443,33 @@ export async function approveRegistration(req, res) {
     );
 
     let emailResult = { sent: false, skipped: true };
+    const emailRecipients = [
+      registration.captainEmail,
+      ...(registration.members || []).map((member) => member.email),
+    ]
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter(Boolean);
+    const uniqueRecipients = [...new Set(emailRecipients)];
+    const failedEmails = [];
     try {
-      emailResult = await sendTeamApprovedEmail({
-        teamName: registration.teamName,
-        captainName: registration.captainName,
-        email: registration.captainEmail,
-        sportName,
-        tournamentName: registration.tournamentName,
-      });
+      for (const email of uniqueRecipients) {
+        try {
+          const result = await sendTeamApprovedEmail({
+            teamName: registration.teamName,
+            captainName: registration.captainName,
+            email,
+            sportName,
+            tournamentName: registration.tournamentName,
+          });
+          emailResult = {
+            sent: Boolean(emailResult.sent || result.sent),
+            skipped: Boolean(emailResult.skipped && result.skipped),
+          };
+        } catch (emailError) {
+          failedEmails.push({ email, message: getEmailErrorMessage(emailError) });
+          console.error("Team approval email recipient error:", email, emailError);
+        }
+      }
     } catch (emailError) {
       console.error("Team approval email error:", emailError);
       return res.json({
@@ -351,6 +483,7 @@ export async function approveRegistration(req, res) {
       ...registration.toObject(),
       emailSent: emailResult.sent,
       emailSkipped: emailResult.skipped,
+      emailFailedCount: failedEmails.length,
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

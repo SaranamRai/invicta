@@ -184,6 +184,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
 app.use("/api/registrations", registrationRoutes);
+app.use("/api/registration", registrationRoutes);
 
 app.use((error, _req, res, next) => {
   void next;

@@ -21,6 +21,21 @@ import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
 import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
+function getRegistrationApprovalBlockMessage(registration) {
+  const players = Array.isArray(registration.allPlayers) ? registration.allPlayers : [];
+  if (players.length === 0) return "";
+  if (players.some((player) => player.idVerificationStatus === "mismatch")) {
+    return "Cannot approve team. One or more players have ID mismatch.";
+  }
+  if (players.some((player) => player.idVerificationStatus === "manual_review")) {
+    return "One or more players require manual ID verification.";
+  }
+  if (players.some((player) => !player.idVerified || player.idVerificationStatus !== "verified")) {
+    return "Cannot approve team. ID verification is required for every player.";
+  }
+  return "";
+}
+
 export function createDoc(model) {
   return async (req, res) => {
     const doc = await model.create({ ...req.body, createdBy: req.user?.id });
@@ -335,6 +350,13 @@ export async function reviewTeamRegistration(req, res) {
 
   const registration = await TeamRegistration.findById(req.params.id);
   if (!registration) return res.status(404).json({ message: "Registration not found" });
+
+  if (status === "approved") {
+    const approvalBlockMessage = getRegistrationApprovalBlockMessage(registration);
+    if (approvalBlockMessage) {
+      return res.status(400).json({ message: approvalBlockMessage });
+    }
+  }
 
   const reviewedAt = new Date();
   registration.status = status;

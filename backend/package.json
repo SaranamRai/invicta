@@ -15,7 +15,8 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
-    "nodemailer": "^8.0.10"
+    "nodemailer": "^8.0.10",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "mongodb-memory-server": "^9.1.8"

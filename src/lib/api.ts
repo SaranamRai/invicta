@@ -127,9 +127,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         : `API request failed (status ${response.status})`;
     }
 
-    // Include request URL in the error to aid debugging in browser console
-    const errorMessage = `${message} — ${fullUrl}`;
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(message, response.status);
   }
 
   return data as T;
@@ -1087,6 +1085,16 @@ export interface TeamRegistrationMember {
   gender?: string;
   email?: string;
   phone?: string;
+  verificationToken?: string;
+  idVerification?: IdVerificationInfo;
+}
+
+export interface IdVerificationInfo {
+  status: "verified" | "mismatch" | "unreadable" | "manual_review" | "pending" | "old_registration";
+  verified?: boolean;
+  extractedRegistrationNumber?: string | null;
+  confidence?: number;
+  verifiedAt?: string;
 }
 
 export interface TeamRegistrationPayload {
@@ -1103,7 +1111,17 @@ export interface TeamRegistrationPayload {
   captainRegNo: string;
   captainEmail: string;
   captainPhone: string;
+  captainVerificationToken?: string;
+  captainIdVerification?: IdVerificationInfo;
   members: TeamRegistrationMember[];
+  allPlayers?: {
+    name?: string;
+    email?: string;
+    registrationNumber?: string;
+    role?: "captain" | "member";
+    idVerified?: boolean;
+    idVerificationStatus?: string;
+  }[];
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedBy?: string;
@@ -1120,6 +1138,48 @@ export function submitTeamRegistration(payload: TeamRegistrationWritePayload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export interface IdCardVerificationResponse {
+  success: boolean;
+  matched: boolean;
+  status: "verified" | "mismatch" | "unreadable" | "manual_review";
+  typedRegistrationNumber?: string;
+  extractedRegistrationNumber?: string | null;
+  confidence?: number;
+  message: string;
+  verificationToken?: string;
+}
+
+export async function verifyRegistrationIdCard(payload: {
+  playerRole: "captain" | "member";
+  playerIndex: number;
+  typedRegistrationNumber: string;
+  idCardImage: File;
+}) {
+  const formData = new FormData();
+  formData.set("playerRole", payload.playerRole);
+  formData.set("playerIndex", String(payload.playerIndex));
+  formData.set("typedRegistrationNumber", payload.typedRegistrationNumber);
+  formData.set("idCardImage", payload.idCardImage);
+
+  const response = await fetch(`${API_BASE_URL}/registration/verify-id-card`, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+  const responseText = await response.text().catch(() => "");
+  let data: { message?: string } | null = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    const proxyFailure = responseText.includes("ECONNREFUSED") || responseText.includes("fetch failed");
+    throw new ApiError(data?.message || (proxyFailure ? "Could not reach the verification service. Please try again in a moment." : "Could not verify ID card."), response.status);
+  }
+  return data as IdCardVerificationResponse;
 }
 
 export function getTeamPendingRegistrations() {

@@ -27,7 +27,6 @@ import {
   mapMongoTeam,
   TournamentPayload,
 } from "@/lib/api";
-import { getStoredSession } from "@/lib/api";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
@@ -155,11 +154,9 @@ export default function PublicDashboard() {
     { label: "Check League Tables", href: "/standings", icon: Trophy },
   ];
 
-  const isLoggedIn = typeof window !== "undefined" && Boolean(getStoredSession());
-
   const easyPaths = [
     { label: "Visitors", href: "/matches", icon: Radio },
-    { label: "Teams", href: registrationOpen ? (isLoggedIn ? "/register" : "/public-register") : "/", icon: ClipboardList },
+    { label: "Teams", href: registrationOpen ? "/public-register" : "/", icon: ClipboardList },
     { label: "Staff", href: "/login", icon: LogIn },
   ];
 
@@ -449,7 +446,7 @@ export default function PublicDashboard() {
                 Registration is open from {formatDate(openTournament.startDate)} to {formatDate(openTournament.endDate)}.
               </p>
               <Link
-                href={isLoggedIn ? "/register" : "/public-register"}
+                href="/public-register"
                 className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-wide text-accent-foreground transition-all hover:bg-accent/90 sm:h-14 sm:text-sm sm:tracking-[0.2em]"
               >
                 Open Registration
