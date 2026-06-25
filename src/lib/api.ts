@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const VERIFY_ID_CARD_TIMEOUT_MS = 30000;
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
@@ -1163,11 +1164,25 @@ export async function verifyRegistrationIdCard(payload: {
   formData.set("typedRegistrationNumber", payload.typedRegistrationNumber);
   formData.set("idCardImage", payload.idCardImage);
 
-  const response = await fetch(`${API_BASE_URL}/registration/verify-id-card`, {
-    method: "POST",
-    body: formData,
-    credentials: "include",
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), VERIFY_ID_CARD_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/registration/verify-id-card`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError("ID scan is taking too long. Please try again with a clearer, cropped image.", 408);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
   const responseText = await response.text().catch(() => "");
   let data: { message?: string } | null = null;
   try {

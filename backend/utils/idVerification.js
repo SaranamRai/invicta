@@ -94,15 +94,15 @@ export async function verifyIdCardRequest(req) {
     text = ocrResult.text;
     confidence = ocrResult.confidence;
   } catch (error) {
-    if (error?.code === "OCR_TIMEOUT") {
+    if (["OCR_TIMEOUT", "OCR_WORKER_INIT_FAILED", "OCR_LANGUAGE_MISSING"].includes(error?.code)) {
       return {
-        statusCode: 504,
+        statusCode: error.code === "OCR_TIMEOUT" ? 504 : 503,
         body: {
           success: false,
           matched: false,
           status: "unreadable",
           extractedRegistrationNumber: null,
-          message: "ID scan is taking too long. Please try again with a clearer, cropped image.",
+          message: error.message || "Could not start ID verification. Please try again in a moment.",
         },
       };
     }
