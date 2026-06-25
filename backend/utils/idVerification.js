@@ -87,7 +87,28 @@ export async function verifyIdCardRequest(req) {
     };
   }
 
-  const { text, confidence } = await runOcrOnImage(idCardImage.buffer);
+  let text = "";
+  let confidence = 0;
+  try {
+    const ocrResult = await runOcrOnImage(idCardImage.buffer);
+    text = ocrResult.text;
+    confidence = ocrResult.confidence;
+  } catch (error) {
+    if (error?.code === "OCR_TIMEOUT") {
+      return {
+        statusCode: 504,
+        body: {
+          success: false,
+          matched: false,
+          status: "unreadable",
+          extractedRegistrationNumber: null,
+          message: "ID scan is taking too long. Please try again with a clearer, cropped image.",
+        },
+      };
+    }
+    throw error;
+  }
+
   const extractedRegistrationNumber = extractRegistrationNumber(text, typedRegistrationNumber);
   if (!extractedRegistrationNumber) {
     return {
