@@ -1,5 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
-const VERIFY_ID_CARD_TIMEOUT_MS = 30000;
+const VERIFY_ID_CARD_TIMEOUT_MS = 50000;
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
