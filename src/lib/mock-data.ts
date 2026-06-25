@@ -19,14 +19,7 @@ export interface Standing {
   pts: number;
 }
 
-export const sports = [
-  { id: "football", name: "Football" },
-  { id: "cricket", name: "Cricket" },
-  { id: "volleyball", name: "Volleyball" },
-  { id: "badminton", name: "Badminton" },
-  { id: "table-tennis", name: "Table Tennis" },
-  { id: "chess", name: "Chess" },
-];
+export const sports: { id: string; name: string }[] = [];
 
 export const matches: Match[] = [];
 

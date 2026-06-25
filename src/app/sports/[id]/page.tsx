@@ -164,10 +164,6 @@ function MembersListView({
     );
   }, [members, query]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [query, members.length]);
-
   const totalPages = Math.max(1, Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE));
   const safePage = Math.min(page, totalPages);
   const pageStart = (safePage - 1) * MEMBERS_PER_PAGE;
@@ -197,10 +193,13 @@ function MembersListView({
           </p>
         </div>
         <div className="relative w-full sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search members by name"
             className="h-11 w-full rounded-xl border border-white/10 bg-background/80 pl-10 pr-4 text-sm font-semibold text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-accent"
           />
@@ -270,7 +269,7 @@ function FixtureCard({ fixture }: { fixture: SportDetailResponse["fixtures"]["ma
             </span>
           </div>
           <h3 className="text-xl font-black uppercase tracking-wide text-foreground">
-            {String(f.teamA || f.teamAName || "Team A")} <span className="text-accent">VS</span> {String(f.teamB || f.teamBName || "Team B")}
+            {String(f.teamAName || f.teamA || "Team A")} <span className="text-accent">VS</span> {String(f.teamBName || f.teamB || "Team B")}
           </h3>
           <p className="mt-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
             {String(f.venue || "Venue TBD")}
@@ -279,6 +278,11 @@ function FixtureCard({ fixture }: { fixture: SportDetailResponse["fixtures"]["ma
       </div>
     </Card>
   );
+}
+
+function getFixtureKey(fixture: unknown, index: number) {
+  const value = fixture as Record<string, unknown>;
+  return String(value._id || `${value.teamAName || value.teamA}-${value.teamBName || value.teamB}-${value.date || "date"}-${index}`);
 }
 
 export default function SportDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
@@ -302,10 +306,14 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
   }, [params.id]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchDetail();
+    const initialLoad = window.setTimeout(() => {
+      void fetchDetail();
+    }, 0);
     const interval = window.setInterval(fetchDetail, 15000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(interval);
+    };
   }, [fetchDetail]);
 
   if (loading) return <div className="flex min-h-72 items-center justify-center p-20"><Loader2 className="animate-spin" size={32} /></div>;
@@ -336,10 +344,6 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
   const hasMaleTeams = filteredMaleTeams.length > 0;
   const hasFemaleTeams = filteredFemaleTeams.length > 0;
   const hasAnyTeams = hasMaleTeams || hasFemaleTeams;
-
-  const hasMaleMembers = members.male.length > 0;
-  const hasFemaleMembers = members.female.length > 0;
-  const hasAnyMembers = hasMaleMembers || hasFemaleMembers;
 
   const hasMaleFixtures = filteredMaleFixtures.length > 0;
   const hasFemaleFixtures = filteredFemaleFixtures.length > 0;
@@ -541,8 +545,11 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
               <CategorySection label="Male Fixtures" icon={Shield}>
                 {hasMaleFixtures ? (
                   <div className="space-y-3">
-                    {filteredMaleFixtures.map((fixture) => (
-                      <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
+                    {filteredMaleFixtures.map((fixture, index) => (
+                      <FixtureCard
+                        key={getFixtureKey(fixture, index)}
+                        fixture={fixture}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -556,8 +563,11 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
               <CategorySection label="Female Fixtures" icon={ShieldOff}>
                 {hasFemaleFixtures ? (
                   <div className="space-y-3">
-                    {filteredFemaleFixtures.map((fixture) => (
-                      <FixtureCard key={(fixture as Record<string, unknown>)._id as string || Math.random().toString()} fixture={fixture} />
+                    {filteredFemaleFixtures.map((fixture, index) => (
+                      <FixtureCard
+                        key={getFixtureKey(fixture, index)}
+                        fixture={fixture}
+                      />
                     ))}
                   </div>
                 ) : (

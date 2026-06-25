@@ -452,8 +452,8 @@ export async function exportApprovedExcel(req, res) {
   try {
     const filters = {};
     if (req.query.tournamentId) filters.tournamentId = String(req.query.tournamentId);
-    if (req.query.sportId) filters.sportId = String(req.query.sportId);
-    if (req.query.sport) filters.sportId = String(req.query.sport);
+    if (req.query.sportId && req.query.sportId !== "all") filters.sportId = String(req.query.sportId);
+    if (req.query.sport && req.query.sport !== "all") filters.sportId = String(req.query.sport);
     if (req.query.category) filters.category = req.query.category;
     if (req.query.department) filters.department = String(req.query.department).trim().toUpperCase();
     if (req.query.teamId) filters._id = String(req.query.teamId);
@@ -465,78 +465,120 @@ export async function exportApprovedExcel(req, res) {
       .sort({ submittedAt: -1 })
       .lean();
 
-    // Build flat rows for Excel
-    const rows = [];
-    for (const reg of registrations) {
-      const base = {
-        tournamentName: reg.tournamentName,
-        sportName: reg.sportName,
-        category: reg.category,
-        department: reg.department,
-        teamName: reg.teamName,
-        teamLogo: reg.teamLogo,
-        captainName: reg.captainName,
-        captainRegNo: reg.captainRegNo,
-        captainEmail: reg.captainEmail,
-        captainPhone: reg.captainPhone,
-        status: reg.status,
-        approvedDate: reg.reviewedAt ? new Date(reg.reviewedAt).toISOString().split("T")[0] : "",
-      };
-
-      if (!reg.members || reg.members.length === 0) {
-        rows.push(base);
-      } else {
-        for (const member of reg.members) {
-          rows.push({
-            ...base,
-            memberName: member.fullName,
-            memberRegNo: member.registrationNo,
-            memberDepartment: member.department,
-            memberSemester: member.semester,
-            memberGender: member.gender,
-          });
-        }
-      }
-    }
-
     try {
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Approved Registrations");
-
-      sheet.columns = [
-        { header: "Tournament", key: "tournamentName", width: 24 },
-        { header: "Sport Name", key: "sportName", width: 20 },
-        { header: "Category", key: "category", width: 12 },
-        { header: "Department", key: "department", width: 20 },
-        { header: "Team Name", key: "teamName", width: 25 },
-        { header: "Team Logo URL/Data", key: "teamLogo", width: 28 },
-        { header: "Captain Name", key: "captainName", width: 20 },
-        { header: "Captain Registration No", key: "captainRegNo", width: 20 },
-        { header: "Captain Email", key: "captainEmail", width: 30 },
-        { header: "Captain Phone", key: "captainPhone", width: 18 },
-        { header: "Member Name", key: "memberName", width: 20 },
-        { header: "Member Registration No", key: "memberRegNo", width: 20 },
-        { header: "Member Department", key: "memberDepartment", width: 20 },
-        { header: "Member Semester", key: "memberSemester", width: 15 },
-        { header: "Member Gender", key: "memberGender", width: 12 },
-        { header: "Registration Status", key: "status", width: 18 },
-        { header: "Approved Date", key: "approvedDate", width: 15 },
+      const exportTitle = "Approved Team Registrations";
+      const filterSummary = [
+        req.query.tournamentName ? `Tournament: ${req.query.tournamentName}` : req.query.tournamentId ? `Tournament ID: ${req.query.tournamentId}` : "Tournament: All",
+        req.query.sportName ? `Sport: ${req.query.sportName}` : filters.sportId ? `Sport ID: ${filters.sportId}` : "Sport: All sports",
+        filters.category ? `Category: ${filters.category}` : "Category: Male and Female",
       ];
 
-      sheet.addRows(rows);
+      const summary = workbook.addWorksheet("Summary");
+      summary.columns = [
+        { header: "Field", key: "field", width: 24 },
+        { header: "Value", key: "value", width: 48 },
+      ];
+      summary.addRows([
+        { field: "Report", value: exportTitle },
+        { field: "Generated At", value: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) },
+        { field: "Filters", value: filterSummary.join(" | ") },
+        { field: "Total Teams", value: registrations.length },
+        { field: "Total Players", value: registrations.reduce((sum, reg) => sum + (reg.members?.length || 0), 0) },
+      ]);
 
-      // Style header row
-      const headerRow = sheet.getRow(1);
-      headerRow.font = { bold: true, size: 11 };
-      headerRow.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFFCD34D" },
+      const styleHeader = (sheet) => {
+        const headerRow = sheet.getRow(1);
+        headerRow.font = { bold: true, size: 11, color: { argb: "FF111827" } };
+        headerRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFCD34D" },
+        };
+        headerRow.alignment = { vertical: "middle", wrapText: true };
+        sheet.views = [{ state: "frozen", ySplit: 1 }];
       };
 
+      const addTeamColumns = (sheet) => {
+        sheet.columns = [
+          { header: "Tournament", key: "tournamentName", width: 24 },
+          { header: "Sport", key: "sportName", width: 20 },
+          { header: "Category", key: "category", width: 12 },
+          { header: "Department", key: "department", width: 16 },
+          { header: "Team Name", key: "teamName", width: 24 },
+          { header: "Captain Name", key: "captainName", width: 20 },
+          { header: "Captain Reg No", key: "captainRegNo", width: 18 },
+          { header: "Captain Email", key: "captainEmail", width: 30 },
+          { header: "Captain Phone", key: "captainPhone", width: 16 },
+          { header: "Player Name", key: "memberName", width: 22 },
+          { header: "Player Reg No", key: "memberRegNo", width: 18 },
+          { header: "Player Department", key: "memberDepartment", width: 18 },
+          { header: "Semester", key: "memberSemester", width: 12 },
+          { header: "Gender", key: "memberGender", width: 12 },
+          { header: "Approved Date", key: "approvedDate", width: 16 },
+        ];
+        styleHeader(sheet);
+      };
+
+      const toRows = (records) => records.flatMap((reg) => {
+        const base = {
+          tournamentName: reg.tournamentName,
+          sportName: reg.sportName,
+          category: reg.category,
+          department: reg.department,
+          teamName: reg.teamName,
+          captainName: reg.captainName,
+          captainRegNo: reg.captainRegNo,
+          captainEmail: reg.captainEmail,
+          captainPhone: reg.captainPhone,
+          approvedDate: reg.reviewedAt ? new Date(reg.reviewedAt).toISOString().split("T")[0] : "",
+        };
+        const members = reg.members?.length ? reg.members : [{}];
+        return members.map((member) => ({
+          ...base,
+          memberName: member.fullName || "",
+          memberRegNo: member.registrationNo || "",
+          memberDepartment: member.department || reg.department || "",
+          memberSemester: member.semester || "",
+          memberGender: member.gender || reg.category || "",
+        }));
+      });
+
+      const allTeamsSheet = workbook.addWorksheet("All Approved Teams");
+      addTeamColumns(allTeamsSheet);
+      allTeamsSheet.addRows(toRows(registrations));
+
+      const grouped = registrations.reduce((acc, reg) => {
+        const key = `${reg.sportName || "Sport"} - ${reg.category || "Category"}`;
+        if (!acc.has(key)) acc.set(key, []);
+        acc.get(key).push(reg);
+        return acc;
+      }, new Map());
+
+      for (const [groupName, records] of grouped.entries()) {
+        const safeName = groupName.replace(/[\\/*?:[\]]/g, " ").slice(0, 31);
+        const sheet = workbook.addWorksheet(safeName || "Sport Category");
+        addTeamColumns(sheet);
+        sheet.addRows(toRows(records));
+      }
+
+      for (const sheet of workbook.worksheets) {
+        styleHeader(sheet);
+        sheet.eachRow((row) => {
+          row.alignment = { vertical: "top", wrapText: true };
+        });
+      }
+
+      const filenameParts = [
+        "approved-registrations",
+        req.query.tournamentName || (req.query.tournamentId ? "tournament" : "all-tournaments"),
+        req.query.sportName || (filters.sportId ? "one-sport" : "all-sports"),
+        filters.category || "all-categories",
+      ].map((part) => String(part).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")).filter(Boolean);
+
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", "attachment; filename=approved-registrations.xlsx");
+      res.setHeader("Content-Disposition", `attachment; filename=${filenameParts.join("-")}.xlsx`);
 
       await workbook.xlsx.write(res);
       res.end();

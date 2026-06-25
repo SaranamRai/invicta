@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities */
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -163,11 +164,11 @@ export default function AboutPage() {
                   msuinvicta2026@gmail.com
                 </a>
                 <a
-                  href="tel:9883924453"
+                  href="tel:+919883924453"
                   className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-4 text-sm font-black text-foreground transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
                 >
                   <Phone size={18} />
-                  9883924453
+                  +91 9883924453
                 </a>
               </div>
             </div>
@@ -345,9 +346,9 @@ export default function AboutPage() {
               <Mail size={15} />
               msuinvicta2026@gmail.com
             </a>
-            <a href="tel:9883924453" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
+            <a href="tel:+919883924453" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
               <Phone size={15} />
-              9883924453
+              +91 9883924453
             </a>
             </div>
           </div>

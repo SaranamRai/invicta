@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card } from "@/components/ui/card";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
 import {
@@ -27,7 +28,7 @@ import {
   getTeamApprovedRegistrations,
   TeamRegistrationPayload,
 } from "@/lib/api";
-import { clearPortalSession, getRoleAccount, RoleAccount } from "@/lib/role-auth";
+import { getRoleAccount, logoutPortalSession, RoleAccount } from "@/lib/role-auth";
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -211,7 +212,7 @@ function CoordinatorDashboardContent() {
   };
 
   const handleSignOut = async () => {
-    clearPortalSession();
+    await logoutPortalSession();
     router.replace("/login");
   };
 
@@ -351,7 +352,8 @@ function CoordinatorDashboardContent() {
     <div className="dashboard-surface min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
             <InvictaLogo className="h-12 w-44 shrink-0 sm:h-14 sm:w-52" />
             <div className="min-w-0">
               <h1 className="sport-heading text-lg font-black sm:text-2xl">Coordinator Dashboard</h1>

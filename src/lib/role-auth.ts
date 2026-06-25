@@ -1,4 +1,4 @@
-import { AuthSession, clearSession, getStoredSession, storeSession } from "@/lib/api";
+import { AuthSession, clearSession, getStoredSession, logoutRoleAccount, storeSession } from "@/lib/api";
 
 export type PortalRole = "admin" | "supercoordinator" | "volunteer" | "coordinator";
 
@@ -44,6 +44,10 @@ export function storePortalSession(session: AuthSession) {
 
 export function clearPortalSession() {
   clearSession();
+}
+
+export async function logoutPortalSession() {
+  await logoutRoleAccount();
 }
 
 export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {

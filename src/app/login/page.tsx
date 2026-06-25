@@ -10,6 +10,7 @@ import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -56,7 +57,8 @@ export default function LoginPage() {
         className="relative z-10 w-full max-w-xl"
       >
         <div className="mb-5 sm:mb-7">
-          <div className="mb-4 flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="mb-4 flex flex-col items-center gap-3">
+            <MedhaviLogo className="h-16 w-56 sm:h-18 sm:w-72" />
             <InvictaLogo className="h-20 w-72 sm:h-24 sm:w-96" />
           </div>
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">Choose a role and open the right dashboard</p>

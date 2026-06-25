@@ -45,7 +45,7 @@ export class ApiError extends Error {
 }
 
 export interface AuthSession {
-  token: string;
+  token?: string;
   role: "admin" | "supercoordinator" | "volunteer" | "coordinator";
   name: string;
   id: string;
@@ -64,7 +64,10 @@ export function getStoredSession(): AuthSession | null {
 
   try {
     const value = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    return value ? JSON.parse(value) as AuthSession : null;
+    if (!value) return null;
+    const { token: _token, ...safeSession } = JSON.parse(value) as AuthSession;
+    void _token;
+    return safeSession as AuthSession;
   } catch {
     return null;
   }
@@ -72,7 +75,9 @@ export function getStoredSession(): AuthSession | null {
 
 export function storeSession(session: AuthSession) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  const { token: _token, ...safeSession } = session;
+  void _token;
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(safeSession));
   window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
 }
 
@@ -98,6 +103,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const response = await fetch(fullUrl, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   const data = await response.json().catch(() => null);
@@ -141,6 +147,7 @@ export async function apiDownload(path: string, options: RequestInit = {}) {
   const response = await fetch(fullUrl, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -175,6 +182,20 @@ export async function loginRoleAccount(email: string, password: string) {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function getCurrentRoleSession() {
+  return apiFetch<AuthSession>("/auth/session");
+}
+
+export async function logoutRoleAccount() {
+  try {
+    await apiFetch<{ message: string }>("/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    clearSession();
+  }
 }
 
 export interface TeamSyncPayload {
@@ -261,12 +282,13 @@ export interface AdminFixturePayload {
   date: string;
   time: string;
   venue: string;
-  status: "scheduled" | "live" | "paused" | "completed";
+  status: "scheduled" | "live" | "paused" | "completed" | "cancelled";
   scoreA?: number;
   scoreB?: number;
   endedAt?: string;
   fullMatchSeconds?: number;
   matchGapMinutes?: number;
+  round?: string;
   assignedVolunteer?: string;
 }
 
@@ -317,6 +339,13 @@ export function updateAdminFixture(fixture: AdminFixturePayload) {
 export function deleteAdminFixture(fixtureId: string) {
   return apiFetch(`/admin/fixtures/${encodeURIComponent(fixtureId)}`, {
     method: "DELETE",
+  });
+}
+
+export function deleteAdminFixtures(fixtureIds: string[]) {
+  return apiFetch<{ message: string; deletedCount: number }>("/admin/fixtures", {
+    method: "DELETE",
+    body: JSON.stringify({ fixtureIds }),
   });
 }
 
@@ -1111,6 +1140,12 @@ export function rejectTeamRegistration(id: string, rejectionReason: string) {
   return apiFetch<TeamRegistrationPayload>(`/registrations/${encodeURIComponent(id)}/reject`, {
     method: "PATCH",
     body: JSON.stringify({ rejectionReason }),
+  });
+}
+
+export function deleteTeamRegistration(id: string) {
+  return apiFetch<{ message: string; cancelledMatches?: number }>(`/registrations/${encodeURIComponent(id)}`, {
+    method: "DELETE",
   });
 }
 

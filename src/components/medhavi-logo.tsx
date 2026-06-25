@@ -7,11 +7,11 @@ type MedhaviLogoProps = {
 
 export function MedhaviLogo({ className, imageClassName }: MedhaviLogoProps) {
   return (
-    <span className={cn("inline-flex h-12 w-44 items-center justify-center overflow-hidden", className)}>
+    <span className={cn("msu-logo-frame inline-flex h-14 w-52 items-center justify-center overflow-hidden", className)}>
       <img
-        src="/msu-logo-transparent.png"
+        src="/medhavi-skills-university.png"
         alt="Medhavi Skills University"
-        className={cn("block h-full max-h-full w-full object-contain", imageClassName)}
+        className={cn("block h-full max-h-full w-full object-contain mix-blend-multiply", imageClassName)}
       />
     </span>
   );

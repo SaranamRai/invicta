@@ -1,4 +1,4 @@
-import { clearPortalSession, PortalRole } from "@/lib/role-auth";
+import { clearPortalSession, logoutPortalSession, PortalRole } from "@/lib/role-auth";
 
 // Admin credentials - hardcoded for demonstration
 // In production, this should be properly hashed and stored in a database
@@ -93,6 +93,7 @@ export function clearPortalAuth() {
     removeStoredValue(ADMIN_AUTH_KEY);
     removeStoredValue(PORTAL_ROLE_KEY);
     clearPortalSession();
+    void logoutPortalSession();
     window.dispatchEvent(new Event(ADMIN_AUTH_EVENT));
   }
 }

@@ -31,11 +31,17 @@ export function FixtureViewer({
   const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
   const [scoreA, setScoreA] = useState<number>(0);
   const [scoreB, setScoreB] = useState<number>(0);
-  const [status, setStatus] = useState<"scheduled" | "live" | "paused" | "completed">("scheduled");
+  const [status, setStatus] = useState<"scheduled" | "live" | "paused" | "completed" | "cancelled">("scheduled");
   const [date, setDate] = useState<string>("");
   const [time, setTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
   const [venue, setVenue] = useState<string>("");
+
+  const teamLabel = (fixture: Fixture, side: "A" | "B") => {
+    const teamId = side === "A" ? fixture.teamA : fixture.teamB;
+    const teamName = side === "A" ? fixture.teamAName : fixture.teamBName;
+    return teams[teamId] || teamName || teamId || `Team ${side}`;
+  };
 
   const filteredFixtures = fixtures.filter((fixture) => {
     if (filterTournament && (fixture.tournamentId || fixture.tournamentName || "no-tournament") !== filterTournament) return false;
@@ -80,7 +86,7 @@ export function FixtureViewer({
     setEditingFixture(fixture);
     setScoreA(fixture.scoreA || 0);
     setScoreB(fixture.scoreB || 0);
-    setStatus(fixture.status);
+    setStatus(fixture.status === "cancelled" ? "scheduled" : fixture.status);
     setDate(fixture.date);
     setTime(fixture.time);
     setEndTime(fixture.endTime || "");
@@ -90,7 +96,7 @@ export function FixtureViewer({
   // One-click end match: marks as completed with current time as endTime
   const handleEndMatch = (fixture: Fixture) => {
     if (!onUpdateFixture) return;
-    if (!confirm(`End match "${teams[fixture.teamA] || fixture.teamA} vs ${teams[fixture.teamB] || fixture.teamB}"? This will mark it as Completed.`)) return;
+    if (!confirm(`End match "${teamLabel(fixture, "A")} vs ${teamLabel(fixture, "B")}"? This will mark it as Completed.`)) return;
     const now = new Date();
     const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     onUpdateFixture({
@@ -275,9 +281,9 @@ export function FixtureViewer({
                 <div className="bg-slate-950 p-4 rounded-xl border border-white/5 text-center">
                   <span className="text-[9px] font-black uppercase text-accent tracking-[0.2em]">Match Matchup</span>
                   <div className="flex justify-between items-center mt-2 text-white font-bold text-sm">
-                    <span className="truncate max-w-[40%]">{teams[editingFixture.teamA] || editingFixture.teamA}</span>
+                    <span className="truncate max-w-[40%]">{teamLabel(editingFixture, "A")}</span>
                     <span className="text-accent font-black italic">VS</span>
-                    <span className="truncate max-w-[40%]">{teams[editingFixture.teamB] || editingFixture.teamB}</span>
+                    <span className="truncate max-w-[40%]">{teamLabel(editingFixture, "B")}</span>
                   </div>
                 </div>
 
@@ -358,7 +364,7 @@ export function FixtureViewer({
                     <span className="text-[10px] font-black uppercase text-accent tracking-[0.2em] block">Match Scores</span>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[9px] font-bold text-slate-400 mb-1 truncate">{teams[editingFixture.teamA] || editingFixture.teamA} Score</label>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 truncate">{teamLabel(editingFixture, "A")} Score</label>
                         <input
                           type="number"
                           min="0"
@@ -368,7 +374,7 @@ export function FixtureViewer({
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] font-bold text-slate-400 mb-1 truncate">{teams[editingFixture.teamB] || editingFixture.teamB} Score</label>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 truncate">{teamLabel(editingFixture, "B")} Score</label>
                         <input
                           type="number"
                           min="0"
@@ -382,8 +388,8 @@ export function FixtureViewer({
                       <div className="flex gap-2 items-center text-[10px] text-green-400 font-bold bg-green-500/5 border border-green-500/10 p-2 rounded-lg justify-center">
                         <Trophy size={12} />
                         <span>
-                          {scoreA > scoreB ? `${teams[editingFixture.teamA] || editingFixture.teamA} Wins!` :
-                           scoreB > scoreA ? `${teams[editingFixture.teamB] || editingFixture.teamB} Wins!` :
+                          {scoreA > scoreB ? `${teamLabel(editingFixture, "A")} Wins!` :
+                           scoreB > scoreA ? `${teamLabel(editingFixture, "B")} Wins!` :
                            "Match is a Draw!"}
                         </span>
                       </div>
@@ -477,7 +483,7 @@ export function FixtureViewer({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                             <span className="text-sm font-bold text-white truncate max-w-[70%]">
-                              {teams[fixture.teamA] || fixture.teamA}
+                              {teamLabel(fixture, "A")}
                             </span>
                             {fixture.status !== "scheduled" && (
                               <span className="font-black text-white scoreboard-number text-sm">{fixture.scoreA}</span>
@@ -488,7 +494,7 @@ export function FixtureViewer({
                           
                           <div className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
                             <span className="text-sm font-bold text-white truncate max-w-[70%]">
-                              {teams[fixture.teamB] || fixture.teamB}
+                              {teamLabel(fixture, "B")}
                             </span>
                             {fixture.status !== "scheduled" && (
                               <span className="font-black text-white scoreboard-number text-sm">{fixture.scoreB}</span>
@@ -502,8 +508,8 @@ export function FixtureViewer({
                             <Trophy size={11} />
                             <span>
                               Winner: {
-                                fixture.scoreA > fixture.scoreB ? (teams[fixture.teamA] || fixture.teamA) :
-                                fixture.scoreB > fixture.scoreA ? (teams[fixture.teamB] || fixture.teamB) : "Draw"
+                                fixture.scoreA > fixture.scoreB ? teamLabel(fixture, "A") :
+                                fixture.scoreB > fixture.scoreA ? teamLabel(fixture, "B") : "Draw"
                               }
                             </span>
                           </div>

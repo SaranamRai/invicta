@@ -134,7 +134,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
         return;
       }
       const session = getStoredSession();
-      if (!session?.token) {
+      if (!session) {
         setErrorMessage("Admin login required to change registration portal state.");
         setTimeout(() => setErrorMessage(null), 4000);
         return;

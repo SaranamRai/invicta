@@ -4,7 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { AuthSession, getStoredSession } from "@/lib/api";
+import { AuthSession, getCurrentRoleSession, getStoredSession, storeSession } from "@/lib/api";
 import { canAccessRole, PortalRole, roleHomePath } from "@/lib/role-auth";
 
 interface ProtectedRouteProps {
@@ -21,8 +21,24 @@ export function ProtectedRoute({ allowedRole, children }: ProtectedRouteProps) {
 
   useEffect(() => {
     const readSession = () => {
-      setAccount(getStoredSession());
-      setHasCheckedSession(true);
+      const storedSession = getStoredSession();
+      if (storedSession) {
+        setAccount(storedSession);
+        setHasCheckedSession(true);
+        return;
+      }
+
+      void getCurrentRoleSession()
+        .then((serverSession) => {
+          storeSession(serverSession);
+          setAccount(serverSession);
+        })
+        .catch(() => {
+          setAccount(null);
+        })
+        .finally(() => {
+          setHasCheckedSession(true);
+        });
     };
 
     readSession();

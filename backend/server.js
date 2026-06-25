@@ -21,6 +21,10 @@ import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 
 if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("JWT_SECRET is required in production.");
+    process.exit(1);
+  }
   console.warn("Warning: JWT_SECRET not set in environment - using temporary development secret");
   process.env.JWT_SECRET ||= "dev_secret_change_me";
 }
@@ -145,10 +149,6 @@ app.use(
       const cleanOrigin = origin.trim().replace(/\/$/, "");
 
       if (allowedOrigins.includes(cleanOrigin)) {
-        return callback(null, true);
-      }
-
-      if (cleanOrigin.endsWith(".vercel.app") && process.env.NODE_ENV === "production") {
         return callback(null, true);
       }
 

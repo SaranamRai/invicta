@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, Camera, Mail, PlayCircle, Share2 } from "lucide-react";
+import { ArrowRight, Camera, Mail, Phone, PlayCircle, Share2 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
@@ -48,13 +49,9 @@ export default function LandingPage() {
         </div>
       </aside>
       <header className="absolute inset-x-0 top-0 z-40">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
           <Link href="/" aria-label="MSU Invicta home" className="flex items-center gap-4">
-            <img
-              src="/msu-logo-transparent.png"
-              alt="Medhavi Skills University"
-              className="h-14 w-36 object-contain brightness-125 contrast-125 sm:h-16 sm:w-44"
-            />
+            <MedhaviLogo className="h-16 w-44 sm:h-20 sm:w-56" />
             <InvictaLogo className="h-12 w-40 sm:h-14 sm:w-52" />
           </Link>
 
@@ -166,8 +163,9 @@ export default function LandingPage() {
                 <Mail size={15} />
                 msuinvicta2026@gmail.com
               </a>
-              <a href="tel:9883924453" className="hover:text-[#f4c35a]">
-                9883924453
+              <a href="tel:+919883924453" className="inline-flex items-center gap-2 hover:text-[#f4c35a]">
+                <Phone size={15} />
+                +91 9883924453
               </a>
             </div>
           </div>
@@ -175,7 +173,7 @@ export default function LandingPage() {
 
         <div className="mx-auto mt-6 flex max-w-7xl flex-col justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/35 sm:flex-row">
           <span>© 2026 Invicta. All rights reserved.</span>
-          <span className="text-sm font-black text-foreground/75 sm:text-base">Managed & Powered by SoCSE</span>
+          <span className="text-sm font-black text-foreground/75 normal-case sm:text-base">Managed & Powered by SoCSE</span>
           <span>Medhavi Skills University</span>
         </div>
       </footer>

@@ -39,8 +39,9 @@ export interface Fixture {
   endedAt?: string;   // ISO timestamp of when admin clicked "End Match"
   fullMatchSeconds?: number;
   matchGapMinutes?: number;
+  round?: string;
   venue: string;
-  status: "scheduled" | "live" | "paused" | "completed";
+  status: "scheduled" | "live" | "paused" | "completed" | "cancelled";
   scoreA?: number;
   scoreB?: number;
   assignedVolunteer?: string;

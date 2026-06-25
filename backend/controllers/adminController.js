@@ -18,6 +18,7 @@ import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
+import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
 export function createDoc(model) {
@@ -194,7 +195,7 @@ export async function listSports(_req, res) {
 }
 
 export async function listPendingRegistrations(_req, res) {
-  const teams = await Team.find({ status: "pending" })
+  const teams = await TeamRegistration.find({ status: "pending" })
     .populate("sportId", "sportName name")
     .sort({ submittedAt: -1 })
     .lean();
@@ -332,19 +333,77 @@ export async function reviewTeamRegistration(req, res) {
     return res.status(400).json({ message: "Rejection reason is required" });
   }
 
-  const team = await Team.findByIdAndUpdate(
-    req.params.id,
-    {
-      status,
-      reviewedBy: req.user.id,
-      reviewedAt: new Date(),
-      rejectionReason: status === "rejected" ? String(rejectionReason).trim() : "",
-    },
-    { new: true }
-  );
+  const registration = await TeamRegistration.findById(req.params.id);
+  if (!registration) return res.status(404).json({ message: "Registration not found" });
 
-  if (!team) return res.status(404).json({ message: "Registration not found" });
-  return res.json(team);
+  const reviewedAt = new Date();
+  registration.status = status;
+  registration.reviewedBy = req.user.id;
+  registration.reviewedAt = reviewedAt;
+  registration.rejectionReason = status === "rejected" ? String(rejectionReason).trim() : "";
+  await registration.save();
+
+  if (status === "approved") {
+    const sportName = registration.sportName || "";
+    await Team.findOneAndUpdate(
+      {
+        sportId: registration.sportId,
+        tournamentId: registration.tournamentId,
+        category: registration.category,
+        department: registration.department,
+        teamName: registration.teamName,
+      },
+      {
+        teamName: registration.teamName,
+        department: registration.department,
+        sport: sportName.trim().toLowerCase().replace(/\s+/g, "-"),
+        sportName,
+        sportId: registration.sportId,
+        tournamentId: registration.tournamentId,
+        tournamentName: registration.tournamentName,
+        category: registration.category,
+        captainName: registration.captainName,
+        captainRegNo: registration.captainRegNo,
+        captainEmail: registration.captainEmail,
+        captainPhone: registration.captainPhone,
+        contactNumber: registration.captainPhone,
+        email: registration.captainEmail,
+        members: registration.members || [],
+        logo: registration.teamLogo || "",
+        status: "approved",
+        submittedAt: registration.submittedAt,
+        reviewedBy: req.user.id,
+        reviewedAt,
+        rejectionReason: "",
+        registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    try {
+      const emailResult = await sendTeamApprovedEmail({
+        teamName: registration.teamName,
+        captainName: registration.captainName,
+        email: registration.captainEmail,
+        sportName,
+        tournamentName: registration.tournamentName,
+      });
+      return res.json({
+        ...registration.toObject(),
+        emailSent: emailResult.sent,
+        emailSkipped: emailResult.skipped,
+      });
+    } catch (emailError) {
+      console.error("Team approval email error:", emailError);
+      return res.json({
+        ...registration.toObject(),
+        emailSent: false,
+        emailWarning: getEmailErrorMessage(emailError),
+      });
+    }
+  }
+
+  return res.json(registration);
 }
 
 export async function listRoleAccounts(_req, res) {

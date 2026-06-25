@@ -7,6 +7,7 @@ import {
   listApprovedRegistrations,
   approveRegistration,
   rejectRegistration,
+  deleteApprovedRegistration,
   exportApprovedExcel,
 } from "../controllers/registrationController.js";
 
@@ -29,6 +30,9 @@ router.patch("/:id/approve", allowRoles("supercoordinator"), approveRegistration
 
 // Reject a registration (supercoordinator only)
 router.patch("/:id/reject", allowRoles("supercoordinator"), rejectRegistration);
+
+// Delete an approved registration and its synced team (admin or supercoordinator)
+router.delete("/:id", allowRoles("admin", "supercoordinator"), deleteApprovedRegistration);
 
 // Export approved registrations as Excel (admin or supercoordinator)
 router.get("/export-excel", allowRoles("admin", "supercoordinator"), exportApprovedExcel);

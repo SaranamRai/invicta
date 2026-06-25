@@ -116,7 +116,26 @@ export default function PublicDashboard() {
   const liveMatches = matchesData.filter((match) => match.status === "Live").length;
   const upcomingMatches = matchesData.filter((match) => match.status === "Upcoming").length;
   const sports = getAvailableSports(teamsData, matchesData);
+  const latestSportIds = new Set(
+    sports
+      .map((sport) => {
+        const latestMatchTime = matchesData
+          .filter((match) => match.sport === sport.id)
+          .reduce((latest, match) => {
+            const scheduledTime = match.date
+              ? new Date(`${match.date}T${match.time || "00:00"}`).getTime()
+              : 0;
+            return Math.max(latest, match.lastUpdated || 0, Number.isNaN(scheduledTime) ? 0 : scheduledTime);
+          }, 0);
+
+        return { id: sport.id, latestMatchTime };
+      })
+      .sort((a, b) => b.latestMatchTime - a.latestMatchTime)
+      .slice(0, 1)
+      .map((sport) => sport.id)
+  );
   const standingsBySport = sports
+    .filter((sport) => latestSportIds.has(sport.id))
     .map((sport) => ({
       ...sport,
       rows: buildStandings(matchesData, teamsData, sport.id).slice(0, 5),
@@ -131,17 +150,17 @@ export default function PublicDashboard() {
   ];
 
   const visitorActions = [
-    { label: "View Sports", text: "See which sports are part of MSU Invicta and browse registered teams.", href: "/sports", icon: ClipboardList },
-    { label: "Follow Matches", text: "Students and visitors can see schedules, live scores, and match updates.", href: "/matches", icon: Radio },
-    { label: "Check League Tables", text: "Completed results update the league table automatically.", href: "/standings", icon: Trophy },
+    { label: "View Sports", href: "/sports", icon: ClipboardList },
+    { label: "Follow Matches", href: "/matches", icon: Radio },
+    { label: "Check League Tables", href: "/standings", icon: Trophy },
   ];
 
   const isLoggedIn = typeof window !== "undefined" && Boolean(getStoredSession());
 
   const easyPaths = [
-    { label: "Visitors", text: "Watch matches, standings, results, rules, and announcements.", href: "/matches", icon: Radio },
-    { label: "Teams", text: "Register only when the tournament registration window is open.", href: registrationOpen ? (isLoggedIn ? "/register" : "/public-register") : "/", icon: ClipboardList },
-    { label: "Staff", text: "Use role login for supercoordinator, coordinator, volunteer, or admin dashboards.", href: "/login", icon: LogIn },
+    { label: "Visitors", href: "/matches", icon: Radio },
+    { label: "Teams", href: registrationOpen ? (isLoggedIn ? "/register" : "/public-register") : "/", icon: ClipboardList },
+    { label: "Staff", href: "/login", icon: LogIn },
   ];
 
   const heroBackdropStyle: React.CSSProperties = {
@@ -151,8 +170,8 @@ export default function PublicDashboard() {
   };
 
   return (
-    <div className="space-y-10">
-      <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
+    <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
+      <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
         <div className="absolute inset-0 bg-no-repeat" style={heroBackdropStyle} />
         <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
@@ -172,7 +191,7 @@ export default function PublicDashboard() {
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-80 lg:grid-cols-1">
-            <Link href="/sports" className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-accent px-3 text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
+            <Link href="/sports" className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-accent px-3 text-white shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
               <span className="sport-heading relative z-10 text-[10px] font-black uppercase tracking-wide sm:text-xs sm:tracking-[0.2em]">View Sports</span>
               <div className="absolute inset-0 hidden translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0 sm:block" />
             </Link>
@@ -239,14 +258,13 @@ export default function PublicDashboard() {
           <Link
             key={item.href}
             href={item.href}
-            className="group flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md"
+            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md"
           >
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
               <item.icon size={20} />
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-wide text-foreground">{item.label}</h2>
-              <p className="mt-1 text-sm font-medium leading-relaxed text-muted-foreground">{item.text}</p>
             </div>
           </Link>
         ))}
@@ -264,7 +282,7 @@ export default function PublicDashboard() {
 
           <Card className="border-2 p-4 sm:p-5">
             {standingsBySport.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid gap-4">
                 {standingsBySport.map((sport) => (
                   <div key={sport.id} className="overflow-hidden rounded-xl border border-border bg-background/40">
                     <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary px-3 py-3 sm:px-4">
@@ -272,7 +290,7 @@ export default function PublicDashboard() {
                       <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Top {sport.rows.length}</span>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[440px] text-left text-sm">
+                      <table className="w-full min-w-[640px] text-left text-sm">
                         <thead className="text-muted-foreground">
                           <tr>
                             <th className="px-3 py-3 text-[9px] font-black uppercase tracking-wide sm:px-4">Rank</th>
@@ -316,7 +334,7 @@ export default function PublicDashboard() {
             </Link>
           </div>
 
-          <div className="grid gap-4">
+          <div className="max-h-[36rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner">
             {matchesData.length > 0 ? matchesData.map((match, i) => (
               <motion.div
                 key={match.id}
@@ -373,7 +391,7 @@ export default function PublicDashboard() {
                 </Card>
               </motion.div>
             )) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center">
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center">
                 <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
                   <Activity size={32} className="text-slate-600" />
                 </div>
@@ -396,7 +414,7 @@ export default function PublicDashboard() {
               key={item.label}
               href={item.href}
               className={cn(
-                "flex min-h-28 items-start gap-4 rounded-xl border border-border bg-secondary/50 p-4 transition-all hover:border-accent hover:bg-accent/10",
+                "flex min-h-20 items-center gap-4 rounded-xl border border-border bg-secondary/50 p-4 transition-all hover:border-accent hover:bg-accent/10",
                 item.label === "Teams" && !registrationOpen ? "pointer-events-none opacity-60" : ""
               )}
             >
@@ -405,7 +423,6 @@ export default function PublicDashboard() {
               </div>
               <div>
                 <h3 className="text-xs font-black uppercase tracking-widest text-foreground">{item.label}</h3>
-                <p className="mt-1 text-xs font-semibold leading-relaxed text-muted-foreground">{item.text}</p>
               </div>
             </Link>
           ))}

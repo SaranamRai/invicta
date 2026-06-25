@@ -7,6 +7,9 @@ import Coordinator from "../models/Coordinator.js";
 import SuperCoordinator from "../models/SuperCoordinator.js";
 import { getEmailErrorMessage, sendAccountCreatedEmail } from "../utils/emailService.js";
 
+const AUTH_COOKIE_NAME = "sportsAuthToken";
+const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 const roleModels = [
   { role: "admin", model: Admin },
   { role: "supercoordinator", model: SuperCoordinator },
@@ -33,6 +36,30 @@ function signToken(account, role) {
   );
 }
 
+function getCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: AUTH_COOKIE_MAX_AGE_MS,
+  };
+}
+
+function toSession(account, role, token) {
+  return {
+    ...(token ? { token } : {}),
+    role,
+    name: account.name,
+    id: account._id || account.id,
+    email: account.email,
+    department: account.department || "",
+    assignedSport: account.assignedSport?.toString?.() || account.assignedSport || "",
+    assignedSportId: account.assignedSportId?.toString?.() || account.assignedSportId || "",
+    assignedSportName: account.assignedSportName || "",
+  };
+}
+
 export async function login(req, res) {
   const { email, password } = req.body;
 
@@ -51,18 +78,39 @@ export async function login(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    return res.json({
-      token: signToken(account, role),
-      role,
-      name: account.name,
-      id: account._id,
-      email: account.email,
-      department: account.department || "",
-      assignedSport: account.assignedSport?.toString?.() || "",
-    });
+    const token = signToken(account, role);
+    res.cookie(AUTH_COOKIE_NAME, token, getCookieOptions());
+    return res.json(toSession(account, role));
   }
 
   return res.status(403).json({ message: "Access denied" });
+}
+
+export function currentSession(req, res) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Login required" });
+  }
+
+  return res.json({
+    role: req.user.role,
+    name: req.user.name,
+    id: req.user.id,
+    email: req.user.email,
+    department: req.user.department || "",
+    assignedSport: req.user.assignedSport || "",
+    assignedSportId: req.user.assignedSportId || "",
+    assignedSportName: req.user.assignedSportName || "",
+  });
+}
+
+export function logout(_req, res) {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+  return res.json({ message: "Logged out" });
 }
 
 export async function createRoleAccount(model, role, req, res) {
