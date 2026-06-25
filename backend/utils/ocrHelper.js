@@ -1,6 +1,8 @@
 import { createWorker } from "tesseract.js";
+import { fileURLToPath } from "node:url";
 
 const OCR_TIMEOUT_MS = 35000;
+const LOCAL_LANG_PATH = fileURLToPath(new URL("../", import.meta.url));
 let workerPromise = null;
 let workerInstance = null;
 let ocrQueue = Promise.resolve();
@@ -20,7 +22,11 @@ function withTimeout(promise, timeoutMs) {
 
 async function getWorker() {
   if (!workerPromise) {
-    workerPromise = createWorker("eng").then(async (worker) => {
+    workerPromise = createWorker("eng", 1, {
+      cacheMethod: "none",
+      gzip: false,
+      langPath: LOCAL_LANG_PATH,
+    }).then(async (worker) => {
       workerInstance = worker;
       await worker.setParameters({
         tessedit_char_whitelist: "0123456789",
