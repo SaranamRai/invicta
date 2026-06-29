@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Upload, Users, X } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Users, X } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
+import { AppToast } from "@/components/ui/app-toast";
 import {
   getPublicSports,
   getPublicTournaments,
@@ -412,18 +413,7 @@ function RegisterPageContent() {
             </div>
           </div>
 
-          {message && (
-            <div className={`mb-6 rounded-xl border px-4 py-3 text-sm font-bold ${
-              status === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-red-200 bg-red-50 text-red-700"
-            }`}>
-              <div className="flex items-center gap-2">
-                {status === "success" && <CheckCircle2 size={18} />}
-                <span>{message}</span>
-              </div>
-            </div>
-          )}
+          <AppToast message={message} variant={status === "success" ? "success" : status === "error" ? "error" : "info"} onClose={() => setMessage("")} />
 
           {registrationOpen ? (
             <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">

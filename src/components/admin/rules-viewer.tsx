@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, CheckCircle, ExternalLink, FileText, Mail, XCircle } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { AppToast } from "@/components/ui/app-toast";
 import { getAdminRules, mapMongoRule, reviewAdminRule } from "@/lib/api";
 import { sports } from "@/lib/mock-data";
 import { getRoleAccount } from "@/lib/role-auth";
@@ -98,11 +99,7 @@ export function RulesViewer() {
         </p>
       </div>
 
-      {message && (
-        <div className="rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm font-bold text-slate-200">
-          {message}
-        </div>
-      )}
+      <AppToast message={message} variant={message.startsWith("Could not") ? "error" : "success"} onClose={() => setMessage("")} />
 
       <RuleSection
         title="Pending Approval"

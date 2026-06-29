@@ -12,6 +12,7 @@ import { RulesViewer } from "@/components/admin/rules-viewer";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Download, LogOut, CheckCircle, Trash2, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppToast } from "@/components/ui/app-toast";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { MedhaviLogo } from "@/components/medhavi-logo";
 import { GenderMark } from "@/components/gender-mark";
@@ -76,7 +77,7 @@ function DownloadApprovedRegistrationsButton({ compact = false, filters }: { com
         <Download size={compact ? 14 : 16} />
         {isDownloading ? "Downloading..." : compact ? "Export Excel" : "Download Approved Registrations (Excel)"}
       </button>
-      {message && <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>}
+      <AppToast message={message} variant={message.startsWith("Could not") ? "error" : "success"} onClose={() => setMessage("")} />
     </div>
   );
 }
@@ -588,11 +589,7 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
           </select>
       </div>
 
-      {message && (
-        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
-          {message}
-        </div>
-      )}
+      <AppToast message={message} variant={message.startsWith("Could not") ? "error" : "success"} onClose={() => setMessage("")} />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

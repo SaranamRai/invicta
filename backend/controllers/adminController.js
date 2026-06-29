@@ -18,7 +18,7 @@ import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
-import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
+import { sendTeamApprovedEmail, sendTeamRejectedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
 function getRegistrationApprovalBlockMessage(registration) {
@@ -425,7 +425,51 @@ export async function reviewTeamRegistration(req, res) {
     }
   }
 
-  return res.json(registration);
+  try {
+    const emailRecipients = [
+      registration.captainEmail,
+      ...(registration.members || []).map((member) => member.email),
+    ]
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter(Boolean);
+    const uniqueRecipients = [...new Set(emailRecipients)];
+    let emailResult = { sent: false, skipped: true };
+    const failedEmails = [];
+
+    for (const email of uniqueRecipients) {
+      try {
+        const result = await sendTeamRejectedEmail({
+          teamName: registration.teamName,
+          captainName: registration.captainName,
+          email,
+          sportName: registration.sportName,
+          tournamentName: registration.tournamentName,
+          rejectionReason: registration.rejectionReason,
+        });
+        emailResult = {
+          sent: Boolean(emailResult.sent || result.sent),
+          skipped: Boolean(emailResult.skipped && result.skipped),
+        };
+      } catch (emailError) {
+        failedEmails.push({ email, message: getEmailErrorMessage(emailError) });
+        console.error("Team rejection email recipient error:", email, emailError);
+      }
+    }
+
+    return res.json({
+      ...registration.toObject(),
+      emailSent: emailResult.sent,
+      emailSkipped: emailResult.skipped,
+      emailFailedCount: failedEmails.length,
+    });
+  } catch (emailError) {
+    console.error("Team rejection email error:", emailError);
+    return res.json({
+      ...registration.toObject(),
+      emailSent: false,
+      emailWarning: getEmailErrorMessage(emailError),
+    });
+  }
 }
 
 export async function listRoleAccounts(_req, res) {

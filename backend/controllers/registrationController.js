@@ -7,7 +7,7 @@ import LiveFeed from "../models/LiveFeed.js";
 import LiveScore from "../models/LiveScore.js";
 import Player from "../models/Player.js";
 import Result from "../models/Result.js";
-import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
+import { sendTeamApprovedEmail, sendTeamRejectedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import { normalizeRegNo, isValidEmail } from "../utils/regNoHelper.js";
 import {
   buildVerifiedStatus,
@@ -524,8 +524,9 @@ export async function rejectRegistration(req, res) {
   try {
     const { id } = req.params;
     const { rejectionReason } = req.body;
+    const cleanRejectionReason = String(rejectionReason || "").trim();
 
-    if (!rejectionReason || !String(rejectionReason).trim()) {
+    if (!cleanRejectionReason) {
       return res.status(400).json({ message: "Rejection reason is required" });
     }
 
@@ -535,13 +536,49 @@ export async function rejectRegistration(req, res) {
         status: "rejected",
         reviewedBy: req.user.id,
         reviewedAt: new Date(),
-        rejectionReason: String(rejectionReason).trim(),
+        rejectionReason: cleanRejectionReason,
       },
       { new: true }
     );
 
     if (!registration) return res.status(404).json({ message: "Registration not found" });
-    return res.json(registration);
+
+    const emailRecipients = [
+      registration.captainEmail,
+      ...(registration.members || []).map((member) => member.email),
+    ]
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter(Boolean);
+    const uniqueRecipients = [...new Set(emailRecipients)];
+    const failedEmails = [];
+    let emailResult = { sent: false, skipped: true };
+
+    for (const email of uniqueRecipients) {
+      try {
+        const result = await sendTeamRejectedEmail({
+          teamName: registration.teamName,
+          captainName: registration.captainName,
+          email,
+          sportName: registration.sportName,
+          tournamentName: registration.tournamentName,
+          rejectionReason: cleanRejectionReason,
+        });
+        emailResult = {
+          sent: Boolean(emailResult.sent || result.sent),
+          skipped: Boolean(emailResult.skipped && result.skipped),
+        };
+      } catch (emailError) {
+        failedEmails.push({ email, message: getEmailErrorMessage(emailError) });
+        console.error("Team rejection email recipient error:", email, emailError);
+      }
+    }
+
+    return res.json({
+      ...registration.toObject(),
+      emailSent: emailResult.sent,
+      emailSkipped: emailResult.skipped,
+      emailFailedCount: failedEmails.length,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
