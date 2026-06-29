@@ -3,7 +3,7 @@ const VERIFY_ID_CARD_TIMEOUT_MS = 15000;
 const BROWSER_OCR_INIT_TIMEOUT_MS = 12000;
 const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 18000;
 
-async function fileToCompressedDataUrl(file: File, maxSize = 360) {
+async function fileToProfilePhotoDataUrl(file: File, maxSize = 320) {
   if (typeof document === "undefined") {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -24,19 +24,56 @@ async function fileToCompressedDataUrl(file: File, maxSize = 360) {
     image.src = sourceUrl;
     await loaded;
 
-    const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
+    let crop = getFallbackProfileCrop(image.width, image.height);
+    const FaceDetectorClass = (window as unknown as { FaceDetector?: new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => { detect: (source: CanvasImageSource) => Promise<{ boundingBox: DOMRectReadOnly }[]> } }).FaceDetector;
+    if (FaceDetectorClass) {
+      try {
+        const detector = new FaceDetectorClass({ fastMode: true, maxDetectedFaces: 1 });
+        const faces = await detector.detect(image);
+        const face = faces[0]?.boundingBox;
+        if (face && face.width > 0 && face.height > 0) {
+          const side = Math.min(
+            Math.max(face.width * 2.2, face.height * 1.75),
+            Math.min(image.width, image.height)
+          );
+          crop = {
+            x: clamp(face.x + face.width / 2 - side / 2, 0, image.width - side),
+            y: clamp(face.y + face.height / 2 - side * 0.44, 0, image.height - side),
+            size: side,
+          };
+        }
+      } catch {
+        /* Fall back to a simple portrait crop when face detection is unavailable. */
+      }
+    }
+
+    const scale = Math.min(1, maxSize / crop.size);
+    const width = Math.max(1, Math.round(crop.size * scale));
+    const height = width;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Could not prepare ID card image.");
-    context.drawImage(image, 0, 0, width, height);
-    return canvas.toDataURL("image/jpeg", 0.74);
+    context.drawImage(image, crop.x, crop.y, crop.size, crop.size, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.82);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getFallbackProfileCrop(width: number, height: number) {
+  const isLandscapeId = width > height * 1.25;
+  const size = isLandscapeId ? Math.min(width * 0.38, height * 0.9) : Math.min(width, height);
+  return {
+    x: isLandscapeId ? width * 0.06 : (width - size) / 2,
+    y: isLandscapeId ? (height - size) / 2 : (height - size) / 2,
+    size,
+  };
 }
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
@@ -1343,7 +1380,7 @@ export async function verifyRegistrationIdCard(payload: {
   idCardImage: File;
 }) {
   const withImage = async (result: IdCardVerificationResponse): Promise<IdCardVerificationResponse> => {
-    const imageData = result.profilePhoto || result.idCardImage || await fileToCompressedDataUrl(payload.idCardImage);
+    const imageData = result.profilePhoto || result.idCardImage || await fileToProfilePhotoDataUrl(payload.idCardImage);
     return {
       ...result,
       profilePhoto: imageData,
