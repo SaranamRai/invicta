@@ -1166,10 +1166,28 @@ function extractRegistrationNumberFromText(text: string, typedRegistrationNumber
 
   const digitRuns = text.match(/\d[\d\s-]{5,}\d/g) || [];
   const typedDigits = normalizedTyped.replace(/\D/g, "");
+  if (/^\d+$/.test(normalizedTyped)) {
+    for (const run of digitRuns) {
+      const normalizedRun = normalizeRegistrationText(run);
+      if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
+        return normalizedTyped;
+      }
+    }
+  }
+
+  const alphaNumericRuns = text.match(/[A-Z0-9][A-Z0-9\s_-]{4,24}[A-Z0-9]/gi) || [];
+  for (const run of alphaNumericRuns) {
+    if (!/\d/.test(run)) continue;
+    const normalizedRun = normalizeRegistrationText(run);
+    if (/[A-Z]/.test(normalizedRun) && /\d/.test(normalizedRun) && normalizedRun.length >= 6 && normalizedRun.length <= 20) {
+      return normalizedRun;
+    }
+  }
+
   for (const run of digitRuns) {
     const normalizedRun = normalizeRegistrationText(run);
-    if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
-      return normalizedTyped;
+    if (normalizedRun.length >= 10 && normalizedRun.length <= 14) {
+      return normalizedRun;
     }
   }
   return "";
@@ -1240,7 +1258,7 @@ async function verifyRegistrationIdCardInBrowser(payload: {
       BROWSER_OCR_INIT_TIMEOUT_MS,
       "ID scan is taking too long. Please try again with a clearer, cropped image."
     );
-    await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
+    await worker.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_" });
     const result = await withClientTimeout(
       worker.recognize(payload.idCardImage),
       BROWSER_OCR_RECOGNIZE_TIMEOUT_MS,
