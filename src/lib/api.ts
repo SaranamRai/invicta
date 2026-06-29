@@ -68,10 +68,15 @@ function clamp(value: number, min: number, max: number) {
 
 function getFallbackProfileCrop(width: number, height: number) {
   const isLandscapeId = width > height * 1.25;
-  const size = isLandscapeId ? Math.min(width * 0.38, height * 0.9) : Math.min(width, height);
+  const isSquareLikeIdPreview = Math.abs(width - height) / Math.max(width, height) < 0.12;
+  const size = isLandscapeId
+    ? Math.min(width * 0.28, height * 0.56)
+    : isSquareLikeIdPreview
+      ? Math.min(width, height) * 0.42
+      : Math.min(width * 0.5, height * 0.34);
   return {
-    x: isLandscapeId ? width * 0.06 : (width - size) / 2,
-    y: isLandscapeId ? (height - size) / 2 : (height - size) / 2,
+    x: isLandscapeId ? width * 0.1 : isSquareLikeIdPreview ? width * 0.2 : (width - size) / 2,
+    y: isLandscapeId ? height * 0.16 : isSquareLikeIdPreview ? height * 0.1 : height * 0.12,
     size,
   };
 }
