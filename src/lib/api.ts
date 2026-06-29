@@ -1,7 +1,43 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
-const VERIFY_ID_CARD_TIMEOUT_MS = 50000;
-const BROWSER_OCR_INIT_TIMEOUT_MS = 25000;
-const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 30000;
+const VERIFY_ID_CARD_TIMEOUT_MS = 15000;
+const BROWSER_OCR_INIT_TIMEOUT_MS = 12000;
+const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 18000;
+
+async function fileToCompressedDataUrl(file: File, maxSize = 360) {
+  if (typeof document === "undefined") {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.decoding = "async";
+    const loaded = new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Could not prepare ID card image."));
+    });
+    image.src = sourceUrl;
+    await loaded;
+
+    const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare ID card image.");
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.74);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
@@ -457,7 +493,7 @@ export interface MongoTeam {
   email?: string;
   contactNumber?: string;
   category?: string;
-  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string }[];
+  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string; profilePhoto?: string }[];
   wins?: number;
   losses?: number;
   draws?: number;
@@ -586,7 +622,16 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     tournamentId: typeof team.tournamentId === "string" ? team.tournamentId : team.tournamentId?._id || team.tournamentId?.id || "",
     tournamentName: team.tournamentName || getRefName(team.tournamentId, ""),
     category: team.category,
-    members: (team.members || []).map(getMemberName).filter(Boolean),
+    members: (team.members || []).map((member) => {
+      if (!member || typeof member !== "object") return getMemberName(member);
+      const value = member as { fullName?: string; name?: string; registrationNumber?: string; registrationNo?: string; regNo?: string; profilePhoto?: string; idCardImage?: string };
+      return {
+        fullName: value.fullName || value.name || value.registrationNumber || value.registrationNo || value.regNo || "",
+        registrationNo: value.registrationNo || value.registrationNumber || value.regNo || "",
+        registrationNumber: value.registrationNumber || value.registrationNo || value.regNo || "",
+        profilePhoto: value.profilePhoto || value.idCardImage || "",
+      };
+    }).filter((member) => typeof member === "string" ? Boolean(member) : Boolean(member.fullName || member.registrationNo)),
     coachCaptain: team.captainName || "",
     captainRegNo: team.captainRegNo || "",
     captainEmail: team.captainEmail || "",
@@ -1088,6 +1133,8 @@ export interface TeamRegistrationMember {
   gender?: string;
   email?: string;
   phone?: string;
+  profilePhoto?: string;
+  idCardImage?: string;
   verificationToken?: string;
   idVerification?: IdVerificationInfo;
 }
@@ -1115,6 +1162,8 @@ export interface TeamRegistrationPayload {
   captainEmail: string;
   captainPhone: string;
   captainVerificationToken?: string;
+  captainProfilePhoto?: string;
+  captainIdCardImage?: string;
   captainIdVerification?: IdVerificationInfo;
   members: TeamRegistrationMember[];
   allPlayers?: {
@@ -1124,6 +1173,7 @@ export interface TeamRegistrationPayload {
     role?: "captain" | "member";
     idVerified?: boolean;
     idVerificationStatus?: string;
+    profilePhoto?: string;
   }[];
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
@@ -1152,6 +1202,8 @@ export interface IdCardVerificationResponse {
   confidence?: number;
   message: string;
   verificationToken?: string;
+  profilePhoto?: string;
+  idCardImage?: string;
 }
 
 function normalizeRegistrationText(value: string) {
@@ -1258,7 +1310,11 @@ async function verifyRegistrationIdCardInBrowser(payload: {
       BROWSER_OCR_INIT_TIMEOUT_MS,
       "ID scan is taking too long. Please try again with a clearer, cropped image."
     );
-    await worker.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_" });
+    const normalizedTyped = normalizeRegistrationText(payload.typedRegistrationNumber);
+    const whitelist = /^\d+$/.test(normalizedTyped)
+      ? "0123456789 -"
+      : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_";
+    await worker.setParameters({ tessedit_char_whitelist: whitelist });
     const result = await withClientTimeout(
       worker.recognize(payload.idCardImage),
       BROWSER_OCR_RECOGNIZE_TIMEOUT_MS,
@@ -1286,6 +1342,23 @@ export async function verifyRegistrationIdCard(payload: {
   typedRegistrationNumber: string;
   idCardImage: File;
 }) {
+  const withImage = async (result: IdCardVerificationResponse): Promise<IdCardVerificationResponse> => {
+    const imageData = result.profilePhoto || result.idCardImage || await fileToCompressedDataUrl(payload.idCardImage);
+    return {
+      ...result,
+      profilePhoto: imageData,
+      idCardImage: imageData,
+    };
+  };
+
+  try {
+    return await withImage(await verifyRegistrationIdCardInBrowser(payload));
+  } catch (browserError) {
+    if (browserError instanceof ApiError && browserError.status === 422) {
+      throw browserError;
+    }
+  }
+
   const formData = new FormData();
   formData.set("playerRole", payload.playerRole);
   formData.set("playerIndex", String(payload.playerIndex));
@@ -1304,7 +1377,7 @@ export async function verifyRegistrationIdCard(payload: {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      return verifyRegistrationIdCardInBrowser(payload);
+      throw new ApiError("ID scan is taking too long. Please try again with a clearer, cropped image.", 408);
     }
     throw error;
   } finally {
@@ -1319,13 +1392,10 @@ export async function verifyRegistrationIdCard(payload: {
     data = null;
   }
   if (!response.ok) {
-    if ([503, 504].includes(response.status)) {
-      return verifyRegistrationIdCardInBrowser(payload);
-    }
     const proxyFailure = responseText.includes("ECONNREFUSED") || responseText.includes("fetch failed");
     throw new ApiError(data?.message || (proxyFailure ? "Could not reach the verification service. Please try again in a moment." : "Could not verify ID card."), response.status);
   }
-  return data as IdCardVerificationResponse;
+  return withImage(data as IdCardVerificationResponse);
 }
 
 export function getTeamPendingRegistrations() {

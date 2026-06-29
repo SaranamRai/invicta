@@ -99,7 +99,13 @@ function mapVolunteerTeam(team) {
     members: (team.members || []).map((m) => {
       if (typeof m === "string") return m;
       if (m && typeof m === "object") {
-        return m.fullName || m.name || m.registrationNo || m.registrationNumber || "";
+        return {
+          fullName: m.fullName || m.name || m.registrationNo || m.registrationNumber || "",
+          registrationNo: m.registrationNo || m.registrationNumber || m.regNo || "",
+          registrationNumber: m.registrationNumber || m.registrationNo || m.regNo || "",
+          department: m.department || team.department || "",
+          profilePhoto: m.profilePhoto || m.idCardImage || m.photo || m.image || "",
+        };
       }
       return "";
     }),
@@ -164,7 +170,9 @@ export async function volunteerTeams(req, res) {
           members: (t.members || []).map((m) => ({
             fullName: m.fullName || "",
             registrationNumber: m.registrationNo || "",
+            registrationNo: m.registrationNo || "",
             department: m.department || "",
+            profilePhoto: m.profilePhoto || m.idCardImage || "",
           })),
           status: t.status,
           submittedAt: t.submittedAt,

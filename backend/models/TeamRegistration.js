@@ -24,6 +24,8 @@ const memberSchema = new mongoose.Schema(
     gender: { type: String, enum: ["", "Male", "Female"], default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
+    profilePhoto: { type: String, default: "" },
+    idCardImage: { type: String, default: "" },
     idVerification: { type: idVerificationSchema, default: () => ({}) },
   },
   { _id: false }
@@ -37,6 +39,7 @@ const allPlayerSchema = new mongoose.Schema(
     role: { type: String, enum: ["captain", "member"], default: "member" },
     idVerified: { type: Boolean, default: false },
     idVerificationStatus: { type: String, default: "pending" },
+    profilePhoto: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -55,6 +58,8 @@ const teamRegistrationSchema = new mongoose.Schema(
     captainRegNo: { type: String, required: true, trim: true, uppercase: true },
     captainEmail: { type: String, required: true, trim: true, lowercase: true },
     captainPhone: { type: String, required: true, trim: true },
+    captainProfilePhoto: { type: String, default: "" },
+    captainIdCardImage: { type: String, default: "" },
     captainIdVerification: { type: idVerificationSchema, default: () => ({}) },
     members: { type: [memberSchema], default: [] },
     allPlayers: { type: [allPlayerSchema], default: [] },

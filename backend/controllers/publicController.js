@@ -108,6 +108,18 @@ function isValidEmail(value) {
   return isValidEmailValue(value);
 }
 
+const VALID_IMAGE_PREFIXES = [
+  "data:image/jpeg;base64,",
+  "data:image/png;base64,",
+  "data:image/webp;base64,",
+  "data:image/jpg;base64,",
+];
+
+function isAllowedImage(value) {
+  if (!value || typeof value !== "string") return false;
+  return VALID_IMAGE_PREFIXES.some((prefix) => value.startsWith(prefix));
+}
+
 function normalizeMember(member) {
   if (typeof member === "string") {
     return {
@@ -118,6 +130,8 @@ function normalizeMember(member) {
       gender: "",
       email: "",
       phone: "",
+      profilePhoto: "",
+      idCardImage: "",
     };
   }
 
@@ -129,6 +143,8 @@ function normalizeMember(member) {
     gender: normalizeText(member?.gender),
     email: normalizeText(member?.email).toLowerCase(),
     phone: normalizeText(member?.phone),
+    profilePhoto: isAllowedImage(member?.profilePhoto || member?.idCardImage || "") ? (member.profilePhoto || member.idCardImage) : "",
+    idCardImage: isAllowedImage(member?.idCardImage || member?.profilePhoto || "") ? (member.idCardImage || member.profilePhoto) : "",
     verificationToken: normalizeText(member?.verificationToken),
   };
 }
@@ -139,7 +155,7 @@ function getVerifiedStatusOrError({ token, registrationNumber, playerRole, playe
   return { value: buildVerifiedStatus(payload) };
 }
 
-function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVerification, members }) {
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, captainIdVerification, members }) {
   return [
     {
       name: captainName,
@@ -148,6 +164,7 @@ function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVer
       role: "captain",
       idVerified: Boolean(captainIdVerification?.verified),
       idVerificationStatus: captainIdVerification?.status || "pending",
+      profilePhoto: captainProfilePhoto || "",
     },
     ...(members || []).map((member) => ({
       name: member.fullName,
@@ -156,6 +173,7 @@ function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVer
       role: "member",
       idVerified: Boolean(member.idVerification?.verified),
       idVerificationStatus: member.idVerification?.status || "pending",
+      profilePhoto: member.profilePhoto || member.idCardImage || "",
     })),
   ];
 }
@@ -248,6 +266,9 @@ export async function registerPublicTeam(req, res) {
     const captainRegNo = normalizeRegNo(req.body.captainRegNo || req.body.captainRegistrationNumber);
     const email = normalizeText(req.body.captainEmail || req.body.email).toLowerCase();
     const phone = normalizeText(req.body.captainPhone || req.body.phone || req.body.contactNumber).replace(/\D/g, "");
+    const captainProfilePhoto = isAllowedImage(req.body.captainProfilePhoto || req.body.captainIdCardImage || "")
+      ? (req.body.captainProfilePhoto || req.body.captainIdCardImage)
+      : "";
 
     if (!department || !teamName || !captainName || !captainRegNo || !email || !phone) {
       return res.status(400).json({ message: "Department, team, captain registration number, captain email, and phone are required" });
@@ -330,6 +351,8 @@ export async function registerPublicTeam(req, res) {
         gender: member.gender || category,
         email: member.email || "",
         phone: member.phone || "",
+        profilePhoto: member.profilePhoto || member.idCardImage || "",
+        idCardImage: member.idCardImage || member.profilePhoto || "",
         idVerification: memberVerification.value,
       };
     });
@@ -339,6 +362,7 @@ export async function registerPublicTeam(req, res) {
       captainName,
       captainEmail: email,
       captainRegNo,
+      captainProfilePhoto,
       captainIdVerification,
       members: storedMembers,
     });
@@ -383,6 +407,8 @@ export async function registerPublicTeam(req, res) {
       captainRegNo,
       captainEmail: email,
       captainPhone: phone,
+      captainProfilePhoto,
+      captainIdCardImage: captainProfilePhoto,
       captainIdVerification,
       members: storedMembers,
       allPlayers,

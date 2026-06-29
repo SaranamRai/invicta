@@ -8,6 +8,7 @@ const playerSchema = new mongoose.Schema(
     department: { type: String, trim: true },
     semester: { type: String, trim: true },
     phone: { type: String, trim: true },
+    profilePhoto: { type: String, trim: true },
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
     teamId: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     isCaptain: { type: Boolean, default: false },

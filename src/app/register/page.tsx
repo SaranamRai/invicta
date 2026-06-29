@@ -43,6 +43,7 @@ type PlayerVerification = {
   extractedRegistrationNumber: string;
   message: string;
   verificationToken: string;
+  profilePhoto: string;
   confidence?: number;
 };
 
@@ -51,6 +52,7 @@ const emptyVerification = (): PlayerVerification => ({
   extractedRegistrationNumber: "",
   message: "Upload each player's student ID card to verify the registration number.",
   verificationToken: "",
+  profilePhoto: "",
 });
 
 const emptyMember = (): MemberInput => ({
@@ -235,6 +237,7 @@ function RegisterPageContent() {
       extractedRegistrationNumber: "",
       message: "Scanning...",
       verificationToken: "",
+      profilePhoto: "",
     };
     if (playerRole === "captain") setCaptainVerification(scanningState);
     else setMemberVerification(index, scanningState);
@@ -246,6 +249,7 @@ function RegisterPageContent() {
         extractedRegistrationNumber: result.extractedRegistrationNumber || "",
         message: result.message,
         verificationToken: result.verificationToken || "",
+        profilePhoto: result.profilePhoto || result.idCardImage || "",
         confidence: result.confidence,
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
@@ -256,6 +260,7 @@ function RegisterPageContent() {
         extractedRegistrationNumber: "",
         message: error instanceof Error ? error.message : "Could not read registration number. Please upload a clearer image.",
         verificationToken: "",
+        profilePhoto: "",
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
       else setMemberVerification(index, nextVerification);
@@ -284,6 +289,8 @@ function RegisterPageContent() {
         gender: member.gender || category,
         email: member.email.trim().toLowerCase(),
         phone: member.phone.trim(),
+        profilePhoto: member.verification.profilePhoto,
+        idCardImage: member.verification.profilePhoto,
         verificationToken: member.verification.verificationToken,
       }))
       .filter((member) => member.fullName || member.registrationNo);
@@ -357,6 +364,8 @@ function RegisterPageContent() {
         captainRegNo: cleanCaptainRegNo,
         captainEmail: cleanCaptainEmail,
         captainPhone: cleanCaptainPhone,
+        captainProfilePhoto: captainVerification.profilePhoto,
+        captainIdCardImage: captainVerification.profilePhoto,
         captainVerificationToken: captainVerification.verificationToken,
         members: cleanMembers,
       };

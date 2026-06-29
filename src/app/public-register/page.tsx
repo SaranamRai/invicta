@@ -35,6 +35,7 @@ type PlayerVerification = {
   extractedRegistrationNumber: string;
   message: string;
   verificationToken: string;
+  profilePhoto: string;
   confidence?: number;
 };
 
@@ -43,6 +44,7 @@ const emptyVerification = (): PlayerVerification => ({
   extractedRegistrationNumber: "",
   message: "Upload each player's student ID card to verify the registration number.",
   verificationToken: "",
+  profilePhoto: "",
 });
 
 const emptyMember = (): MemberInput => ({
@@ -185,7 +187,7 @@ export default function PublicRegisterPage() {
       setMessage("ID card image is required.");
       return;
     }
-    const scanningState: PlayerVerification = { status: "scanning", extractedRegistrationNumber: "", message: "Scanning...", verificationToken: "" };
+    const scanningState: PlayerVerification = { status: "scanning", extractedRegistrationNumber: "", message: "Scanning...", verificationToken: "", profilePhoto: "" };
     if (playerRole === "captain") setCaptainVerification(scanningState);
     else setMemberVerification(index, scanningState);
     try {
@@ -195,6 +197,7 @@ export default function PublicRegisterPage() {
         extractedRegistrationNumber: result.extractedRegistrationNumber || "",
         message: result.message,
         verificationToken: result.verificationToken || "",
+        profilePhoto: result.profilePhoto || result.idCardImage || "",
         confidence: result.confidence,
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
@@ -205,6 +208,7 @@ export default function PublicRegisterPage() {
         extractedRegistrationNumber: "",
         message: error instanceof Error ? error.message : "Could not read registration number. Please upload a clearer image.",
         verificationToken: "",
+        profilePhoto: "",
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
       else setMemberVerification(index, nextVerification);
@@ -227,6 +231,8 @@ export default function PublicRegisterPage() {
         semester: member.semester.trim(),
         email: member.email.trim().toLowerCase(),
         phone: member.phone.trim(),
+        profilePhoto: member.verification.profilePhoto,
+        idCardImage: member.verification.profilePhoto,
         verificationToken: member.verification.verificationToken,
       }))
       .filter((member) => member.fullName || member.registrationNumber);
@@ -305,6 +311,8 @@ export default function PublicRegisterPage() {
         email: email.trim(),
         captainEmail: email.trim(),
         captainVerificationToken: captainVerification.verificationToken,
+        captainProfilePhoto: captainVerification.profilePhoto,
+        captainIdCardImage: captainVerification.profilePhoto,
         phone: cleanPhone,
         captainPhone: cleanPhone,
         status: "pending",

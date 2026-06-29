@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Calendar, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Search, Send, ShieldCheck, Shield, ShieldOff, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
+import { BookOpen, CheckCircle, ClipboardList, FileUp, LogOut, Megaphone, Search, Send, ShieldCheck, Shield, ShieldOff, Table2, Trophy, UserPlus, UsersRound } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -1066,9 +1066,14 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
             {reg.members && reg.members.length > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2">
                 {reg.members.map((m, i) => (
-                  <span key={`${reg._id}-${m.registrationNo}-${i}`} className="rounded-md bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                    {m.fullName} {m.registrationNo ? `(${m.registrationNo})` : ""}
-                  </span>
+                  <div key={`${reg._id}-${m.registrationNo}-${i}`} className="flex items-center gap-2 rounded-md bg-background px-2 py-1">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary text-[9px] font-black text-muted-foreground">
+                      {m.profilePhoto || m.idCardImage ? <img src={m.profilePhoto || m.idCardImage} alt="" className="h-full w-full object-cover" /> : (m.fullName || "ID").slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="min-w-0 truncate text-[10px] font-medium text-muted-foreground">
+                      {m.fullName} {m.registrationNo ? `(${m.registrationNo})` : ""}
+                    </span>
+                  </div>
                 ))}
               </div>
             ) : (

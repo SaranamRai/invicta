@@ -5,7 +5,7 @@ import { Calendar, ChevronDown, Search, Shield, ShieldOff, Trophy, User, UsersRo
 import { Card } from "@/components/ui/card";
 import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
-import { getVolunteerTeams, getTeamApprovedRegistrations, TeamRegistrationPayload } from "@/lib/api";
+import { getVolunteerTeams } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getRoleAccount } from "@/lib/role-auth";
 
@@ -26,6 +26,35 @@ function formatDate(value?: number) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not recorded";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function getMemberName(member: unknown) {
+  if (typeof member === "string") return member;
+  if (!member || typeof member !== "object") return "";
+  const value = member as { fullName?: string; name?: string; registrationNo?: string; registrationNumber?: string };
+  return value.fullName || value.name || value.registrationNo || value.registrationNumber || "";
+}
+
+function getMemberRegNo(member: unknown) {
+  if (!member || typeof member !== "object") return "";
+  const value = member as { registrationNo?: string; registrationNumber?: string; regNo?: string };
+  return value.registrationNo || value.registrationNumber || value.regNo || "";
+}
+
+function getMemberPhoto(member: unknown) {
+  if (!member || typeof member !== "object") return "";
+  const value = member as { profilePhoto?: string; idCardImage?: string; photo?: string; image?: string };
+  return value.profilePhoto || value.idCardImage || value.photo || value.image || "";
+}
+
+function PlayerThumb({ member }: { member: unknown }) {
+  const photo = getMemberPhoto(member);
+  const name = getMemberName(member);
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary text-[10px] font-black text-muted-foreground">
+      {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : (name || "ID").slice(0, 2).toUpperCase()}
+    </div>
+  );
 }
 
 function CategorySection({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -109,7 +138,7 @@ export default function VolunteerTeamsPage() {
       team.name.toLowerCase().includes(query) ||
       (team.department || "").toLowerCase().includes(query) ||
       (team.coachCaptain || "").toLowerCase().includes(query) ||
-      (team.members || []).some((member) => String(member).toLowerCase().includes(query));
+      (team.members || []).some((member) => `${getMemberName(member)} ${getMemberRegNo(member)}`.toLowerCase().includes(query));
 
     return matchesSport && matchesTournament && matchesSearch;
   });
@@ -119,7 +148,7 @@ export default function VolunteerTeamsPage() {
 
   const allMembers = filteredTeams.flatMap((team) =>
     (team.members || []).map((member, index) => ({
-      member: String(member),
+      member,
       teamName: team.name,
       department: team.department || team.name,
       sport: team.sport,
@@ -340,7 +369,7 @@ export default function VolunteerTeamsPage() {
             {maleMembers.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {maleMembers.map((item, index) => (
-                  <MemberCard key={`male-${item.teamName}-${item.member}-${index}`} item={item} />
+                  <MemberCard key={`male-${item.teamName}-${getMemberName(item.member)}-${index}`} item={item} />
                 ))}
               </div>
             ) : (
@@ -354,7 +383,7 @@ export default function VolunteerTeamsPage() {
             {femaleMembers.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {femaleMembers.map((item, index) => (
-                  <MemberCard key={`female-${item.teamName}-${item.member}-${index}`} item={item} />
+                  <MemberCard key={`female-${item.teamName}-${getMemberName(item.member)}-${index}`} item={item} />
                 ))}
               </div>
             ) : (
@@ -419,9 +448,15 @@ function TeamCard({ team, expanded, onToggle }: { team: Team; expanded: boolean;
               {expanded && (
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {team.members.map((member, index) => (
-                    <span key={`${team.id}-${member}-${index}`} className="rounded-lg bg-secondary px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                      {String(member)}
-                    </span>
+                    <div key={`${team.id}-${getMemberName(member)}-${index}`} className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
+                      <PlayerThumb member={member} />
+                      <div className="min-w-0">
+                        <p className="truncate text-[10px] font-bold uppercase tracking-wider text-foreground">{getMemberName(member) || "Player"}</p>
+                        {getMemberRegNo(member) && (
+                          <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{getMemberRegNo(member)}</p>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -433,15 +468,16 @@ function TeamCard({ team, expanded, onToggle }: { team: Team; expanded: boolean;
   );
 }
 
-function MemberCard({ item }: { item: { member: string; teamName: string; department: string; sport: string; sportName?: string; category: string; registeredAt?: number } }) {
+function MemberCard({ item }: { item: { member: unknown; teamName: string; department: string; sport: string; sportName?: string; category: string; registeredAt?: number } }) {
+  const name = getMemberName(item.member);
+  const regNo = getMemberRegNo(item.member);
   return (
     <Card className="p-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-accent">
-          <User size={18} />
-        </div>
+        <PlayerThumb member={item.member} />
         <div className="min-w-0">
-          <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{item.member}</p>
+          <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">{name || "Player"}</p>
+          {regNo && <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-widest text-accent">{regNo}</p>}
           <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {getSportDisplayName(item.sport, item.sportName)} / {item.department} / {item.teamName}
           </p>

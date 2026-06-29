@@ -39,7 +39,7 @@ function getRegNoList(body) {
   return regNos.filter(Boolean);
 }
 
-function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVerification, members }) {
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, captainIdVerification, members }) {
   return [
     {
       name: captainName,
@@ -48,6 +48,7 @@ function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVer
       role: "captain",
       idVerified: Boolean(captainIdVerification?.verified),
       idVerificationStatus: captainIdVerification?.status || "pending",
+      profilePhoto: captainProfilePhoto || "",
     },
     ...(members || []).map((member) => ({
       name: member.fullName,
@@ -56,6 +57,7 @@ function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVer
       role: "member",
       idVerified: Boolean(member.idVerification?.verified),
       idVerificationStatus: member.idVerification?.status || "pending",
+      profilePhoto: member.profilePhoto || member.idCardImage || "",
     })),
   ];
 }
@@ -180,6 +182,8 @@ export async function submitRegistration(req, res) {
       captainRegNo: rawCaptainRegNo,
       captainEmail,
       captainPhone,
+      captainProfilePhoto,
+      captainIdCardImage,
       captainVerificationToken,
       members: rawMembers,
     } = req.body;
@@ -284,6 +288,10 @@ export async function submitRegistration(req, res) {
     if (teamLogo && !isAllowedImage(teamLogo)) {
       return res.status(400).json({ message: "Team logo must be a JPEG, PNG, or WebP image" });
     }
+    const cleanCaptainProfilePhoto = captainProfilePhoto || captainIdCardImage || "";
+    if (cleanCaptainProfilePhoto && !isAllowedImage(cleanCaptainProfilePhoto)) {
+      return res.status(400).json({ message: "Captain ID photo must be a JPEG, PNG, or WebP image" });
+    }
 
     const duplicateRegistration = await findUsedRegNos(allRegNos);
     if (duplicateRegistration) {
@@ -301,6 +309,8 @@ export async function submitRegistration(req, res) {
       gender: member.gender || category,
       email: String(member.email || "").trim().toLowerCase(),
       phone: String(member.phone || "").trim(),
+      profilePhoto: isAllowedImage(member.profilePhoto || member.idCardImage || "") ? (member.profilePhoto || member.idCardImage || "") : "",
+      idCardImage: isAllowedImage(member.idCardImage || member.profilePhoto || "") ? (member.idCardImage || member.profilePhoto || "") : "",
       idVerification: getVerifiedStatusOrError({
         token: member.verificationToken,
         registrationNumber: member.registrationNo || member.registrationNumber || "",
@@ -313,6 +323,7 @@ export async function submitRegistration(req, res) {
       captainName: trimmedCaptainName,
       captainEmail: trimmedCaptainEmail,
       captainRegNo: cleanCaptainRegNo,
+      captainProfilePhoto: cleanCaptainProfilePhoto,
       captainIdVerification,
       members: storedMembers,
     });
@@ -330,6 +341,8 @@ export async function submitRegistration(req, res) {
       captainRegNo: cleanCaptainRegNo,
       captainEmail: trimmedCaptainEmail,
       captainPhone: trimmedCaptainPhone,
+      captainProfilePhoto: cleanCaptainProfilePhoto,
+      captainIdCardImage: cleanCaptainProfilePhoto,
       captainIdVerification,
       members: storedMembers,
       allPlayers,
@@ -443,6 +456,8 @@ export async function approveRegistration(req, res) {
         captainRegNo: registration.captainRegNo,
         captainEmail: registration.captainEmail,
         captainPhone: registration.captainPhone,
+        captainProfilePhoto: registration.captainProfilePhoto || registration.captainIdCardImage || "",
+        captainIdCardImage: registration.captainIdCardImage || registration.captainProfilePhoto || "",
         contactNumber: registration.captainPhone,
         email: registration.captainEmail,
         members: registration.members || [],

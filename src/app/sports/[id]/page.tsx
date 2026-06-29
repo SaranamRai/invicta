@@ -69,9 +69,14 @@ function TeamCard({
             <div className="grid gap-2">
               {team.members.map((member, index) => (
                 <div key={`${member.registrationNo || member.fullName}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-card/60 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-foreground">{member.fullName || "Unnamed Player"}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.registrationNo || "Member ID N/A"}</p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/20 bg-secondary text-[10px] font-black text-muted-foreground">
+                      {member.profilePhoto ? <img src={member.profilePhoto} alt="" className="h-full w-full object-cover" /> : (member.fullName || "ID").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">{member.fullName || "Unnamed Player"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.registrationNo || "Member ID N/A"}</p>
+                    </div>
                   </div>
                   <span className="shrink-0 rounded-full bg-accent/15 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-accent">
                     {member.position || member.role || "Player"}

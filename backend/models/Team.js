@@ -14,6 +14,8 @@ const teamSchema = new mongoose.Schema(
     captainRegNo: { type: String, trim: true, uppercase: true },
     captainEmail: { type: String, trim: true, lowercase: true },
     captainPhone: { type: String, trim: true },
+    captainProfilePhoto: { type: String },
+    captainIdCardImage: { type: String },
     contactNumber: { type: String, trim: true },
     email: { type: String, trim: true },
     viceCaptainName: { type: String, trim: true },

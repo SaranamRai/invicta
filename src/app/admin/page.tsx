@@ -360,6 +360,7 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           role: "captain" as const,
           idVerified: registration.captainIdVerification?.verified,
           idVerificationStatus: registration.captainIdVerification?.status || "old_registration",
+          profilePhoto: registration.captainProfilePhoto || registration.captainIdCardImage || "",
         },
         ...(registration.members || []).map((member) => ({
           name: member.fullName,
@@ -368,6 +369,7 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           role: "member" as const,
           idVerified: member.idVerification?.verified,
           idVerificationStatus: member.idVerification?.status || "old_registration",
+          profilePhoto: member.profilePhoto || member.idCardImage || "",
         })),
       ];
 
@@ -378,6 +380,7 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
         {players.map((player, index) => (
           <div key={`${player.registrationNumber}-${index}`} className="rounded-lg border border-border bg-card px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
+              <PlayerPhoto photo={player.profilePhoto} name={player.name || "Player"} />
               <p className="text-xs font-black text-foreground">
                 {player.role === "captain" ? "Captain" : `Member ${index}`} · {player.name || "Player"}
               </p>
@@ -391,6 +394,15 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PlayerPhoto({ photo, name }: { photo?: string; name: string }) {
+  const initials = name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary text-[10px] font-black text-muted-foreground">
+      {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : initials || "ID"}
     </div>
   );
 }

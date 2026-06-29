@@ -678,6 +678,7 @@ function normalizeMember(member) {
     const registrationNumber = member.registrationNumber || member.registrationNo || member.regNo ? normalizeText(String(member.registrationNumber || member.registrationNo || member.regNo)).toUpperCase() : "";
     const phone = normalizeText(member.phone || "");
     const semester = normalizeText(member.semester || "");
+    const profilePhoto = typeof member.profilePhoto === "string" ? member.profilePhoto : "";
     if (!fullName && !registrationNumber) return null;
     return {
       fullName: fullName || undefined,
@@ -685,6 +686,7 @@ function normalizeMember(member) {
       registrationNumber: registrationNumber || undefined,
       phone: phone || undefined,
       semester: semester || undefined,
+      profilePhoto: profilePhoto || undefined,
     };
   }
   return null;
@@ -718,6 +720,7 @@ async function syncTeamPlayers(team) {
         department: team.department,
         semester: typeof normalized === "string" ? "" : normalized.semester || "",
         phone: typeof normalized === "string" ? "" : normalized.phone || "",
+        profilePhoto: typeof normalized === "string" ? "" : normalized.profilePhoto || "",
         sportId: team.sportId,
         teamId: team._id,
         isCaptain: Boolean(team.captainName && memberName === team.captainName),
