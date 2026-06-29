@@ -17,12 +17,12 @@ const roleHomePath: Record<PortalRole, string> = {
 };
 
 const protectedRoutes: Array<{ prefix: string; roles: PortalRole[] }> = [
-  { prefix: "/admin", roles: ["admin", "supercoordinator"] },
-  { prefix: "/admin-dashboard", roles: ["admin", "supercoordinator"] },
+  { prefix: "/admin-dashboard", roles: ["admin"] },
+  { prefix: "/admin", roles: ["supercoordinator"] },
   { prefix: "/volunteer", roles: ["volunteer"] },
   { prefix: "/volunteer-dashboard", roles: ["volunteer"] },
   { prefix: "/coordinator-dashboard", roles: ["coordinator"] },
-  { prefix: "/register", roles: ["admin", "supercoordinator", "coordinator"] },
+  { prefix: "/register", roles: ["supercoordinator", "coordinator"] },
 ];
 
 function decodeBase64UrlJson<T>(value: string): T | null {
@@ -79,7 +79,7 @@ export function proxy(request: NextRequest) {
     return redirectToLogin(request);
   }
 
-  if (session.role === "admin" || session.role === "supercoordinator" || requiredRoles.includes(session.role)) {
+  if (requiredRoles.includes(session.role)) {
     return NextResponse.next();
   }
 

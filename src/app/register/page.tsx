@@ -597,7 +597,7 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <ProtectedRoute allowedRole={["coordinator", "admin", "supercoordinator"]}>
+    <ProtectedRoute allowedRole={["coordinator", "supercoordinator"]}>
       <RegisterPageContent />
     </ProtectedRoute>
   );

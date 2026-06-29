@@ -16,10 +16,12 @@ import {
 } from "../controllers/adminDataController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
+import * as technicalAdmin from "../controllers/technicalAdminController.js";
 
 const router = Router();
 
 const adminOrSuper = allowRoles("admin", "supercoordinator");
+const adminOnly = allowRoles("admin");
 const superOnly = allowRoles("supercoordinator");
 
 router.use(authMiddleware);
@@ -35,6 +37,19 @@ router.use((req, res, next) => {
   }
   return next();
 });
+
+router.get("/health", adminOnly, technicalAdmin.health);
+router.get("/stats", adminOnly, technicalAdmin.stats);
+router.get("/database-status", adminOnly, technicalAdmin.databaseStatus);
+router.get("/api-logs", adminOnly, technicalAdmin.apiLogs);
+router.get("/error-logs", adminOnly, technicalAdmin.errorLogs);
+router.get("/audit-logs", adminOnly, technicalAdmin.auditLogs);
+router.get("/live-monitoring", adminOnly, technicalAdmin.liveMonitoring);
+router.get("/email-status", adminOnly, technicalAdmin.emailStatus);
+router.post("/test-smtp", adminOnly, technicalAdmin.testSmtp);
+router.post("/test-mongodb", adminOnly, technicalAdmin.testMongoDb);
+router.patch("/system-users/:role/:id/status", adminOnly, technicalAdmin.updateSystemUserStatus);
+router.post("/system-users/:role/:id/reset-password", adminOnly, technicalAdmin.resetSystemUserPassword);
 
 router.get("/sports", adminOrSuper, adminHandlers.listSports);
 router.post("/sports", superOnly, adminHandlers.createSport);

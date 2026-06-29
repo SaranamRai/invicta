@@ -7,6 +7,8 @@ const superCoordinatorSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: { type: String, enum: ["supercoordinator"], default: "supercoordinator" },
     phone: { type: String, trim: true },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    mustChangePassword: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

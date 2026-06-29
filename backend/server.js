@@ -16,6 +16,8 @@ import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
 import registrationRoutes from "./routes/registrationRoutes.js";
 import Sport from "./models/Sport.js";
+import ApiLog from "./models/ApiLog.js";
+import ErrorLog from "./models/ErrorLog.js";
 import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
 dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
@@ -166,6 +168,34 @@ app.use(
 app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    if (!req.originalUrl?.startsWith("/api/")) return;
+    const route = req.originalUrl.split("?")[0];
+    const entry = {
+      method: req.method,
+      route,
+      statusCode: res.statusCode,
+      responseTimeMs: Date.now() - startedAt,
+      userRole: req.user?.role || "",
+      userEmail: req.user?.email || "",
+      userAgent: req.get("user-agent") || "",
+      ip: req.ip || "",
+    };
+
+    ApiLog.create(entry).catch(() => {});
+    if (res.statusCode >= 400) {
+      ErrorLog.create({
+        errorType: res.statusCode >= 500 ? "server_error" : "request_error",
+        ...entry,
+        message: res.statusMessage || "Request failed",
+      }).catch(() => {});
+    }
+  });
+  next();
+});
+
 app.get("/api/health", async (_req, res, next) => {
   try {
     res.json({
@@ -186,9 +216,20 @@ app.use("/api/coordinator", coordinatorRoutes);
 app.use("/api/registrations", registrationRoutes);
 app.use("/api/registration", registrationRoutes);
 
-app.use((error, _req, res, next) => {
+app.use((error, req, res, next) => {
   void next;
   console.error(error);
+  ErrorLog.create({
+    errorType: "exception",
+    route: req.originalUrl?.split("?")[0] || "",
+    method: req.method,
+    statusCode: error.status || 500,
+    message: error.message || "Server error",
+    userRole: req.user?.role || "",
+    userEmail: req.user?.email || "",
+    userAgent: req.get("user-agent") || "",
+    ip: req.ip || "",
+  }).catch(() => {});
   res.status(error.status || 500).json({ message: error.message || "Server error" });
 });
 

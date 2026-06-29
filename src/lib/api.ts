@@ -1506,3 +1506,180 @@ export async function downloadApprovedRegistrationsExcel(params?: Record<string,
 
   return filename;
 }
+
+export interface TechnicalAdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: AuthSession["role"];
+  status: "active" | "inactive";
+  assignedSport?: string;
+  department?: string;
+  createdAt?: string;
+}
+
+export interface TechnicalAdminHealth {
+  environment: string;
+  frontendUrl: string;
+  backendUrl: string;
+  uptimeSeconds: number;
+  database: { connected: boolean; readyState: number; host: string; name: string };
+  smtp: TechnicalEmailStatus;
+  liveScoreService: { healthy: boolean; message: string };
+  deployment: Record<string, string>;
+  appVersion: string;
+  checkedAt: string;
+}
+
+export interface TechnicalEmailStatus {
+  configured: boolean;
+  healthy: boolean;
+  provider: string;
+  from: string;
+  sent: number;
+  failed: number;
+  lastEmailSentAt?: string | null;
+  lastEmailError?: string;
+  lastCheckedAt?: string | null;
+  coordinatorCredentialEmails?: number;
+  volunteerCredentialEmails?: number;
+  message?: string;
+}
+
+export interface TechnicalRouteUsage {
+  route: string;
+  count: number;
+  avgResponseTimeMs: number;
+}
+
+export interface TechnicalAdminStats {
+  api: {
+    requestsToday: number;
+    failedToday: number;
+    notFoundToday: number;
+    serverErrorsToday: number;
+    averageResponseTimeMs: number;
+    lastError?: TechnicalErrorLog | null;
+    mostUsedRoutes: TechnicalRouteUsage[];
+  };
+  registrations: Record<string, number>;
+  fixtures: Record<string, number>;
+  users: TechnicalAdminUser[];
+  checkedAt: string;
+}
+
+export interface TechnicalCollectionStatus {
+  key: string;
+  collection: string;
+  count: number;
+}
+
+export interface TechnicalDatabaseStatus {
+  database: { connected: boolean; readyState: number; host: string; name: string };
+  collections: TechnicalCollectionStatus[];
+  checkedAt: string;
+}
+
+export interface TechnicalApiLog {
+  _id: string;
+  method: string;
+  route: string;
+  statusCode: number;
+  responseTimeMs: number;
+  userRole?: string;
+  userEmail?: string;
+  createdAt: string;
+}
+
+export interface TechnicalErrorLog extends TechnicalApiLog {
+  errorType?: string;
+  message?: string;
+}
+
+export interface TechnicalAuditLog {
+  _id: string;
+  action: string;
+  performedBy?: string;
+  role?: string;
+  status?: string;
+  route?: string;
+  details?: string;
+  createdAt: string;
+}
+
+export interface TechnicalLiveMatch {
+  id: string;
+  matchTitle: string;
+  sport?: string;
+  category?: string;
+  status: string;
+  teamAName?: string;
+  teamBName?: string;
+  scoreA: number;
+  scoreB: number;
+  lastScoreUpdate?: string | null;
+  warnings: string[];
+}
+
+export function getTechnicalAdminHealth() {
+  return apiFetch<TechnicalAdminHealth>("/admin/health");
+}
+
+export function getTechnicalAdminStats() {
+  return apiFetch<TechnicalAdminStats>("/admin/stats");
+}
+
+export function getTechnicalAdminDatabaseStatus() {
+  return apiFetch<TechnicalDatabaseStatus>("/admin/database-status");
+}
+
+export function getTechnicalAdminApiLogs(params?: Record<string, string | undefined>) {
+  return apiFetch<{ logs: TechnicalApiLog[] }>(withQuery("/admin/api-logs", params));
+}
+
+export function getTechnicalAdminErrorLogs(params?: Record<string, string | undefined>) {
+  return apiFetch<{ logs: TechnicalErrorLog[] }>(withQuery("/admin/error-logs", params));
+}
+
+export function getTechnicalAdminAuditLogs(params?: Record<string, string | undefined>) {
+  return apiFetch<{ logs: TechnicalAuditLog[] }>(withQuery("/admin/audit-logs", params));
+}
+
+export function getTechnicalAdminLiveMonitoring() {
+  return apiFetch<{ matches: TechnicalLiveMatch[]; checkedAt: string }>("/admin/live-monitoring");
+}
+
+export function getTechnicalAdminEmailStatus() {
+  return apiFetch<TechnicalEmailStatus>("/admin/email-status");
+}
+
+export function testTechnicalAdminSmtp() {
+  return apiFetch<{ sent: boolean; skipped: boolean; message: string }>("/admin/test-smtp", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function testTechnicalAdminMongoDb() {
+  return apiFetch<{ ok: boolean; responseTimeMs: number }>("/admin/test-mongodb", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function updateTechnicalAdminUserStatus(role: string, id: string, status: "active" | "inactive") {
+  return apiFetch<{ user: TechnicalAdminUser }>(`/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function resetTechnicalAdminUserPassword(role: string, id: string) {
+  return apiFetch<{ message: string; temporaryPassword: string; user: TechnicalAdminUser }>(
+    `/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/reset-password`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+}
