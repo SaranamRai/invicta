@@ -9,8 +9,6 @@ import { useRouter } from "next/navigation";
 import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { InvictaLogo } from "@/components/invicta-logo";
-import { MedhaviLogo } from "@/components/medhavi-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -57,9 +55,16 @@ export default function LoginPage() {
         className="relative z-10 w-full max-w-xl"
       >
         <div className="mb-5 sm:mb-7">
-          <div className="mb-4 flex flex-col items-center gap-3">
-            <MedhaviLogo className="h-16 w-56 sm:h-18 sm:w-72" />
-            <InvictaLogo className="h-20 w-72 sm:h-24 sm:w-96" />
+          <div className="mx-auto mb-4 flex w-full max-w-xl items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:gap-6 sm:px-8">
+            <div className="flex h-12 w-32 shrink-0 items-center justify-center overflow-hidden sm:h-16 sm:w-44">
+              <img
+                src="/msu-logo-transparent.png"
+                alt="Medhavi Skills University"
+                className="h-auto w-full max-w-full object-contain"
+              />
+            </div>
+            <span className="h-12 w-px shrink-0 bg-slate-300" aria-hidden="true" />
+            <span className="min-w-0 text-2xl font-black uppercase text-slate-900 sport-heading sm:text-4xl">Invicta</span>
           </div>
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">Choose a role and open the right dashboard</p>
         </div>

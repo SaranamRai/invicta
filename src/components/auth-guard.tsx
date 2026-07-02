@@ -5,6 +5,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
@@ -42,7 +43,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="dashboard-surface flex min-h-screen w-full flex-col bg-background text-foreground lg:flex-row">
+    <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
         <Header />
@@ -50,6 +51,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <LiveScoreFloatingButton />
     </div>
   );
 }

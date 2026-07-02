@@ -804,7 +804,7 @@ export default function AdminDashboard() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="dashboard-surface min-h-screen bg-background text-foreground pb-12">
+    <div className="dashboard-surface min-h-screen overflow-x-hidden bg-background pb-12 text-foreground">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">

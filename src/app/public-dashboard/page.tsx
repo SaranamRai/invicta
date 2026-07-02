@@ -161,15 +161,18 @@ export default function PublicDashboard() {
   ];
 
   const heroBackdropStyle: React.CSSProperties = {
-    backgroundImage: 'linear-gradient(110deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82)),url("/msu-logo-transparent.png")',
-    backgroundPosition: "center, right 2rem center",
-    backgroundSize: "auto, 560px auto",
+    backgroundImage: 'radial-gradient(circle at 80% 45%,rgba(252,211,77,0.22),transparent 28%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.91) 48%,rgba(15,23,42,0.72) 100%),url("/msu-logo-transparent.png")',
+    backgroundPosition: "center, center, right 1rem center",
+    backgroundSize: "cover, cover, cover",
   };
 
   return (
     <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
-      <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl sm:rounded-2xl">
-        <div className="absolute inset-0 bg-no-repeat" style={heroBackdropStyle} />
+      <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
+        <div className="absolute inset-0 bg-no-repeat opacity-95" style={heroBackdropStyle} />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.72)_42%,rgba(2,6,23,0.9)_100%)]" />
+        <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(2,6,23,0.98)]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#020617] to-transparent" />
         <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
