@@ -4,7 +4,6 @@ import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
 import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -46,7 +45,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
-        <Header />
         <main className="mx-auto w-full max-w-[1440px] px-2 py-2 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
           {children}
         </main>
