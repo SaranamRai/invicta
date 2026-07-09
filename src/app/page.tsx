@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Camera, Mail, Phone, PlayCircle, Share2 } from "lucide-react";
+import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { MedhaviLogo } from "@/components/medhavi-logo";
@@ -177,6 +178,7 @@ export default function LandingPage() {
           <span>Medhavi Skills University</span>
         </div>
       </footer>
+      <LiveScoreFloatingButton />
     </div>
   );
 }
