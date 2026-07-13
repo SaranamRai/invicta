@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Camera, Mail, Phone, PlayCircle, Share2 } from "lucide-react";
+import { ArrowRight, Mail, Phone } from "lucide-react";
 import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
@@ -26,30 +26,6 @@ const sports = [
 export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
-      <aside className="fixed right-0 top-1/2 z-30 hidden -translate-y-1/2 lg:block">
-        <div className="flex flex-col items-center gap-4 rounded-l-2xl border border-r-0 border-border bg-background/80 px-3 py-5 shadow-xl backdrop-blur">
-          <span className="writing-mode-vertical text-[9px] font-black uppercase tracking-[0.24em] text-foreground/45 [writing-mode:vertical-rl]">
-            Follow Us
-          </span>
-          <span className="h-8 w-px bg-border" />
-          {[
-            { label: "Instagram", href: "https://www.instagram.com/", icon: Camera },
-            { label: "Facebook", href: "https://www.facebook.com/", icon: Share2 },
-            { label: "YouTube", href: "https://www.youtube.com/", icon: PlayCircle },
-          ].map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={item.label}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-foreground/60 transition-colors hover:border-[#f4c35a] hover:text-[#f4c35a]"
-            >
-              <item.icon size={16} />
-            </a>
-          ))}
-        </div>
-      </aside>
       <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-5">
         <div className="landing-navbar mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-background/72 px-3 py-3 shadow-2xl shadow-black/10 backdrop-blur-2xl sm:gap-5 sm:px-5 lg:flex-nowrap">
           <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center gap-3">
@@ -70,12 +46,6 @@ export default function LandingPage() {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <Link
-              href="/public-dashboard"
-              className="hidden rounded-xl bg-[#e5ad3b] px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black shadow-lg shadow-[#e5ad3b]/20 transition-all hover:bg-[#f7cf70] md:inline-flex"
-            >
-              Dashboard
-            </Link>
             <ThemeToggle />
           </div>
         </div>
