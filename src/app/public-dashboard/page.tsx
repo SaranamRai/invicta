@@ -17,6 +17,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { SportMark } from "@/components/sport-mark";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 import { Team } from "@/lib/fixture-generator";
 import {
   getPublicFixtures,
@@ -161,31 +162,34 @@ export default function PublicDashboard() {
   ];
 
   const heroBackdropStyle: React.CSSProperties = {
-    backgroundImage: 'radial-gradient(circle at 80% 45%,rgba(252,211,77,0.22),transparent 28%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.91) 48%,rgba(15,23,42,0.72) 100%),url("/msu-logo-transparent.png")',
+    backgroundImage: 'radial-gradient(circle at 82% 38%,rgba(252,211,77,0.24),transparent 30%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.94) 46%,rgba(15,23,42,0.78) 100%),url("/medhavi-skills-university.png")',
     backgroundPosition: "center, center, right 1rem center",
-    backgroundSize: "cover, cover, cover",
+    backgroundSize: "cover, cover, min(46rem, 70%) auto",
   };
 
   return (
     <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
-      <section className="relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
-        <div className="absolute inset-0 bg-no-repeat opacity-95" style={heroBackdropStyle} />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.72)_42%,rgba(2,6,23,0.9)_100%)]" />
+      <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
+        <div className="absolute inset-0 bg-no-repeat opacity-100" style={heroBackdropStyle} />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.82)_100%)]" />
         <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(2,6,23,0.98)]" />
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#020617] to-transparent" />
         <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
+            <div className="inline-flex rounded-2xl bg-white p-2 shadow-2xl shadow-black/30 ring-1 ring-accent/30">
+              <MedhaviLogo className="h-14 w-48 sm:h-16 sm:w-60" />
+            </div>
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-5">
-              <span className="sport-heading text-4xl font-black uppercase tracking-wide text-white drop-shadow-lg sm:text-6xl lg:text-7xl">
+              <span className="sport-heading text-4xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)] sm:text-6xl lg:text-7xl">
                 MSU
               </span>
               <InvictaLogo className="h-12 w-44 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
             </div>
-            <p className="max-w-2xl text-sm font-semibold leading-relaxed text-slate-300 sm:text-lg">
+            <p className="max-w-2xl text-sm font-bold leading-relaxed text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)] sm:text-lg">
               A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
             </p>
           </div>
@@ -195,10 +199,10 @@ export default function PublicDashboard() {
               <span className="sport-heading relative z-10 text-[10px] font-black uppercase tracking-wide sm:text-xs sm:tracking-[0.2em]">View Sports</span>
               <div className="absolute inset-0 hidden translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0 sm:block" />
             </Link>
-            <Link href="/matches" className="flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wide text-white transition-all hover:border-accent hover:text-accent sm:h-14 sm:text-xs sm:tracking-[0.2em]">
+            <Link href="/matches" className="flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wide text-white transition-all hover:border-accent hover:bg-white/15 hover:text-accent active:scale-95 sm:h-14 sm:text-xs sm:tracking-[0.2em]">
               View Live Matches
             </Link>
-            <Link href="/" className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[9px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white sm:text-[10px] sm:tracking-[0.18em]">
+            <Link href="/" className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[9px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white active:scale-95 sm:h-14 sm:text-[10px] sm:tracking-[0.18em]">
               <Home size={14} className="text-accent" />
               Landing Page
             </Link>
@@ -235,7 +239,7 @@ export default function PublicDashboard() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Card className="group relative overflow-hidden border-2 transition-all hover:border-accent">
+            <Card className="group relative flex min-h-[7.5rem] overflow-hidden border-2 transition-all hover:border-accent">
               <div className="absolute right-0 top-0 p-2 opacity-5 transition-opacity group-hover:opacity-10">
                 <stat.icon size={80} />
               </div>
