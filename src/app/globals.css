@@ -41,10 +41,11 @@ img, picture, video, canvas, svg {
   --landing-overlay-42: rgba(255, 238, 181, 0.12);
   --landing-overlay-photo: rgba(255, 255, 255, 0.02);
   --landing-overlay-bottom: #fffaf0;
+  --landing-overlay-bottom-soft: rgba(255, 250, 240, 0.82);
   --landing-overlay-top: rgba(255, 222, 138, 0.2);
-  --landing-photo-opacity: 0.94;
+  --landing-photo-opacity: 0.58;
   --landing-photo-fade-solid: rgba(255, 255, 255, 0.92);
-  --landing-photo-fade-mid: rgba(255, 248, 226, 0.28);
+  --landing-photo-fade-mid: rgba(255, 248, 226, 0.34);
   --landing-card-bg: rgba(0, 0, 0, 0.03);
   --landing-card-border: rgba(0, 0, 0, 0.08);
   --landing-footer-bg: #f8fafc;
@@ -73,8 +74,9 @@ img, picture, video, canvas, svg {
   --landing-overlay-42: rgba(5, 6, 8, 0.42);
   --landing-overlay-photo: rgba(5, 6, 8, 0.38);
   --landing-overlay-bottom: #090a0c;
+  --landing-overlay-bottom-soft: rgba(9, 10, 12, 0.76);
   --landing-overlay-top: rgba(0, 0, 0, 0.4);
-  --landing-photo-opacity: 0.76;
+  --landing-photo-opacity: 0.7;
   --landing-photo-fade-solid: rgba(5, 6, 8, 0.98);
   --landing-photo-fade-mid: rgba(5, 6, 8, 0.74);
   --landing-card-bg: rgba(255, 255, 255, 0.08);
@@ -104,6 +106,7 @@ img, picture, video, canvas, svg {
   --color-landing-overlay-48: var(--landing-overlay-48);
   --color-landing-overlay-42: var(--landing-overlay-42);
   --color-landing-overlay-bottom: var(--landing-overlay-bottom);
+  --color-landing-overlay-bottom-soft: var(--landing-overlay-bottom-soft);
   --color-landing-overlay-top: var(--landing-overlay-top);
   --color-landing-card-bg: var(--landing-card-bg);
   --color-landing-card-border: var(--landing-card-border);
@@ -491,13 +494,60 @@ a {
   color-scheme: light dark;
 }
 
+.landing-navbar {
+  background-image:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.42)),
+    linear-gradient(90deg, rgba(252, 211, 77, 0.12), transparent 42%);
+}
+
+:root[data-theme="dark"] .landing-navbar {
+  background-image:
+    linear-gradient(135deg, rgba(2, 6, 23, 0.76), rgba(15, 23, 42, 0.58)),
+    linear-gradient(90deg, rgba(252, 211, 77, 0.16), transparent 46%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .landing-hero-photo {
   opacity: var(--landing-photo-opacity);
-  filter: saturate(1.42) contrast(1.12) brightness(1.2);
+  filter: saturate(1.18) contrast(1.06) brightness(1.06);
+  mix-blend-mode: multiply;
+}
+
+.landing-hero-image {
+  background-image: url("/landingpage.jpeg");
+  background-position: 72% center;
+  background-size: cover;
+  transform: scale(1.06);
+  mask-image:
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 18%, rgba(0, 0, 0, 0.82) 42%, #000 100%),
+    linear-gradient(180deg, transparent 0%, #000 14%, #000 74%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 18%, rgba(0, 0, 0, 0.82) 42%, #000 100%),
+    linear-gradient(180deg, transparent 0%, #000 14%, #000 74%, transparent 100%);
+  -webkit-mask-composite: source-in;
 }
 
 :root[data-theme="dark"] .landing-hero-photo {
-  filter: saturate(1.24) contrast(1.12) brightness(1.1);
+  filter: saturate(1.1) contrast(1.08) brightness(0.92);
+  mix-blend-mode: screen;
+}
+
+@media (max-width: 768px) {
+  .landing-hero-photo {
+    opacity: calc(var(--landing-photo-opacity) * 0.74);
+  }
+
+  .landing-hero-image {
+    background-position: 66% center;
+    transform: scale(1.12);
+    mask-image:
+      linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.72) 46%, #000 100%),
+      linear-gradient(180deg, transparent 0%, #000 18%, #000 68%, transparent 100%);
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.12) 12%, rgba(0, 0, 0, 0.72) 46%, #000 100%),
+      linear-gradient(180deg, transparent 0%, #000 18%, #000 68%, transparent 100%);
+  }
 }
 
 .landing-display {

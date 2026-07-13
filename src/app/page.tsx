@@ -8,7 +8,8 @@ import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "About Us", href: "/about" },
+  { label: "Sports", href: "/#sports" },
+  { label: "About", href: "/about" },
   { label: "Contact", href: "/#contact" },
 ];
 
@@ -49,41 +50,47 @@ export default function LandingPage() {
           ))}
         </div>
       </aside>
-      <header className="absolute inset-x-0 top-0 z-40">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
-          <Link href="/" aria-label="MSU Invicta home" className="flex items-center gap-4">
-            <MedhaviLogo className="h-16 w-44 sm:h-20 sm:w-56" />
-            <InvictaLogo className="h-12 w-40 sm:h-14 sm:w-52" />
+      <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-5">
+        <div className="landing-navbar mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-background/72 px-3 py-3 shadow-2xl shadow-black/10 backdrop-blur-2xl sm:gap-5 sm:px-5 lg:flex-nowrap">
+          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center gap-3">
+            <MedhaviLogo className="h-12 w-36 sm:h-14 sm:w-44 lg:h-16 lg:w-52" />
+            <InvictaLogo className="h-10 w-32 sm:h-11 sm:w-40 lg:h-12 lg:w-48" />
           </Link>
 
-          <nav className="flex items-center gap-4 sm:gap-8">
+          <nav className="order-3 flex w-full items-center justify-center gap-1 rounded-xl border border-border/70 bg-card/55 p-1 sm:gap-2 lg:order-none lg:w-auto">
             {navLinks.map((link, index) => (
               <a
                 key={link.label}
                 href={link.href}
-                className={`relative whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:text-[#f4c35a] sm:text-xs sm:tracking-[0.24em] ${index === 0 ? "text-[#f4c35a]" : "text-foreground/80"}`}
+                className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all hover:bg-accent/15 hover:text-[#d99d2b] sm:px-4 sm:text-[11px] ${index === 0 ? "bg-accent text-accent-foreground shadow-sm" : "text-foreground/72"}`}
               >
                 {link.label}
-                {index === 0 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
               </a>
             ))}
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link
+              href="/public-dashboard"
+              className="hidden rounded-xl bg-[#e5ad3b] px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-black shadow-lg shadow-[#e5ad3b]/20 transition-all hover:bg-[#f7cf70] md:inline-flex"
+            >
+              Dashboard
+            </Link>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       <main>
-        <section id="home" className="relative flex min-h-screen items-center overflow-hidden pb-16 pt-32 sm:pt-28">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_34%,rgba(229,173,59,0.18),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_48%,var(--landing-overlay-photo)_100%)]" />
-          <div className="landing-hero-photo absolute inset-y-6 right-[-30%] w-[128%] sm:inset-y-8 sm:right-[-18%] sm:w-[88%] lg:right-[-7%] lg:w-[68%]">
-            <div className="h-full w-full bg-[url('/landingpage.jpeg')] bg-contain bg-center bg-no-repeat" />
-            <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-[var(--landing-photo-fade-solid)] via-[var(--landing-photo-fade-mid)] to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[var(--landing-overlay-bottom)] to-transparent" />
+        <section id="home" className="relative isolate flex min-h-screen items-center overflow-hidden pb-16 pt-40 sm:pt-36 lg:pt-32">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_34%,rgba(229,173,59,0.22),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_45%,var(--landing-overlay-photo)_100%)]" />
+          <div className="landing-hero-photo absolute inset-0">
+            <div className="landing-hero-image absolute inset-0" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-photo-fade-solid)_0%,var(--landing-photo-fade-mid)_36%,transparent_72%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[var(--landing-overlay-bottom)] via-[var(--landing-overlay-bottom-soft)] to-transparent" />
+            <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-[var(--landing-overlay-top)] to-transparent" />
           </div>
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_38%,var(--landing-overlay-48)_68%,var(--landing-overlay-42)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_35%,var(--landing-overlay-48)_64%,var(--landing-overlay-42)_100%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
           <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
 
