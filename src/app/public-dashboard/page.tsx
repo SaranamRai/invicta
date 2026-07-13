@@ -17,7 +17,6 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { SportMark } from "@/components/sport-mark";
-import { MedhaviLogo } from "@/components/medhavi-logo";
 import { Team } from "@/lib/fixture-generator";
 import {
   getPublicFixtures,
@@ -162,23 +161,20 @@ export default function PublicDashboard() {
   ];
 
   const heroBackdropStyle: React.CSSProperties = {
-    backgroundImage: 'radial-gradient(circle at 82% 38%,rgba(252,211,77,0.24),transparent 30%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.94) 46%,rgba(15,23,42,0.78) 100%),url("/medhavi-skills-university.png")',
-    backgroundPosition: "center, center, right 1rem center",
-    backgroundSize: "cover, cover, min(46rem, 70%) auto",
+    backgroundImage: 'radial-gradient(circle at 78% 40%,rgba(255,255,255,0.26) 0%,rgba(255,255,255,0.18) 28%,transparent 50%),radial-gradient(circle at 82% 38%,rgba(252,211,77,0.22),transparent 34%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.9) 42%,rgba(15,23,42,0.54) 100%),url("/medhavi-skills-university.png")',
+    backgroundPosition: "right 2rem center, center, center, right 3rem center",
+    backgroundSize: "min(42rem, 64%) auto, cover, cover, min(40rem, 58%) auto",
   };
 
   return (
     <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
       <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
         <div className="absolute inset-0 bg-no-repeat opacity-100" style={heroBackdropStyle} />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.82)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.36)_100%)]" />
         <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(2,6,23,0.98)]" />
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#020617] to-transparent" />
         <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
           <div className="max-w-2xl space-y-4">
-            <div className="inline-flex rounded-2xl bg-white p-2 shadow-2xl shadow-black/30 ring-1 ring-accent/30">
-              <MedhaviLogo className="h-14 w-48 sm:h-16 sm:w-60" />
-            </div>
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
               Official MSU Sports Event Hub
