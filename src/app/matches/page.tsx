@@ -12,6 +12,23 @@ import { getPublicFixtures, getPublicLiveFeeds, getPublicLiveScores, getPublicTo
 
 const tabs = ["All Matches", "Live", "Paused", "Upcoming", "Finished"];
 
+const getDateKey = (value?: string | Date | null): string => {
+  if (!value) return "";
+
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const isoDate = value.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (isoDate) return isoDate;
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : getDateKey(parsed);
+};
+
 export default function MatchesPage() {
   const [activeTab, setActiveTab] = useState("All Matches");
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
@@ -79,6 +96,15 @@ export default function MatchesPage() {
   const tournamentFilteredMatches = selectedTournamentId
     ? matchesData.filter((match) => match.tournamentId === selectedTournamentId)
     : matchesData;
+
+  const matchCountByDate = React.useMemo(() => {
+    return tournamentFilteredMatches.reduce<Record<string, number>>((counts, match) => {
+      const dateKey = getDateKey(match.date);
+      if (!dateKey) return counts;
+      counts[dateKey] = (counts[dateKey] || 0) + 1;
+      return counts;
+    }, {});
+  }, [tournamentFilteredMatches]);
 
   const sportOptions = React.useMemo(() => {
     const sports = tournamentFilteredMatches
@@ -204,21 +230,38 @@ export default function MatchesPage() {
                     {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
                     {Array.from({ length: days }).map((_, i) => {
                       const dayNumber = i + 1;
-                      const isSelected = selectedDate.getDate() === dayNumber && selectedDate.getMonth() === currentDate.getMonth() && selectedDate.getFullYear() === currentDate.getFullYear();
-                      const isToday = new Date().getDate() === dayNumber && new Date().getMonth() === currentDate.getMonth() && new Date().getFullYear() === currentDate.getFullYear();
+                      const calendarDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNumber);
+                      const dateKey = getDateKey(calendarDate);
+                      const matchCount = matchCountByDate[dateKey] || 0;
+                      const hasMatches = matchCount > 0;
+                      const isSelected = getDateKey(selectedDate) === dateKey;
+                      const isToday = getDateKey(new Date()) === dateKey;
                       return (
                         <button
                           key={dayNumber}
                           onClick={() => { const d = new Date(currentDate); d.setDate(dayNumber); setSelectedDate(d); setIsCalendarOpen(false); }}
+                          title={hasMatches ? `${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : undefined}
+                          aria-label={`${formatFullDate(calendarDate)}${hasMatches ? `, ${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : ""}`}
                           className={cn(
                             "h-10 w-10 rounded-xl text-xs font-black transition-all flex items-center justify-center relative group",
                             isSelected ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20" :
+                            hasMatches ? "border border-accent/50 bg-accent/15 text-accent shadow-sm shadow-accent/10 hover:bg-accent/25" :
                             isToday ? "bg-accent/10 text-accent border border-accent/20" :
                             "hover:bg-white/10 text-slate-400"
                           )}
                         >
                           {dayNumber}
-                          {isToday && !isSelected && <div className="absolute bottom-1 h-1 w-1 rounded-full bg-accent" />}
+                          {hasMatches && (
+                            <span
+                              className={cn(
+                                "absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-black leading-none shadow",
+                                isSelected ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
+                              )}
+                            >
+                              {matchCount}
+                            </span>
+                          )}
+                          {isToday && !isSelected && !hasMatches && <div className="absolute bottom-1 h-1 w-1 rounded-full bg-accent" />}
                         </button>
                       );
                     })}
