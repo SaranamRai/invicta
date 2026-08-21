@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+const idVerificationSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ["verified", "mismatch", "unreadable", "manual_review", "pending", "old_registration"],
+      default: "pending",
+    },
+    verified: { type: Boolean, default: false },
+    extractedRegistrationNumber: { type: String, default: "" },
+    confidence: { type: Number, default: 0 },
+    verifiedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const memberSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true, trim: true },
@@ -9,6 +24,19 @@ const memberSchema = new mongoose.Schema(
     gender: { type: String, enum: ["", "Male", "Female"], default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
+    idVerification: { type: idVerificationSchema, default: () => ({}) },
+  },
+  { _id: false }
+);
+
+const allPlayerSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "" },
+    email: { type: String, default: "" },
+    registrationNumber: { type: String, default: "" },
+    role: { type: String, enum: ["captain", "member"], default: "member" },
+    idVerified: { type: Boolean, default: false },
+    idVerificationStatus: { type: String, default: "pending" },
   },
   { _id: false }
 );
@@ -27,7 +55,9 @@ const teamRegistrationSchema = new mongoose.Schema(
     captainRegNo: { type: String, required: true, trim: true, uppercase: true },
     captainEmail: { type: String, required: true, trim: true, lowercase: true },
     captainPhone: { type: String, required: true, trim: true },
+    captainIdVerification: { type: idVerificationSchema, default: () => ({}) },
     members: { type: [memberSchema], default: [] },
+    allPlayers: { type: [allPlayerSchema], default: [] },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

@@ -18,6 +18,13 @@ import { MatchData } from "@/lib/types";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
 import { getPublicFixtures, getPublicLiveScores, mapMongoFixture } from "@/lib/api";
 
+type LiveSportsPanelProps = {
+  initialExpanded?: boolean;
+  onClose?: () => void;
+  positionClassName?: string;
+  showMinimizedButton?: boolean;
+};
+
 function SportIcon({ name, className }: { name: string; className?: string }) {
   const normalized = name.toLowerCase();
   if (normalized.includes("football") || normalized.includes("soccer")) {
@@ -38,8 +45,13 @@ function SportIcon({ name, className }: { name: string; className?: string }) {
   return <Trophy className={cn("h-4 w-4 text-yellow-500", className)} />;
 }
 
-export function LiveSportsPanel() {
-  const [isExpanded, setIsExpanded] = useState(true);
+export function LiveSportsPanel({
+  initialExpanded = true,
+  onClose,
+  positionClassName = "fixed top-24 right-5 sm:right-8 lg:right-10",
+  showMinimizedButton = true,
+}: LiveSportsPanelProps = {}) {
+  const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
   const [highlightedTeam, setHighlightedTeam] = useState<{ [matchId: string]: "A" | "B" | "both" | null }>({});
@@ -122,7 +134,10 @@ export function LiveSportsPanel() {
 
   return (
     <>
-      <div className="fixed top-24 right-5 sm:right-8 lg:right-10 z-40 w-[320px] max-w-[calc(100vw-2.5rem)] font-sans">
+      <div
+        data-testid="live-score-widget"
+        className={cn(positionClassName, "z-40 w-[320px] max-w-[calc(100vw-2.5rem)] font-sans")}
+      >
         <AnimatePresence mode="popLayout">
           {isExpanded ? (
             <motion.div
@@ -155,11 +170,17 @@ export function LiveSportsPanel() {
                   </span>
                 </div>
                 <button
-                  onClick={() => setIsExpanded(false)}
+                  onClick={() => {
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      setIsExpanded(false);
+                    }
+                  }}
                   className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Minimize Live Panel"
+                  aria-label={onClose ? "Close Live Panel" : "Minimize Live Panel"}
                 >
-                  <Minimize2 size={13} />
+                  {onClose ? <X size={13} /> : <Minimize2 size={13} />}
                 </button>
               </div>
 
@@ -284,7 +305,7 @@ export function LiveSportsPanel() {
                 View All Matches
               </Link>
             </motion.div>
-          ) : (
+          ) : showMinimizedButton ? (
             /* Minimized Icon Widget */
             <motion.button
               key="minimized"
@@ -309,7 +330,7 @@ export function LiveSportsPanel() {
                 {liveMatches.length}
               </span>
             </motion.button>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
 

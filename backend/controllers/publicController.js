@@ -13,6 +13,8 @@ import TeamRegistration from "../models/TeamRegistration.js";
 import Player from "../models/Player.js";
 import mongoose from "mongoose";
 import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
+import { normalizeRegNo as normalizeVerifiedRegNo, isValidEmail as isValidEmailValue } from "../utils/regNoHelper.js";
+import { buildVerifiedStatus, verifyRegistrationToken } from "../utils/idVerification.js";
 
 const publicModels = {
   sports: Sport,
@@ -99,11 +101,11 @@ function normalizeSport(value) {
 }
 
 function normalizeRegNo(value) {
-  return normalizeText(value).toUpperCase();
+  return normalizeVerifiedRegNo(value);
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+  return isValidEmailValue(value);
 }
 
 function normalizeMember(member) {
@@ -127,7 +129,35 @@ function normalizeMember(member) {
     gender: normalizeText(member?.gender),
     email: normalizeText(member?.email).toLowerCase(),
     phone: normalizeText(member?.phone),
+    verificationToken: normalizeText(member?.verificationToken),
   };
+}
+
+function getVerifiedStatusOrError({ token, registrationNumber, playerRole, playerIndex }) {
+  const payload = verifyRegistrationToken(token, { registrationNumber, playerRole, playerIndex });
+  if (!payload) return { error: "ID verification is required for every player." };
+  return { value: buildVerifiedStatus(payload) };
+}
+
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVerification, members }) {
+  return [
+    {
+      name: captainName,
+      email: captainEmail,
+      registrationNumber: captainRegNo,
+      role: "captain",
+      idVerified: Boolean(captainIdVerification?.verified),
+      idVerificationStatus: captainIdVerification?.status || "pending",
+    },
+    ...(members || []).map((member) => ({
+      name: member.fullName,
+      email: member.email || "",
+      registrationNumber: member.registrationNo,
+      role: "member",
+      idVerified: Boolean(member.idVerification?.verified),
+      idVerificationStatus: member.idVerification?.status || "pending",
+    })),
+  ];
 }
 
 async function resolveSport(req) {
@@ -235,6 +265,16 @@ export async function registerPublicTeam(req, res) {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
     }
 
+    const captainVerification = getVerifiedStatusOrError({
+      token: req.body.captainVerificationToken,
+      registrationNumber: captainRegNo,
+      playerRole: "captain",
+      playerIndex: 0,
+    });
+    if (captainVerification.error) {
+      return res.status(400).json({ message: captainVerification.error });
+    }
+
     const members = Array.isArray(req.body.members)
       ? req.body.members.map(normalizeMember).filter((member) => member.fullName || member.registrationNumber)
       : [];
@@ -242,12 +282,17 @@ export async function registerPublicTeam(req, res) {
     const sportWithFallback = withPlayerCountFallback(sportDoc.toObject ? sportDoc.toObject() : sportDoc);
     const minPlayers = Number(sportWithFallback.minPlayers || 1);
     const maxPlayers = Number(sportWithFallback.maxPlayers || minPlayers);
-    if (members.length < minPlayers || members.length > maxPlayers) {
-      return res.status(400).json({ message: `${sportName} requires ${minPlayers} to ${maxPlayers} players.` });
+    const minMembers = Math.max(0, minPlayers - 1);
+    const maxMembers = Math.max(minMembers, maxPlayers - 1);
+    if (members.length < minMembers || members.length > maxMembers) {
+      return res.status(400).json({ message: `${sportName} requires ${minPlayers} to ${maxPlayers} total players including the captain.` });
     }
 
     if (members.some((member) => !member.fullName || !member.registrationNumber)) {
       return res.status(400).json({ message: "Each team member must include full name and registration number." });
+    }
+    if (members.some((member) => !member.email || !isValidEmail(member.email))) {
+      return res.status(400).json({ message: "Each team member must include a valid email." });
     }
 
     const memberRegNos = members.map((member) => member.registrationNumber).filter(Boolean);
@@ -255,23 +300,51 @@ export async function registerPublicTeam(req, res) {
     if (memberRegNoSet.size !== memberRegNos.length) {
       return res.status(400).json({ message: "Same registration number should not be added twice in the same team." });
     }
+    if (memberRegNos.includes(captainRegNo) || members.some((member) => member.email === email || member.fullName.toLowerCase() === captainName.toLowerCase())) {
+      return res.status(400).json({ message: "The captain is already included in the team. Please add only other members." });
+    }
+    const memberEmails = members.map((member) => member.email).filter(Boolean);
+    if (new Set([email, ...memberEmails]).size !== [email, ...memberEmails].length) {
+      return res.status(400).json({ message: "This email is already used by another player." });
+    }
+
     const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
 
-    if (!memberRegNos.includes(captainRegNo)) {
-      members.unshift({
-        fullName: captainName,
-        registrationNumber: captainRegNo,
-        department,
-        semester: normalizeText(req.body.captainSemester),
-        gender: category === "Male" ? "Male" : "Female",
-        email,
-        phone,
-        isCaptain: true,
+    const storedMembers = members.map((member, index) => {
+      const memberVerification = getVerifiedStatusOrError({
+        token: member.verificationToken,
+        registrationNumber: member.registrationNumber,
+        playerRole: "member",
+        playerIndex: index,
       });
-    } else {
-      members.forEach((member) => {
-        if (member.registrationNumber === captainRegNo) member.isCaptain = true;
-      });
+      if (memberVerification.error) {
+        const error = new Error(memberVerification.error);
+        error.status = 400;
+        throw error;
+      }
+      return {
+        fullName: member.fullName,
+        registrationNo: member.registrationNumber,
+        department: member.department || department,
+        semester: member.semester || "",
+        gender: member.gender || category,
+        email: member.email || "",
+        phone: member.phone || "",
+        idVerification: memberVerification.value,
+      };
+    });
+
+    const captainIdVerification = captainVerification.value;
+    const allPlayers = buildAllPlayers({
+      captainName,
+      captainEmail: email,
+      captainRegNo,
+      captainIdVerification,
+      members: storedMembers,
+    });
+
+    if (allPlayers.some((player) => player.idVerificationStatus === "mismatch")) {
+      return res.status(400).json({ message: "Typed registration number does not match the ID card." });
     }
 
     await assertRegistrationNumbersUnused(registrationNumbers);
@@ -310,15 +383,9 @@ export async function registerPublicTeam(req, res) {
       captainRegNo,
       captainEmail: email,
       captainPhone: phone,
-      members: members.map((member) => ({
-        fullName: member.fullName,
-        registrationNo: member.registrationNumber,
-        department: member.department || department,
-        semester: member.semester || "",
-        gender: member.gender || category,
-        email: member.email || "",
-        phone: member.phone || "",
-      })),
+      captainIdVerification,
+      members: storedMembers,
+      allPlayers,
       status: "pending",
       submittedAt: new Date(),
     });
@@ -348,7 +415,7 @@ export async function registerPublicTeam(req, res) {
     });
   } catch (error) {
     console.error("Public team registration failed:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(error.status || 500).json({ message: error.status ? error.message : "Internal server error" });
   }
 }
 

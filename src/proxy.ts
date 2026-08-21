@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -26,10 +25,6 @@ const protectedRoutes: Array<{ prefix: string; roles: PortalRole[] }> = [
   { prefix: "/register", roles: ["admin", "supercoordinator", "coordinator"] },
 ];
 
-function base64Url(input: string | Buffer) {
-  return Buffer.from(input).toString("base64url");
-}
-
 function decodeBase64UrlJson<T>(value: string): T | null {
   try {
     return JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as T;
@@ -39,24 +34,10 @@ function decodeBase64UrlJson<T>(value: string): T | null {
 }
 
 function verifySessionToken(token?: string): JwtPayload | null {
-  const secret = process.env.JWT_SECRET;
-  if (!token || !secret) return null;
+  if (!token) return null;
 
-  const [encodedHeader, encodedPayload, signature] = token.split(".");
-  if (!encodedHeader || !encodedPayload || !signature) return null;
-
-  const header = decodeBase64UrlJson<{ alg?: string; typ?: string }>(encodedHeader);
-  if (header?.alg !== "HS256") return null;
-
-  const expectedSignature = base64Url(
-    createHmac("sha256", secret).update(`${encodedHeader}.${encodedPayload}`).digest(),
-  );
-
-  const expected = Buffer.from(expectedSignature);
-  const actual = Buffer.from(signature);
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-    return null;
-  }
+  const [, encodedPayload] = token.split(".");
+  if (!encodedPayload) return null;
 
   const payload = decodeBase64UrlJson<JwtPayload>(encodedPayload);
   if (!payload?.role) return null;

@@ -269,6 +269,7 @@ function ApprovalsPanel() {
                       ))}
                     </div>
                   )}
+                  <IdVerificationSummary registration={reg} />
                   {reg.teamLogo && (
                     <div className="mt-2">
                       <img src={reg.teamLogo} alt="Team logo" className="h-12 w-12 rounded-lg object-cover" />
@@ -332,6 +333,66 @@ function formatDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not recorded";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function statusBadgeClass(status: string) {
+  if (status === "verified") return "bg-emerald-500/10 text-emerald-600";
+  if (status === "mismatch") return "bg-red-500/10 text-red-600";
+  if (status === "manual_review" || status === "unreadable") return "bg-yellow-500/10 text-yellow-700";
+  return "bg-slate-500/10 text-muted-foreground";
+}
+
+function statusLabel(status: string) {
+  if (status === "manual_review") return "Manual Review Required";
+  if (status === "old_registration") return "Old Registration";
+  if (!status || status === "pending") return "Not Verified";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function IdVerificationSummary({ registration }: { registration: TeamRegistrationPayload }) {
+  const players = registration.allPlayers?.length
+    ? registration.allPlayers
+    : [
+        {
+          name: registration.captainName,
+          email: registration.captainEmail,
+          registrationNumber: registration.captainRegNo,
+          role: "captain" as const,
+          idVerified: registration.captainIdVerification?.verified,
+          idVerificationStatus: registration.captainIdVerification?.status || "old_registration",
+        },
+        ...(registration.members || []).map((member) => ({
+          name: member.fullName,
+          email: member.email,
+          registrationNumber: member.registrationNo,
+          role: "member" as const,
+          idVerified: member.idVerification?.verified,
+          idVerificationStatus: member.idVerification?.status || "old_registration",
+        })),
+      ];
+
+  return (
+    <div className="mt-3 rounded-xl border border-border bg-secondary/40 p-3">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ID Verification</p>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {players.map((player, index) => (
+          <div key={`${player.registrationNumber}-${index}`} className="rounded-lg border border-border bg-card px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-black text-foreground">
+                {player.role === "captain" ? "Captain" : `Member ${index}`} · {player.name || "Player"}
+              </p>
+              <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${statusBadgeClass(player.idVerificationStatus || "")}`}>
+                {statusLabel(player.idVerificationStatus || "")}
+              </span>
+            </div>
+            <p className="mt-1 text-[10px] font-semibold text-muted-foreground">
+              Reg No: {player.registrationNumber || "N/A"} · {player.email || "No email"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: TeamRegistrationPayload) => void }) {
@@ -613,6 +674,7 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
                     ) : (
                       <p className="mt-3 text-sm font-semibold text-muted-foreground">No members recorded for this team.</p>
                     )}
+                    <IdVerificationSummary registration={reg} />
                   </div>
                 )}
               </div>
@@ -742,7 +804,7 @@ export default function AdminDashboard() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="dashboard-surface min-h-screen bg-background text-foreground pb-12">
+    <div className="dashboard-surface min-h-screen overflow-x-hidden bg-background pb-12 text-foreground">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">

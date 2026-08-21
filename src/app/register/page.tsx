@@ -13,6 +13,7 @@ import {
   TeamRegistrationWritePayload,
   TeamRegistrationMember,
   TournamentPayload,
+  verifyRegistrationIdCard,
 } from "@/lib/api";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -31,7 +32,26 @@ type MemberInput = {
   gender: string;
   email: string;
   phone: string;
+  idCardFile: File | null;
+  verification: PlayerVerification;
 };
+
+type VerificationStatus = "not_uploaded" | "scanning" | "verified" | "mismatch" | "unreadable" | "manual_review";
+
+type PlayerVerification = {
+  status: VerificationStatus;
+  extractedRegistrationNumber: string;
+  message: string;
+  verificationToken: string;
+  confidence?: number;
+};
+
+const emptyVerification = (): PlayerVerification => ({
+  status: "not_uploaded",
+  extractedRegistrationNumber: "",
+  message: "Upload each player's student ID card to verify the registration number.",
+  verificationToken: "",
+});
 
 const emptyMember = (): MemberInput => ({
   fullName: "",
@@ -41,6 +61,8 @@ const emptyMember = (): MemberInput => ({
   gender: "",
   email: "",
   phone: "",
+  idCardFile: null,
+  verification: emptyVerification(),
 });
 
 function RegisterPageContent() {
@@ -58,6 +80,8 @@ function RegisterPageContent() {
   const [members, setMembers] = useState<MemberInput[]>([]);
   const [teamLogo, setTeamLogo] = useState<string>("");
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
+  const [captainIdCardFile, setCaptainIdCardFile] = useState<File | null>(null);
+  const [captainVerification, setCaptainVerification] = useState<PlayerVerification>(emptyVerification());
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
@@ -73,6 +97,8 @@ function RegisterPageContent() {
   );
   const requiredPlayers = Math.max(1, Number(selectedSport?.minPlayers || 1));
   const maxPlayers = Math.max(requiredPlayers, Number(selectedSport?.maxPlayers || requiredPlayers));
+  const requiredMembers = Math.max(0, requiredPlayers - 1);
+  const maxMembers = Math.max(requiredMembers, maxPlayers - 1);
   const sportCategories = selectedSport?.categories?.length ? selectedSport.categories : ["Male", "Female"];
 
   const updateRegistrationWindow = (tournaments: TournamentPayload[]) => {
@@ -169,12 +195,71 @@ function RegisterPageContent() {
   };
 
   const updateMember = (index: number, field: keyof MemberInput, value: string) => {
-    const nextMembers = Array.from({ length: maxPlayers }, (_, i) => members[i] || emptyMember());
+    const nextMembers = Array.from({ length: maxMembers }, (_, i) => members[i] || emptyMember());
     nextMembers[index] = {
       ...nextMembers[index],
       [field]: field === "registrationNo" ? normalizeRegNo(value) : value,
+      ...(field === "registrationNo" ? { verification: emptyVerification() } : {}),
     };
     setMembers(nextMembers);
+  };
+
+  const updateMemberIdCard = (index: number, file: File | null) => {
+    const nextMembers = Array.from({ length: maxMembers }, (_, i) => members[i] || emptyMember());
+    nextMembers[index] = { ...nextMembers[index], idCardFile: file, verification: emptyVerification() };
+    setMembers(nextMembers);
+  };
+
+  const setMemberVerification = (index: number, verification: PlayerVerification) => {
+    const nextMembers = Array.from({ length: maxMembers }, (_, i) => members[i] || emptyMember());
+    nextMembers[index] = { ...nextMembers[index], verification };
+    setMembers(nextMembers);
+  };
+
+  const verifyPlayerId = async (playerRole: "captain" | "member", index: number) => {
+    const typedRegistrationNumber = playerRole === "captain" ? normalizeRegNo(captainRegNo) : normalizeRegNo(members[index]?.registrationNo);
+    const idCardImage = playerRole === "captain" ? captainIdCardFile : members[index]?.idCardFile;
+    if (!typedRegistrationNumber) {
+      setMessage("Registration number is required before ID verification.");
+      setStatus("error");
+      return;
+    }
+    if (!idCardImage) {
+      setMessage("ID card image is required.");
+      setStatus("error");
+      return;
+    }
+
+    const scanningState: PlayerVerification = {
+      status: "scanning",
+      extractedRegistrationNumber: "",
+      message: "Scanning...",
+      verificationToken: "",
+    };
+    if (playerRole === "captain") setCaptainVerification(scanningState);
+    else setMemberVerification(index, scanningState);
+
+    try {
+      const result = await verifyRegistrationIdCard({ playerRole, playerIndex: index, typedRegistrationNumber, idCardImage });
+      const nextVerification: PlayerVerification = {
+        status: result.status,
+        extractedRegistrationNumber: result.extractedRegistrationNumber || "",
+        message: result.message,
+        verificationToken: result.verificationToken || "",
+        confidence: result.confidence,
+      };
+      if (playerRole === "captain") setCaptainVerification(nextVerification);
+      else setMemberVerification(index, nextVerification);
+    } catch (error) {
+      const nextVerification: PlayerVerification = {
+        status: "unreadable",
+        extractedRegistrationNumber: "",
+        message: error instanceof Error ? error.message : "Could not read registration number. Please upload a clearer image.",
+        verificationToken: "",
+      };
+      if (playerRole === "captain") setCaptainVerification(nextVerification);
+      else setMemberVerification(index, nextVerification);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -190,15 +275,16 @@ function RegisterPageContent() {
     const cleanCaptainPhone = normalizePhone(captainPhone);
 
     const cleanMembers: TeamRegistrationMember[] = members
-      .slice(0, maxPlayers)
+      .slice(0, maxMembers)
       .map((member) => ({
         fullName: member.fullName.trim(),
         registrationNo: normalizeRegNo(member.registrationNo),
         department: member.department.trim() || cleanDepartment,
         semester: member.semester.trim(),
         gender: member.gender || category,
-        email: member.email.trim(),
+        email: member.email.trim().toLowerCase(),
         phone: member.phone.trim(),
+        verificationToken: member.verification.verificationToken,
       }))
       .filter((member) => member.fullName || member.registrationNo);
 
@@ -212,10 +298,15 @@ function RegisterPageContent() {
     if (!cleanCaptainRegNo) { setStatus("error"); setMessage("Captain registration number is required."); return; }
     if (!cleanCaptainEmail) { setStatus("error"); setMessage("Captain email is required."); return; }
     if (!cleanCaptainPhone || cleanCaptainPhone.length !== 10) { setStatus("error"); setMessage("Captain phone must be exactly 10 digits."); return; }
-
-    if (cleanMembers.length < requiredPlayers) {
+    if (captainVerification.status !== "verified" || !captainVerification.verificationToken) {
       setStatus("error");
-      setMessage(`Please enter at least ${requiredPlayers} player${requiredPlayers === 1 ? "" : "s"} for ${selectedSport?.sportName || "this sport"}.`);
+      setMessage("Please verify ID card for every player before submitting the team registration.");
+      return;
+    }
+
+    if (cleanMembers.length < requiredMembers) {
+      setStatus("error");
+      setMessage(`Please enter at least ${requiredMembers} other member${requiredMembers === 1 ? "" : "s"} for ${selectedSport?.sportName || "this sport"}. Total players includes the captain.`);
       return;
     }
 
@@ -224,12 +315,28 @@ function RegisterPageContent() {
       setMessage("Each team member must include full name and registration number.");
       return;
     }
+    if (cleanMembers.some((member) => !member.email)) {
+      setStatus("error");
+      setMessage("Each team member must include an email.");
+      return;
+    }
+    if (cleanMembers.some((member) => !member.verificationToken)) {
+      setStatus("error");
+      setMessage("Please verify ID card for every player before submitting the team registration.");
+      return;
+    }
 
     // Check duplicates within submission
     const allRegNos = [cleanCaptainRegNo, ...cleanMembers.map((m) => m.registrationNo)];
     if (new Set(allRegNos).size !== allRegNos.length) {
       setStatus("error");
-      setMessage("Duplicate registration number found in the same team submission.");
+      setMessage(allRegNos.slice(1).includes(cleanCaptainRegNo) ? "The captain is already included in the team. Please add only other members." : "This registration number is already used by another player.");
+      return;
+    }
+    const allEmails = [cleanCaptainEmail, ...cleanMembers.map((m) => (m.email || "").toLowerCase())];
+    if (new Set(allEmails).size !== allEmails.length) {
+      setStatus("error");
+      setMessage("This email is already used by another player.");
       return;
     }
 
@@ -250,6 +357,7 @@ function RegisterPageContent() {
         captainRegNo: cleanCaptainRegNo,
         captainEmail: cleanCaptainEmail,
         captainPhone: cleanCaptainPhone,
+        captainVerificationToken: captainVerification.verificationToken,
         members: cleanMembers,
       };
 
@@ -266,6 +374,8 @@ function RegisterPageContent() {
       setMembers([]);
       setTeamLogo("");
       setTeamLogoFile(null);
+      setCaptainIdCardFile(null);
+      setCaptainVerification(emptyVerification());
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Registration failed. Please try again.");
@@ -348,9 +458,23 @@ function RegisterPageContent() {
                 <Field label="Captain Phone *">
                   <input type="tel" inputMode="numeric" pattern="\d{10}" maxLength={10} value={captainPhone} onChange={(e) => setCaptainPhone(normalizePhone(e.target.value))} required className="input-light" placeholder="10 digit phone number" />
                 </Field>
+                <div className="sm:col-span-2">
+                  <VerificationPanel
+                    title="Captain ID Card Upload"
+                    typedRegistrationNumber={normalizeRegNo(captainRegNo)}
+                    file={captainIdCardFile}
+                    verification={captainVerification}
+                    onFileChange={(file) => {
+                      setCaptainIdCardFile(file);
+                      setCaptainVerification(emptyVerification());
+                    }}
+                    onVerify={() => verifyPlayerId("captain", 0)}
+                  />
+                </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Players Required</p>
                   <p className="mt-1 text-2xl font-black text-slate-950">{requiredPlayers}-{maxPlayers}</p>
+                  <p className="mt-1 text-xs font-bold text-amber-700">Total players includes the captain.</p>
                 </div>
                 <Field label="Team Logo (optional)">
                   <div className="flex flex-col gap-2">
@@ -380,36 +504,57 @@ function RegisterPageContent() {
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-slate-950">Team Members</h2>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Enter each player&apos;s details. Registration no. is a unique player ID and cannot be used in another sport.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Captain is automatically included as a team member. Add only the remaining players.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Upload each player&apos;s student ID card. The system will verify whether the typed registration number matches the ID card.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                    {maxPlayers} slots
+                    {maxMembers} member slots
                   </span>
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
-                  {Array.from({ length: maxPlayers }).map((_, index) => (
-                    <div key={`${sportId}-${category}-${index}`} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <input
-                        value={members[index]?.fullName || ""}
-                        onChange={(e) => updateMember(index, "fullName", e.target.value)}
-                        required={index < requiredPlayers}
-                        className="input-light"
-                        placeholder={`Player ${index + 1} full name *`}
-                      />
-                      <input
-                        value={members[index]?.registrationNo || ""}
-                        onChange={(e) => updateMember(index, "registrationNo", e.target.value)}
-                        required={index < requiredPlayers}
-                        className="input-light uppercase"
-                        placeholder="Registration no. *"
-                      />
-                      <input
-                        value={members[index]?.semester || ""}
-                        onChange={(e) => updateMember(index, "semester", e.target.value)}
-                        className="input-light"
-                        placeholder="Semester"
-                      />
+                  {Array.from({ length: maxMembers }).map((_, index) => (
+                    <div key={`${sportId}-${category}-${index}`} className="rounded-xl border border-slate-200 p-3">
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <input
+                          value={members[index]?.fullName || ""}
+                          onChange={(e) => updateMember(index, "fullName", e.target.value)}
+                          required={index < requiredMembers}
+                          className="input-light"
+                          placeholder={`Member ${index + 1} full name *`}
+                        />
+                        <input
+                          value={members[index]?.email || ""}
+                          onChange={(e) => updateMember(index, "email", e.target.value)}
+                          required={index < requiredMembers}
+                          type="email"
+                          className="input-light"
+                          placeholder="Member email *"
+                        />
+                        <input
+                          value={members[index]?.registrationNo || ""}
+                          onChange={(e) => updateMember(index, "registrationNo", e.target.value)}
+                          required={index < requiredMembers}
+                          className="input-light uppercase"
+                          placeholder="Registration no. *"
+                        />
+                        <input
+                          value={members[index]?.semester || ""}
+                          onChange={(e) => updateMember(index, "semester", e.target.value)}
+                          className="input-light"
+                          placeholder="Semester"
+                        />
+                      </div>
+                      <div className="mt-3">
+                        <VerificationPanel
+                          title={`Member ${index + 1} ID Card Upload`}
+                          typedRegistrationNumber={normalizeRegNo(members[index]?.registrationNo || "")}
+                          file={members[index]?.idCardFile || null}
+                          verification={members[index]?.verification || emptyVerification()}
+                          onFileChange={(file) => updateMemberIdCard(index, file)}
+                          onVerify={() => verifyPlayerId("member", index)}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -465,5 +610,74 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
       {children}
     </label>
+  );
+}
+
+function VerificationPanel({
+  title,
+  typedRegistrationNumber,
+  file,
+  verification,
+  onFileChange,
+  onVerify,
+}: {
+  title: string;
+  typedRegistrationNumber: string;
+  file: File | null;
+  verification: PlayerVerification;
+  onFileChange: (file: File | null) => void;
+  onVerify: () => void;
+}) {
+  const badgeClass =
+    verification.status === "verified"
+      ? "bg-emerald-100 text-emerald-700"
+      : verification.status === "mismatch"
+      ? "bg-red-100 text-red-700"
+      : verification.status === "unreadable" || verification.status === "manual_review"
+      ? "bg-yellow-100 text-yellow-800"
+      : verification.status === "scanning"
+      ? "bg-blue-100 text-blue-700"
+      : "bg-slate-100 text-slate-600";
+  const statusLabel = verification.status === "not_uploaded"
+    ? "Not Uploaded"
+    : verification.status === "manual_review"
+    ? "Manual Review Required"
+    : verification.status.charAt(0).toUpperCase() + verification.status.slice(1);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{title}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Typed Reg No: {typedRegistrationNumber || "Not entered"}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Extracted Reg No: {verification.extractedRegistrationNumber || "Not scanned"}</p>
+        </div>
+        <span className={`inline-flex w-fit rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${badgeClass}`}>
+          {statusLabel}
+        </span>
+      </div>
+      <p className="mt-3 text-xs font-semibold text-slate-600">{verification.message}</p>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <label className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-bold text-slate-500 transition-colors hover:border-amber-400 hover:text-amber-600">
+          <Upload size={16} />
+          {file ? file.name : "Upload JPG, PNG, or WebP ID card"}
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            onChange={(event) => onFileChange(event.target.files?.[0] || null)}
+            className="sr-only"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={onVerify}
+          disabled={verification.status === "scanning"}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {verification.status === "scanning" && <Loader2 className="animate-spin" size={16} />}
+          Verify ID
+        </button>
+      </div>
+    </div>
   );
 }

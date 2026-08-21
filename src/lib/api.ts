@@ -1,4 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const VERIFY_ID_CARD_TIMEOUT_MS = 50000;
+const BROWSER_OCR_INIT_TIMEOUT_MS = 25000;
+const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 30000;
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
@@ -127,9 +130,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         : `API request failed (status ${response.status})`;
     }
 
-    // Include request URL in the error to aid debugging in browser console
-    const errorMessage = `${message} — ${fullUrl}`;
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(message, response.status);
   }
 
   return data as T;
@@ -1087,6 +1088,16 @@ export interface TeamRegistrationMember {
   gender?: string;
   email?: string;
   phone?: string;
+  verificationToken?: string;
+  idVerification?: IdVerificationInfo;
+}
+
+export interface IdVerificationInfo {
+  status: "verified" | "mismatch" | "unreadable" | "manual_review" | "pending" | "old_registration";
+  verified?: boolean;
+  extractedRegistrationNumber?: string | null;
+  confidence?: number;
+  verifiedAt?: string;
 }
 
 export interface TeamRegistrationPayload {
@@ -1103,7 +1114,17 @@ export interface TeamRegistrationPayload {
   captainRegNo: string;
   captainEmail: string;
   captainPhone: string;
+  captainVerificationToken?: string;
+  captainIdVerification?: IdVerificationInfo;
   members: TeamRegistrationMember[];
+  allPlayers?: {
+    name?: string;
+    email?: string;
+    registrationNumber?: string;
+    role?: "captain" | "member";
+    idVerified?: boolean;
+    idVerificationStatus?: string;
+  }[];
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedBy?: string;
@@ -1120,6 +1141,173 @@ export function submitTeamRegistration(payload: TeamRegistrationWritePayload) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export interface IdCardVerificationResponse {
+  success: boolean;
+  matched: boolean;
+  status: "verified" | "mismatch" | "unreadable" | "manual_review";
+  typedRegistrationNumber?: string;
+  extractedRegistrationNumber?: string | null;
+  confidence?: number;
+  message: string;
+  verificationToken?: string;
+}
+
+function normalizeRegistrationText(value: string) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function extractRegistrationNumberFromText(text: string, typedRegistrationNumber: string) {
+  const normalizedTyped = normalizeRegistrationText(typedRegistrationNumber);
+  if (!normalizedTyped) return "";
+  const compactText = normalizeRegistrationText(text);
+  if (compactText.includes(normalizedTyped)) return normalizedTyped;
+
+  const digitRuns = text.match(/\d[\d\s-]{5,}\d/g) || [];
+  const typedDigits = normalizedTyped.replace(/\D/g, "");
+  for (const run of digitRuns) {
+    const normalizedRun = normalizeRegistrationText(run);
+    if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
+      return normalizedTyped;
+    }
+  }
+  return "";
+}
+
+function withClientTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new ApiError(message, 408)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
+async function postClientOcrVerification(
+  payload: {
+    playerRole: "captain" | "member";
+    playerIndex: number;
+    typedRegistrationNumber: string;
+    idCardImage: File;
+  },
+  ocrText: string,
+  extractedRegistrationNumber: string,
+  confidence: number
+) {
+  const formData = new FormData();
+  formData.set("playerRole", payload.playerRole);
+  formData.set("playerIndex", String(payload.playerIndex));
+  formData.set("typedRegistrationNumber", payload.typedRegistrationNumber);
+  formData.set("ocrText", ocrText);
+  formData.set("extractedRegistrationNumber", extractedRegistrationNumber);
+  formData.set("idCardImage", payload.idCardImage);
+
+  const response = await fetch(`${API_BASE_URL}/registration/verify-id-card/client-ocr`, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+  });
+  const responseText = await response.text().catch(() => "");
+  let data: { message?: string; confidence?: number } | null = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    throw new ApiError(data?.message || "Could not verify ID card.", response.status);
+  }
+  return { ...(data as IdCardVerificationResponse), confidence: data?.confidence || confidence };
+}
+
+async function verifyRegistrationIdCardInBrowser(payload: {
+  playerRole: "captain" | "member";
+  playerIndex: number;
+  typedRegistrationNumber: string;
+  idCardImage: File;
+}) {
+  if (typeof window === "undefined") {
+    throw new ApiError("ID verification service is still starting. Please try again in a moment.", 503);
+  }
+
+  const { createWorker } = await import("tesseract.js");
+  let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+  try {
+    worker = await withClientTimeout(
+      createWorker("eng", 1),
+      BROWSER_OCR_INIT_TIMEOUT_MS,
+      "ID scan is taking too long. Please try again with a clearer, cropped image."
+    );
+    await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
+    const result = await withClientTimeout(
+      worker.recognize(payload.idCardImage),
+      BROWSER_OCR_RECOGNIZE_TIMEOUT_MS,
+      "ID scan is taking too long. Please try again with a clearer, cropped image."
+    );
+    const text = result?.data?.text || "";
+    const extractedRegistrationNumber = extractRegistrationNumberFromText(text, payload.typedRegistrationNumber);
+    if (!extractedRegistrationNumber) {
+      throw new ApiError("Could not read registration number from ID card. Please upload a clearer image.", 422);
+    }
+    return await postClientOcrVerification(
+      payload,
+      text,
+      extractedRegistrationNumber,
+      Math.round(Number(result?.data?.confidence || 0))
+    );
+  } finally {
+    await worker?.terminate().catch(() => {});
+  }
+}
+
+export async function verifyRegistrationIdCard(payload: {
+  playerRole: "captain" | "member";
+  playerIndex: number;
+  typedRegistrationNumber: string;
+  idCardImage: File;
+}) {
+  const formData = new FormData();
+  formData.set("playerRole", payload.playerRole);
+  formData.set("playerIndex", String(payload.playerIndex));
+  formData.set("typedRegistrationNumber", payload.typedRegistrationNumber);
+  formData.set("idCardImage", payload.idCardImage);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), VERIFY_ID_CARD_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/registration/verify-id-card`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return verifyRegistrationIdCardInBrowser(payload);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const responseText = await response.text().catch(() => "");
+  let data: { message?: string } | null = null;
+  try {
+    data = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    data = null;
+  }
+  if (!response.ok) {
+    if ([503, 504].includes(response.status)) {
+      return verifyRegistrationIdCardInBrowser(payload);
+    }
+    const proxyFailure = responseText.includes("ECONNREFUSED") || responseText.includes("fetch failed");
+    throw new ApiError(data?.message || (proxyFailure ? "Could not reach the verification service. Please try again in a moment." : "Could not verify ID card."), response.status);
+  }
+  return data as IdCardVerificationResponse;
 }
 
 export function getTeamPendingRegistrations() {
