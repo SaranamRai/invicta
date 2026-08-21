@@ -1,0 +1,38 @@
+{
+  "name": "sport-management",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "next dev -H 127.0.0.1",
+    "dev:api": "npm --prefix backend run dev",
+    "start:api": "npm --prefix backend run start",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test:toggle": "node scripts/test-toggle.js"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "date-fns": "^4.3.0",
+    "firebase": "^12.13.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-firebase-hooks": "^5.1.1",
+    "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

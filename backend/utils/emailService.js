@@ -24,6 +24,47 @@ function getTransporter() {
   return transporter;
 }
 
+export function getSmtpStatus() {
+  const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || process.env.MAIL_HOST || "";
+  const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.MAIL_PORT || 587);
+  const user = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.MAIL_USER || "";
+
+  return {
+    configured: Boolean(host && user),
+    host,
+    port,
+    user: user ? user.replace(/(^.).*(@.*$)/, "$1***$2") : "",
+    secure: process.env.SMTP_SECURE === "true",
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.MAIL_FROM || user || "",
+  };
+}
+
+export async function sendAdminSmtpTest(adminEmail) {
+  const transport = getTransporter();
+  const target = process.env.ADMIN_ALERT_EMAIL || adminEmail || process.env.SMTP_USER || process.env.EMAIL_USER;
+
+  if (!transport || !target) {
+    return {
+      sent: false,
+      configured: false,
+      message: "SMTP is not fully configured.",
+    };
+  }
+
+  await transport.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER || "noreply@invicta-sports.com",
+    to: target,
+    subject: "INVICTA SMTP health check",
+    text: `SMTP test sent at ${new Date().toISOString()}`,
+  });
+
+  return {
+    sent: true,
+    configured: true,
+    message: `SMTP test email sent to ${target}.`,
+  };
+}
+
 export async function sendAccountCreatedEmail({ name, email, role, assignedSport, password }) {
   const webAppLink = process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://127.0.0.1:3000";
   const loginLink = webAppLink.endsWith("/login") ? webAppLink : `${webAppLink.replace(/\/$/, "")}/login`;

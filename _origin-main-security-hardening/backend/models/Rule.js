@@ -1,0 +1,28 @@
+import mongoose from "mongoose";
+
+const ruleSchema = new mongoose.Schema(
+  {
+    sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
+    tournamentName: { type: String, trim: true },
+    sport: { type: String, trim: true, lowercase: true },
+    sportName: { type: String, trim: true },
+    category: { type: String, trim: true },
+    title: { type: String, required: true, trim: true },
+    rules: { type: String, required: true },
+    description: { type: String },
+    attachmentData: { type: String },
+    attachmentName: { type: String, trim: true },
+    attachmentType: { type: String, trim: true },
+    attachmentKind: { type: String, enum: ["document", "image"] },
+    status: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId },
+    reviewedByName: { type: String, trim: true },
+    reviewedAt: { type: Date },
+    createdByName: { type: String, trim: true },
+    createdByEmail: { type: String, trim: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+
+export default mongoose.model("Rule", ruleSchema);

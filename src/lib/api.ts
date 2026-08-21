@@ -1050,6 +1050,95 @@ export function getAdminSports() {
   return apiFetch<MongoSport[]>("/admin/sports");
 }
 
+export interface AdminHealthPayload {
+  status: string;
+  backend: string;
+  mongodb: string;
+  smtp: string;
+  uptime: string;
+  uptimeSeconds: number;
+  environment: string;
+  startedAt: string;
+  timestamp: string;
+}
+
+export interface AdminStatsPayload {
+  totalRequestsToday: number;
+  failedRequestsToday: number;
+  averageResponseTimeMs: number;
+  slowestResponseTimeMs: number;
+  slowestRoutes: Array<{
+    method: string;
+    path: string;
+    statusCode: number;
+    durationMs: number;
+    createdAt: string;
+  }>;
+  roleCounts: Record<string, number>;
+  liveMatches: number;
+}
+
+export interface AdminLogPayload {
+  _id: string;
+  method?: string;
+  path?: string;
+  route?: string;
+  statusCode?: number;
+  durationMs?: number;
+  message?: string;
+  userRole?: string;
+  userEmail?: string;
+  createdAt?: string;
+}
+
+export function getTechnicalAdminHealth() {
+  return apiFetch<AdminHealthPayload>("/admin/health");
+}
+
+export function getTechnicalAdminStats() {
+  return apiFetch<AdminStatsPayload>("/admin/stats");
+}
+
+export function getTechnicalAdminDatabaseStatus() {
+  return apiFetch<{
+    connected: boolean;
+    name: string;
+    host: string;
+    collections: string[];
+  }>("/admin/database-status");
+}
+
+export function getTechnicalAdminApiLogs() {
+  return apiFetch<AdminLogPayload[]>("/admin/api-logs?limit=25");
+}
+
+export function getTechnicalAdminErrorLogs() {
+  return apiFetch<AdminLogPayload[]>("/admin/error-logs?limit=25");
+}
+
+export function getTechnicalAdminEmailStatus() {
+  return apiFetch<{
+    configured: boolean;
+    host: string;
+    port: number;
+    user: string;
+    secure: boolean;
+    from: string;
+  }>("/admin/email-status");
+}
+
+export function testTechnicalAdminSmtp() {
+  return apiFetch<{ sent: boolean; configured: boolean; message: string }>("/admin/test-smtp", {
+    method: "POST",
+  });
+}
+
+export function testTechnicalAdminMongodb() {
+  return apiFetch<{ ok: boolean; readyState: number; database: string; timestamp: string }>("/admin/test-mongodb", {
+    method: "POST",
+  });
+}
+
 export function createAdminSport(payload: {
   sportName: string;
   categories?: ("Male" | "Female")[];

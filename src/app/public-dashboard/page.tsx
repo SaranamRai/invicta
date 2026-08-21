@@ -478,7 +478,6 @@ export default function PublicDashboard() {
           )}
         </div>
       </section>
-
     </div>
   );
 }

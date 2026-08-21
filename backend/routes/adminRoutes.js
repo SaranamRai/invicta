@@ -16,10 +16,23 @@ import {
 } from "../controllers/adminDataController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
+import {
+  adminHealth,
+  adminStats,
+  apiLogs,
+  auditLogs,
+  databaseStatus,
+  emailStatus,
+  errorLogs,
+  liveMonitoring,
+  testMongodb,
+  testSmtp,
+} from "../controllers/technicalAdminController.js";
 
 const router = Router();
 
 const adminOrSuper = allowRoles("admin", "supercoordinator");
+const adminOnly = allowRoles("admin");
 const superOnly = allowRoles("supercoordinator");
 
 router.use(authMiddleware);
@@ -37,6 +50,16 @@ router.use((req, res, next) => {
 });
 
 router.get("/sports", adminOrSuper, adminHandlers.listSports);
+router.get("/health", adminOnly, adminHealth);
+router.get("/stats", adminOnly, adminStats);
+router.get("/database-status", adminOnly, databaseStatus);
+router.get("/api-logs", adminOnly, apiLogs);
+router.get("/error-logs", adminOnly, errorLogs);
+router.get("/audit-logs", adminOnly, auditLogs);
+router.get("/live-monitoring", adminOnly, liveMonitoring);
+router.get("/email-status", adminOnly, emailStatus);
+router.post("/test-smtp", adminOnly, testSmtp);
+router.post("/test-mongodb", adminOnly, testMongodb);
 router.post("/sports", superOnly, adminHandlers.createSport);
 router.put("/sports/:id", superOnly, adminHandlers.updateSport);
 router.delete("/sports/:id", superOnly, adminHandlers.deleteSport);

@@ -1,0 +1,125 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { MatchData } from "@/lib/types";
+import { Card } from "@/components/ui/card";
+import Link from "next/link";
+import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { getAssignedMatches } from "@/lib/services/mongo-service";
+import { getRoleAccount } from "@/lib/role-auth";
+
+export default function MatchesSelectionPage() {
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"All" | "Live" | "Paused" | "Upcoming" | "Finished">("All");
+  const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMatches() {
+      const matchesData = await getAssignedMatches();
+      if (!isMounted) return;
+      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
+    }
+
+    void loadMatches();
+    const interval = window.setInterval(loadMatches, 15000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [assignedSport]);
+
+  const filteredMatches = matches.filter(match => {
+    const matchesSearch = match.teamA.toLowerCase().includes(search.toLowerCase()) || 
+                          match.teamB.toLowerCase().includes(search.toLowerCase());
+    const matchesFilter = filter === "All" || match.status === filter;
+    return matchesSearch && matchesFilter;
+  });
+
+  return (
+    <div className="space-y-8 sm:space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase sport-heading sm:text-4xl">All Matches</h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
+            Find the match you are responsible for, then open it to update the clock, score, announcements, and match events.
+          </p>
+        </div>
+
+        <div className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-1 sm:gap-2">
+          {(["All", "Live", "Paused", "Upcoming", "Finished"] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "shrink-0 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-wide transition-all sm:px-4 sm:tracking-widest",
+                filter === f ? "bg-accent text-accent-foreground" : "text-slate-400 hover:text-white"
+              )}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <input 
+          type="text" 
+          placeholder="Search by team name..." 
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-12 text-sm font-bold tracking-tight focus:outline-none focus:border-accent text-white placeholder:text-slate-500 transition-colors"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredMatches.map(match => (
+          <Link key={match.id} href={`/volunteer/matches/${match.id}`}>
+            <Card className="bg-white/5 border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden group sm:p-6">
+              {match.status === "Live" && (
+                <div className="absolute left-0 top-0 h-full w-1 bg-accent" />
+              )}
+              
+              <div className="flex justify-between items-center mb-6">
+                <span className={cn(
+                  "text-[10px] font-black uppercase tracking-widest flex items-center gap-2",
+                  match.status === "Live" ? "text-accent" :
+                  match.status === "Paused" ? "text-amber-400" :
+                  match.status === "Upcoming" ? "text-blue-500" :
+                  "text-slate-500"
+                )}>
+                  {match.status === "Live" && <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />}
+                  {match.status}
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{match.sport}</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider text-white">{match.teamA}</span>
+                  <span className="text-xl font-black text-white">{match.scoreA}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider text-white">{match.teamB}</span>
+                  <span className="text-xl font-black text-white">{match.scoreB}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/10 text-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-accent transition-colors">
+                  Open Match Controls &rarr;
+                </span>
+              </div>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
