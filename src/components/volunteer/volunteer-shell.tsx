@@ -21,8 +21,8 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   return (
-    <div className="dashboard-surface min-h-screen bg-background text-foreground flex flex-col md:flex-row">
-      <div className="flex w-full flex-col border-b border-border bg-card md:sticky md:top-0 md:h-screen md:w-72 md:border-b-0 md:border-r">
+    <div className="dashboard-surface flex min-h-screen overflow-x-hidden bg-background text-foreground md:h-screen md:flex-row md:overflow-hidden">
+      <div className="flex w-full flex-col border-b border-border bg-card md:h-screen md:w-72 md:shrink-0 md:overflow-hidden md:border-b-0 md:border-r">
         <div className="border-b border-border p-3 sm:p-6">
           <div className="flex flex-wrap items-center gap-3 md:block md:space-y-4">
             <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
@@ -31,7 +31,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-accent mt-1.5 sm:text-[10px] sm:tracking-[0.2em] sm:mt-2">Volunteer Match Tools</p>
         </div>
 
-        <nav className="no-scrollbar flex flex-nowrap gap-2 overflow-x-auto p-3 sm:p-4 md:flex-1 md:flex-col md:space-y-2 md:overflow-visible">
+        <nav className="no-scrollbar flex flex-nowrap gap-2 overflow-x-auto p-3 sm:p-4 md:flex-1 md:flex-col md:space-y-2 md:overflow-y-auto md:overflow-x-hidden md:overscroll-contain">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -65,7 +65,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-auto">
+      <div className="relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-4 backdrop-blur-xl sm:px-8 md:px-12 md:py-5">
           <div className="flex min-w-0 items-center gap-4">
             <MedhaviLogo className="hidden h-11 w-44 shrink-0 lg:inline-flex" />
