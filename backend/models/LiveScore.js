@@ -32,4 +32,7 @@ const liveScoreSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
+liveScoreSchema.index({ fixtureId: 1 });
+liveScoreSchema.index({ tournamentId: 1, sportId: 1, currentStatus: 1 });
+
 export default mongoose.model("LiveScore", liveScoreSchema);

@@ -23,14 +23,9 @@ export async function connectDB() {
 
 export async function getDBStatus() {
   const connection = mongoose.connection;
-  const collections = connection.db
-    ? await connection.db.listCollections().toArray()
-    : [];
-
   return {
     connected: connection.readyState === 1,
     name: connection.name || "",
     host: connection.host || "",
-    collections: collections.map((collection) => collection.name).sort(),
   };
 }

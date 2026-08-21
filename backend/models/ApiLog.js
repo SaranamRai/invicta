@@ -14,4 +14,8 @@ const apiLogSchema = new mongoose.Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+apiLogSchema.index({ createdAt: -1 });
+apiLogSchema.index({ statusCode: 1, createdAt: -1 });
+apiLogSchema.index({ route: 1, createdAt: -1 });
+
 export default mongoose.model("ApiLog", apiLogSchema);

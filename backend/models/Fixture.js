@@ -42,4 +42,7 @@ const fixtureSchema = new mongoose.Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+fixtureSchema.index({ date: 1, time: 1 });
+fixtureSchema.index({ tournamentId: 1, sportId: 1, status: 1 });
+
 export default mongoose.model("Fixture", fixtureSchema);

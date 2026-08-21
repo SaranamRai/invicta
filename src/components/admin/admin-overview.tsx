@@ -12,7 +12,7 @@ import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import { getAdminRoleAccounts, RoleAccountPayload } from "@/lib/api";
+import { getAdminRoleAccounts, getApiClientMetrics, RoleAccountPayload } from "@/lib/api";
 
 interface AdminOverviewProps {
   teams: Team[];
@@ -64,6 +64,7 @@ export function AdminOverview({
   const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
   const [apiStatus, setApiStatus] = useState("Checking");
   const [pageLoadMs, setPageLoadMs] = useState<number | null>(null);
+  const [webVitals, setWebVitals] = useState({ ttfb: 0, fcp: 0, lcp: 0, inp: 0, cls: 0 });
 
   // Calculate stats
   const totalTeams = teams.length;
@@ -169,6 +170,20 @@ export function AdminOverview({
       isMounted = false;
       window.clearInterval(interval);
     };
+  }, []);
+
+  useEffect(() => {
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (navigation) setWebVitals((current) => ({ ...current, ttfb: Math.round(navigation.responseStart - navigation.startTime) }));
+    const observers = [
+      new PerformanceObserver((list) => setWebVitals((current) => ({ ...current, fcp: Math.round(list.getEntries().at(-1)?.startTime || current.fcp) }))),
+      new PerformanceObserver((list) => setWebVitals((current) => ({ ...current, lcp: Math.round(list.getEntries().at(-1)?.startTime || current.lcp) }))),
+      new PerformanceObserver((list) => setWebVitals((current) => ({ ...current, inp: Math.round(list.getEntries().at(-1)?.duration || current.inp) }))),
+      new PerformanceObserver((list) => setWebVitals((current) => ({ ...current, cls: Number((current.cls + list.getEntries().reduce((sum, entry) => sum + (entry as PerformanceEntry & { value?: number }).value! || 0, 0)).toFixed(3)) }))),
+    ];
+    const types = ["paint", "largest-contentful-paint", "event", "layout-shift"];
+    observers.forEach((observer, index) => { try { observer.observe({ type: types[index], buffered: true } as PerformanceObserverInit); } catch {} });
+    return () => observers.forEach((observer) => observer.disconnect());
   }, []);
 
   // Calendar dates generation
@@ -337,6 +352,10 @@ export function AdminOverview({
             <PerformanceTile label="API Status" value={apiStatus} tone={apiStatus === "Online" ? "good" : "bad"} />
             <PerformanceTile label="API Latency" value={apiLatencyMs === null ? "N/A" : `${apiLatencyMs} ms`} tone={apiLatencyMs !== null && apiLatencyMs < 500 ? "good" : "warn"} />
             <PerformanceTile label="Page Load" value={pageLoadMs === null ? "N/A" : `${pageLoadMs} ms`} tone={pageLoadMs !== null && pageLoadMs < 2500 ? "good" : "warn"} />
+            <PerformanceTile label="TTFB" value={webVitals.ttfb ? `${webVitals.ttfb} ms` : "Collecting"} tone={webVitals.ttfb && webVitals.ttfb < 800 ? "good" : "warn"} />
+            <PerformanceTile label="FCP / LCP" value={webVitals.fcp && webVitals.lcp ? `${webVitals.fcp} / ${webVitals.lcp} ms` : "Collecting"} tone={webVitals.lcp && webVitals.lcp < 2500 ? "good" : "warn"} />
+            <PerformanceTile label="INP / CLS" value={webVitals.inp ? `${webVitals.inp} ms / ${webVitals.cls}` : "Collecting"} tone={webVitals.inp && webVitals.inp < 200 && webVitals.cls < 0.1 ? "good" : "warn"} />
+            <PerformanceTile label="API Error Rate" value={`${getApiClientMetrics().errorRate}%`} tone={getApiClientMetrics().errorRate === 0 ? "good" : "warn"} />
           </CardContent>
         </Card>
       </div>

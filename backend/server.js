@@ -202,6 +202,8 @@ app.get("/api/health", async (_req, res, next) => {
       status: "ok",
       service: "sports-management-api",
       database: await getDBStatus(),
+      uptimeSeconds: Math.round(process.uptime()),
+      checkedAt: new Date().toISOString(),
     });
   } catch (error) {
     next(error);

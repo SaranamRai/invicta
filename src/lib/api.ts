@@ -1,4 +1,19 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const publicRequestCache = new Map<string, { expiresAt: number; value: unknown }>();
+const publicRequestInflight = new Map<string, Promise<unknown>>();
+const apiMeasurements: Array<{ at: number; duration: number; failed: boolean }> = [];
+
+export function getApiClientMetrics() {
+  const recent = apiMeasurements.filter((entry) => entry.at > Date.now() - 5 * 60_000);
+  return {
+    errorRate: recent.length ? Math.round((recent.filter((entry) => entry.failed).length / recent.length) * 100) : 0,
+    samples: recent.map((entry) => entry.duration).slice(-12),
+  };
+}
+
+function publicCacheTtl(path: string) {
+  return path.includes("live-score") || path.includes("live-feed") ? 5_000 : 20_000;
+}
 const VERIFY_ID_CARD_TIMEOUT_MS = 15000;
 const BROWSER_OCR_INIT_TIMEOUT_MS = 12000;
 const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 18000;
@@ -181,11 +196,17 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   const fullUrl = `${API_BASE_URL}${path}`;
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  const requestStartedAt = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(fullUrl, { ...options, headers, credentials: "include" });
+  } catch (error) {
+    apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: true });
+    if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
+    throw error;
+  }
+  apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: !response.ok });
+  if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
 
   const data = await response.json().catch(() => null);
 
@@ -249,10 +270,25 @@ export async function apiDownload(path: string, options: RequestInit = {}) {
 }
 
 async function publicApiFetch<T>(path: string): Promise<T[]> {
+  const cached = publicRequestCache.get(path);
+  if (cached && cached.expiresAt > Date.now()) return cached.value as T[];
+
+  const inflight = publicRequestInflight.get(path);
+  if (inflight) return inflight as Promise<T[]>;
+
+  const request = apiFetch<T[]>(path)
+    .then((data) => {
+      publicRequestCache.set(path, { value: data, expiresAt: Date.now() + publicCacheTtl(path) });
+      return data;
+    })
+    .catch(() => [] as T[])
+    .finally(() => publicRequestInflight.delete(path));
+  publicRequestInflight.set(path, request);
+
   try {
-    return await apiFetch<T[]>(path);
-  } catch {
-    return [];
+    return await request;
+  } finally {
+    // Kept for readability: the request cleanup happens in the shared promise.
   }
 }
 
