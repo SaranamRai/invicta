@@ -382,6 +382,8 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female")[]>>({});
   const [venueBySport, setVenueBySport] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState(getTodayInputValue());
+  const [endDate, setEndDate] = useState("");
+  const [matchesPerDay, setMatchesPerDay] = useState(5);
   const [dayStartTime, setDayStartTime] = useState("09:00");
   const [dayEndTime, setDayEndTime] = useState("17:00");
   const [matchDurationMinutes, setMatchDurationMinutes] = useState(45);
@@ -469,6 +471,8 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           venueId: target.venueId,
           venue: selectedVenue?.name || "",
           startDate,
+          endDate: endDate || undefined,
+          matchesPerDay,
           dayStartTime,
           dayEndTime,
           matchDurationMinutes,
@@ -658,6 +662,18 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                   onChange={(event) => setStartDate(event.target.value)}
                   className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent"
                 />
+              </label>
+
+              <label className="space-y-2">
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  <CalendarDays size={13} /> End Date (optional)
+                </span>
+                <input type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent" />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Matches per day</span>
+                <input type="number" min={1} value={matchesPerDay} onChange={(event) => setMatchesPerDay(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent" />
               </label>
 
               <label className="space-y-2">

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listPublic, registerPublicTeam, getSportDetailView } from "../controllers/publicController.js";
+import { listPublic, registerPublicTeam, getSportDetailView, getPublicRegistrationFields } from "../controllers/publicController.js";
 
 const router = Router();
 
@@ -14,6 +14,7 @@ router.get("/points-table", listPublic("points-table"));
 router.get("/gallery", listPublic("gallery"));
 router.get("/tournaments", listPublic("tournaments"));
 router.get("/teams", listPublic("teams"));
+router.get("/registration-fields", getPublicRegistrationFields);
 router.post("/teams", registerPublicTeam);
 router.get("/sports/:sportId/detail", getSportDetailView);
 

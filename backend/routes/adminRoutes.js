@@ -13,6 +13,8 @@ import {
   updateFixture,
   updateTeam,
   listPlayers,
+  updatePlayer,
+  deletePlayer,
 } from "../controllers/adminDataController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
@@ -97,6 +99,10 @@ router.put("/tournaments/:id", superOnly, adminHandlers.updateTournament);
 router.patch("/tournaments/:id/registration", superOnly, adminHandlers.toggleTournamentRegistration);
 router.delete("/tournaments/:id", superOnly, adminHandlers.deleteTournament);
 router.get("/players", adminOrSuper, listPlayers);
+router.put("/players/:id", superOnly, updatePlayer);
+router.delete("/players/:id", superOnly, deletePlayer);
+router.get("/registration-fields", adminOrSuper, adminHandlers.listRegistrationFields);
+router.put("/registration-fields", superOnly, adminHandlers.replaceRegistrationFields);
 router.get("/issues", adminOrSuper, listIssues);
 
 export default router;

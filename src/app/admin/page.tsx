@@ -23,7 +23,6 @@ import {
   getAdminFixtures,
   getAdminTeams,
   updateAdminFixture,
-  updateAdminTeam,
   getAdminSports,
   getAdminTournaments,
   getTeamPendingRegistrations,
@@ -729,42 +728,11 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Recalculate team standings (wins/losses) based on completed fixtures
-  const recalculateStandings = (allFixtures = fixtures) => {
-    const updatedTeams = teams.map((team) => {
-      let won = 0;
-      let lost = 0;
-
-      allFixtures.forEach((fix) => {
-        if (
-          fix.status === "completed" &&
-          fix.scoreA !== undefined &&
-          fix.scoreB !== undefined
-        ) {
-          const isTeamA = fix.teamA === team.id || fix.teamA === team.name;
-          const isTeamB = fix.teamB === team.id || fix.teamB === team.name;
-
-          if (isTeamA) {
-            if (fix.scoreA > fix.scoreB) won++;
-            else if (fix.scoreA < fix.scoreB) lost++;
-          } else if (isTeamB) {
-            if (fix.scoreB > fix.scoreA) won++;
-            else if (fix.scoreB < fix.scoreA) lost++;
-          }
-        }
-      });
-
-      return {
-        ...team,
-        wins: won,
-        losses: lost,
-      };
-    });
-
-    updatedTeams.forEach((team) => {
-      void updateAdminTeam(team).catch((error) => console.error("Mongo standings update failed:", error));
-    });
-    setTeams(updatedTeams);
+  const recalculateStandings = async () => {
+    // League rows are calculated from completed MongoDB fixtures by the API.
+    const [nextTeams, nextFixtures] = await Promise.all([getAdminTeams(), getAdminFixtures()]);
+    setTeams(nextTeams as Team[]);
+    setFixtures(nextFixtures as Fixture[]);
   };
 
   const handleAutomaticFixturesGenerated = async () => {
@@ -776,7 +744,7 @@ export default function AdminDashboard() {
     await deleteAdminFixtures(fixtureIds);
     const nextFixtures = await getAdminFixtures();
     setFixtures(nextFixtures as Fixture[]);
-    recalculateStandings(nextFixtures as Fixture[]);
+    await recalculateStandings();
   };
 
   // Delete single fixture
@@ -784,7 +752,7 @@ export default function AdminDashboard() {
     await deleteAdminFixture(fixtureId);
     const nextFixtures = await getAdminFixtures();
     setFixtures(nextFixtures as Fixture[]);
-    recalculateStandings(nextFixtures as Fixture[]);
+    await recalculateStandings();
   };
 
   // Update fixture handler
@@ -792,7 +760,7 @@ export default function AdminDashboard() {
     const savedFixture = await updateAdminFixture(updatedFixture);
     const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
     setFixtures(nextFixtures);
-    recalculateStandings(nextFixtures);
+    await recalculateStandings();
   };
 
   const handleLogout = async () => {

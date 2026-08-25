@@ -11,10 +11,11 @@ import Tournament from "../models/Tournament.js";
 import Team from "../models/Team.js";
 import TeamRegistration from "../models/TeamRegistration.js";
 import Player from "../models/Player.js";
+import RegistrationField from "../models/RegistrationField.js";
 import mongoose from "mongoose";
+import { buildLeagueTable } from "../utils/leagueTable.js";
 import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
 import { normalizeRegNo as normalizeVerifiedRegNo, isValidEmail as isValidEmailValue } from "../utils/regNoHelper.js";
-import { buildVerifiedStatus, verifyRegistrationToken } from "../utils/idVerification.js";
 
 const publicModels = {
   sports: Sport,
@@ -43,6 +44,13 @@ function addQueryFilters(resource, req, filter) {
 
 export function listPublic(resource) {
   return async (req, res) => {
+    if (resource === "points-table") {
+      const filters = {};
+      for (const key of ["tournamentId", "sportId", "category"]) {
+        if (req.query[key]) filters[key] = String(req.query[key]);
+      }
+      return res.json(await buildLeagueTable(filters));
+    }
     const model = publicModels[resource];
     const filter = addQueryFilters(resource, req, resource === "announcements"
       ? { visibleToPublic: true }
@@ -145,25 +153,31 @@ function normalizeMember(member) {
     phone: normalizeText(member?.phone),
     profilePhoto: isAllowedImage(member?.profilePhoto || member?.idCardImage || "") ? (member.profilePhoto || member.idCardImage) : "",
     idCardImage: isAllowedImage(member?.idCardImage || member?.profilePhoto || "") ? (member.idCardImage || member.profilePhoto) : "",
-    verificationToken: normalizeText(member?.verificationToken),
   };
 }
 
-function getVerifiedStatusOrError({ token, registrationNumber, playerRole, playerIndex }) {
-  const payload = verifyRegistrationToken(token, { registrationNumber, playerRole, playerIndex });
-  if (!payload) return { error: "ID verification is required for every player." };
-  return { value: buildVerifiedStatus(payload) };
+const DEFAULT_REGISTRATION_FIELDS = [
+  ["department", "Department", "text", true, true, 1],
+  ["teamName", "Team Name", "text", true, true, 2],
+  ["captainName", "Captain Name", "text", true, true, 3],
+  ["captainRegNo", "Captain Registration Number", "text", true, true, 4],
+  ["captainEmail", "Captain Email", "email", true, true, 5],
+  ["captainPhone", "Captain Phone Number", "tel", true, true, 6],
+];
+
+export async function getPublicRegistrationFields(_req, res) {
+  const saved = await RegistrationField.find().sort({ order: 1, name: 1 }).lean();
+  const fields = saved.length ? saved : DEFAULT_REGISTRATION_FIELDS.map(([name, label, type, enabled, required, order]) => ({ name, label, type, enabled, required, order }));
+  return res.json(fields);
 }
 
-function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, captainIdVerification, members }) {
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, members }) {
   return [
     {
       name: captainName,
       email: captainEmail,
       registrationNumber: captainRegNo,
       role: "captain",
-      idVerified: Boolean(captainIdVerification?.verified),
-      idVerificationStatus: captainIdVerification?.status || "pending",
       profilePhoto: captainProfilePhoto || "",
     },
     ...(members || []).map((member) => ({
@@ -171,8 +185,6 @@ function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfi
       email: member.email || "",
       registrationNumber: member.registrationNo,
       role: "member",
-      idVerified: Boolean(member.idVerification?.verified),
-      idVerificationStatus: member.idVerification?.status || "pending",
       profilePhoto: member.profilePhoto || member.idCardImage || "",
     })),
   ];
@@ -254,6 +266,9 @@ async function assertRegistrationNumbersUnused(registrationNumbers) {
 
 export async function registerPublicTeam(req, res) {
   try {
+    const configuredFields = await RegistrationField.find().lean();
+    const fieldEnabled = (name) => configuredFields.length === 0 || configuredFields.find((field) => field.name === name)?.enabled !== false;
+    const fieldRequired = (name) => configuredFields.find((field) => field.name === name)?.required === true;
     const department = normalizeText(req.body.department).toUpperCase();
     const teamName = normalizeText(req.body.teamName || req.body.name || department);
     const sportDoc = await resolveSport(req);
@@ -270,30 +285,22 @@ export async function registerPublicTeam(req, res) {
       ? (req.body.captainProfilePhoto || req.body.captainIdCardImage)
       : "";
 
-    if (!department || !teamName || !captainName || !captainRegNo || !email || !phone) {
-      return res.status(400).json({ message: "Department, team, captain registration number, captain email, and phone are required" });
+    const values = { department, teamName, captainName, captainRegNo, captainEmail: email, captainPhone: phone };
+    const missing = Object.entries(values).find(([name, value]) => fieldEnabled(name) && fieldRequired(name) && !value);
+    if (missing) {
+      return res.status(400).json({ message: `Please complete the required ${missing[0]} field.` });
     }
 
     if (!["Male", "Female"].includes(category)) {
       return res.status(400).json({ message: "Category must be either Male or Female" });
     }
 
-    if (!isValidEmail(email)) {
+    if (fieldEnabled("captainEmail") && email && !isValidEmail(email)) {
       return res.status(400).json({ message: "Captain email is invalid" });
     }
 
-    if (phone.length !== 10) {
+    if (fieldEnabled("captainPhone") && phone && phone.length !== 10) {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
-    }
-
-    const captainVerification = getVerifiedStatusOrError({
-      token: req.body.captainVerificationToken,
-      registrationNumber: captainRegNo,
-      playerRole: "captain",
-      playerIndex: 0,
-    });
-    if (captainVerification.error) {
-      return res.status(400).json({ message: captainVerification.error });
     }
 
     const members = Array.isArray(req.body.members)
@@ -331,19 +338,7 @@ export async function registerPublicTeam(req, res) {
 
     const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
 
-    const storedMembers = members.map((member, index) => {
-      const memberVerification = getVerifiedStatusOrError({
-        token: member.verificationToken,
-        registrationNumber: member.registrationNumber,
-        playerRole: "member",
-        playerIndex: index,
-      });
-      if (memberVerification.error) {
-        const error = new Error(memberVerification.error);
-        error.status = 400;
-        throw error;
-      }
-      return {
+    const storedMembers = members.map((member) => ({
         fullName: member.fullName,
         registrationNo: member.registrationNumber,
         department: member.department || department,
@@ -353,23 +348,14 @@ export async function registerPublicTeam(req, res) {
         phone: member.phone || "",
         profilePhoto: member.profilePhoto || member.idCardImage || "",
         idCardImage: member.idCardImage || member.profilePhoto || "",
-        idVerification: memberVerification.value,
-      };
-    });
-
-    const captainIdVerification = captainVerification.value;
+      }));
     const allPlayers = buildAllPlayers({
       captainName,
       captainEmail: email,
       captainRegNo,
       captainProfilePhoto,
-      captainIdVerification,
       members: storedMembers,
     });
-
-    if (allPlayers.some((player) => player.idVerificationStatus === "mismatch")) {
-      return res.status(400).json({ message: "Typed registration number does not match the ID card." });
-    }
 
     await assertRegistrationNumbersUnused(registrationNumbers);
 
@@ -409,7 +395,6 @@ export async function registerPublicTeam(req, res) {
       captainPhone: phone,
       captainProfilePhoto,
       captainIdCardImage: captainProfilePhoto,
-      captainIdVerification,
       members: storedMembers,
       allPlayers,
       status: "pending",

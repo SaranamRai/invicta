@@ -425,6 +425,8 @@ export interface GenerateFixturesPayload {
   venueId?: string;
   venue?: string;
   startDate: string;
+  endDate?: string;
+  matchesPerDay?: number;
   dayStartTime: string;
   dayEndTime: string;
   matchDurationMinutes: number;
@@ -815,6 +817,16 @@ export function mapMongoRule(rule: MongoRule) {
 
 export function getPublicFixtures(params?: Record<string, string | undefined>) {
   return publicApiFetch<MongoFixture>(withQuery("/public/fixtures", params));
+}
+
+export interface LeagueTableRow {
+  position: number; teamId: string; team: string; department: string; sportId: string; sport: string;
+  tournamentId: string; tournamentName: string; category: string; played: number; wins: number;
+  draws: number; losses: number; goalsFor: number; goalsAgainst: number; goalDifference: number; points: number;
+}
+
+export function getPublicLeagueTable(params?: Record<string, string | undefined>) {
+  return publicApiFetch<LeagueTableRow>(withQuery("/public/points-table", params));
 }
 
 export function getVolunteerAssignedFixtures(params?: Record<string, string | undefined>) {

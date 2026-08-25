@@ -16,6 +16,8 @@ import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
+import RegistrationField from "../models/RegistrationField.js";
+import { audit } from "../utils/audit.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
 import { sendTeamApprovedEmail, sendTeamRejectedEmail, getEmailErrorMessage } from "../utils/emailService.js";
@@ -653,7 +655,25 @@ export async function deleteRoleAccount(req, res) {
   const account = await model.findByIdAndDelete(id);
   if (!account) return res.status(404).json({ message: "Account not found" });
 
+  await audit(req, "Deleted role account", `${role}: ${account.email}`);
   return res.json({ message: "Account deleted successfully" });
+}
+
+export async function listRegistrationFields(_req, res) {
+  return res.json(await RegistrationField.find().sort({ order: 1, name: 1 }).lean());
+}
+
+export async function replaceRegistrationFields(req, res) {
+  const fields = Array.isArray(req.body.fields) ? req.body.fields : [];
+  const names = new Set(["department", "teamName", "captainName", "captainRegNo", "captainEmail", "captainPhone"]);
+  if (fields.some((field) => !names.has(String(field.name)))) return res.status(400).json({ message: "One or more registration fields are invalid" });
+  await Promise.all(fields.map((field, index) => RegistrationField.findOneAndUpdate(
+    { name: String(field.name) },
+    { name: String(field.name), label: String(field.label || field.name), type: ["text", "email", "tel"].includes(field.type) ? field.type : "text", enabled: field.enabled !== false, required: field.required === true, order: Number.isFinite(Number(field.order)) ? Number(field.order) : index + 1 },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  )));
+  await audit(req, "Updated registration form", `${fields.length} fields configured`);
+  return res.json(await RegistrationField.find().sort({ order: 1, name: 1 }).lean());
 }
 
 export async function listRules(_req, res) {
@@ -730,4 +750,6 @@ export const adminHandlers = {
   updateVenue,
   deleteVenue,
   listPendingRegistrations,
+  listRegistrationFields,
+  replaceRegistrationFields,
 };

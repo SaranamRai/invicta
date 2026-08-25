@@ -5,21 +5,15 @@ import { motion } from "framer-motion";
 import { Download, Trophy } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { Team } from "@/lib/fixture-generator";
-import { MatchData } from "@/lib/types";
-import { getPublicFixtures, getPublicLiveScores, getPublicTeams, getPublicTournaments, mapMongoFixture, mapMongoTeam, TournamentPayload } from "@/lib/api";
-import { buildStandings, getAvailableSports } from "@/lib/live-data";
+import { getPublicLeagueTable, getPublicTournaments, LeagueTableRow, TournamentPayload } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const categories = ["Inter-Department"];
-
 export default function StandingsPage() {
-  const [matches, setMatches] = useState<MatchData[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [standings, setStandings] = useState<LeagueTableRow[]>([]);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [activeSport, setActiveSport] = useState("");
-  const [activeCategory, setActiveCategory] = useState(categories[0] || "");
+  const [activeCategory, setActiveCategory] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -38,23 +32,12 @@ export default function StandingsPage() {
 
     async function loadStandingsData() {
       if (!selectedTournamentId) {
-        setMatches([]);
-        setTeams([]);
+        setStandings([]);
         return;
       }
 
-      const params = { tournamentId: selectedTournamentId };
-      const [fixtures, liveScores, publicTeams] = await Promise.all([
-        getPublicFixtures(params),
-        getPublicLiveScores(params),
-        getPublicTeams(params),
-      ]);
-
-      if (!isMounted) return;
-
-      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-      setMatches(fixtures.map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData));
-      setTeams(publicTeams.map((team) => mapMongoTeam(team) as Team));
+      const rows = await getPublicLeagueTable({ tournamentId: selectedTournamentId });
+      if (isMounted) setStandings(rows);
     };
 
     void loadStandingsData();
@@ -66,19 +49,17 @@ export default function StandingsPage() {
     };
   }, [selectedTournamentId]);
 
-  const sports = useMemo(() => getAvailableSports(teams, matches), [teams, matches]);
+  const sports = useMemo(() => Array.from(new Map(standings.map((row) => [row.sportId || row.sport, row.sport])).entries()).map(([id, name]) => ({ id, name })), [standings]);
+  const categories = useMemo(() => Array.from(new Set(standings.filter((row) => !activeSport || row.sportId === activeSport).map((row) => row.category))).filter(Boolean), [standings, activeSport]);
 
   const activeSportId = activeSport || sports[0]?.id || "";
 
-  const standings = useMemo(
-    () => buildStandings(matches, teams, activeSportId),
-    [matches, teams, activeSportId]
-  );
+  const visibleStandings = useMemo(() => standings.filter((row) => (!activeSportId || row.sportId === activeSportId || row.sport === activeSportId) && (!activeCategory || row.category === activeCategory)), [standings, activeSportId, activeCategory]);
 
   const handleExport = () => {
-    const headers = "Rank,Team,Sport,Played,Won,Lost,Draws,Points\n";
-    const rows = standings
-      .map((team) => `${team.rank},"${team.team}",${team.sport},${team.played},${team.won},${team.lost},${team.draws},${team.pts}`)
+    const headers = "Rank,Team,Sport,Played,Won,Drawn,Lost,Goals For,Goals Against,Points\n";
+    const rows = visibleStandings
+      .map((team) => `${team.position},"${team.team}",${team.sport},${team.played},${team.wins},${team.draws},${team.losses},${team.goalsFor},${team.goalsAgainst},${team.points}`)
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
     const link = document.createElement("a");
@@ -99,7 +80,7 @@ export default function StandingsPage() {
         </div>
         <button
           onClick={handleExport}
-          disabled={standings.length === 0}
+          disabled={visibleStandings.length === 0}
           className="flex items-center gap-3 rounded-xl border-2 border-border bg-card px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Download size={18} /> Download Stats
@@ -182,11 +163,13 @@ export default function StandingsPage() {
                   <th className="px-8 py-5 text-center text-emerald-500">Won</th>
                   <th className="px-8 py-5 text-center text-rose-500">Lost</th>
                   <th className="px-8 py-5 text-center">Drawn</th>
+                  <th className="px-8 py-5 text-center">GF</th>
+                  <th className="px-8 py-5 text-center">GA</th>
                   <th className="px-8 py-5 text-right">POINTS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {standings.length > 0 ? standings.map((team, i) => (
+                {visibleStandings.length > 0 ? visibleStandings.map((team, i) => (
                   <tr key={`${team.sport}-${team.team}`} className={cn("group transition-all hover:bg-secondary/30", i < 3 && "bg-accent/5")}>
                     <td className="px-8 py-6">
                       <span className={cn(
@@ -196,26 +179,28 @@ export default function StandingsPage() {
                         i === 2 ? "bg-amber-700/20 text-amber-900 dark:text-amber-200" :
                         "bg-secondary text-muted-foreground"
                       )}>
-                        {team.rank}
+                        {team.position}
                       </span>
                     </td>
                     <td className="px-8 py-6">
                       <p className="text-lg font-black sport-heading tracking-wide uppercase">{team.team}</p>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-accent">{activeCategory}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-accent">{team.category}</p>
                     </td>
                     <td className="px-8 py-6 text-center text-lg font-bold">{team.played}</td>
-                    <td className="px-8 py-6 text-center text-lg font-black sport-heading text-emerald-500">{team.won}</td>
-                    <td className="px-8 py-6 text-center text-lg font-black sport-heading text-rose-500">{team.lost}</td>
+                    <td className="px-8 py-6 text-center text-lg font-black sport-heading text-emerald-500">{team.wins}</td>
+                    <td className="px-8 py-6 text-center text-lg font-black sport-heading text-rose-500">{team.losses}</td>
                     <td className="px-8 py-6 text-center font-bold text-muted-foreground">{team.draws}</td>
+                    <td className="px-8 py-6 text-center font-bold">{team.goalsFor}</td>
+                    <td className="px-8 py-6 text-center font-bold">{team.goalsAgainst}</td>
                     <td className="px-8 py-6 text-right">
                       <span className="inline-flex h-12 min-w-[80px] items-center justify-center rounded-xl bg-primary px-4 text-xl font-black sport-heading text-primary-foreground shadow-lg shadow-primary/20">
-                        {team.pts}
+                        {team.points}
                       </span>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={7} className="py-20 text-center">
+                    <td colSpan={9} className="py-20 text-center">
                       <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                         No league table data yet. Registered teams and completed matches will appear here automatically.

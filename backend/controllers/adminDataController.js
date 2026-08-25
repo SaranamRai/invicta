@@ -11,6 +11,7 @@ import Announcement from "../models/Announcement.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Result from "../models/Result.js";
+import { audit } from "../utils/audit.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -979,11 +980,16 @@ export async function generateFixtures(req, res) {
   }
 
   const startDate = parseDateOnly(req.body.startDate);
+  const endDate = req.body.endDate ? parseDateOnly(req.body.endDate) : null;
   const dayStartMinutes = parseTimeToMinutes(req.body.dayStartTime, "Day start time");
   const dayEndMinutes = parseTimeToMinutes(req.body.dayEndTime, "Day end time");
   const matchDurationMinutes = parsePositiveMinutes(req.body.matchDurationMinutes, "Match duration");
   const rawGapMinutes = Number(req.body.gapMinutes || 0);
   const gapMinutes = Number.isFinite(rawGapMinutes) && rawGapMinutes > 0 ? Math.floor(rawGapMinutes) : 0;
+  const derivedDailyCapacity = Math.floor((dayEndMinutes - dayStartMinutes + gapMinutes) / (matchDurationMinutes + gapMinutes));
+  const matchesPerDay = req.body.matchesPerDay === undefined || req.body.matchesPerDay === ""
+    ? derivedDailyCapacity
+    : parsePositiveMinutes(req.body.matchesPerDay, "Matches per day");
 
   if (dayEndMinutes <= dayStartMinutes) {
     return res.status(400).json({ message: "Day end time must be after day start time" });
@@ -992,6 +998,8 @@ export async function generateFixtures(req, res) {
   if (dayStartMinutes + matchDurationMinutes > dayEndMinutes) {
     return res.status(400).json({ message: "The match duration does not fit inside the selected day window" });
   }
+  if (matchesPerDay > derivedDailyCapacity) return res.status(400).json({ message: `Unable to generate fixtures: ${matchesPerDay} matches do not fit between the selected start and end times.` });
+  if (endDate && endDate < startDate) return res.status(400).json({ message: "End date must be on or after start date" });
 
   const sportName = sportDoc.sportName || sportDoc.name || "";
   const sport = normalizeSport(sportName);
@@ -1046,9 +1054,18 @@ export async function generateFixtures(req, res) {
     let placed = false;
 
     for (let dayOffset = 0; dayOffset < 365 && !placed; dayOffset += 1) {
+      if (endDate && cursorDate > endDate) break;
       while (!isWeekend(cursorDate)) {
         cursorDate.setDate(cursorDate.getDate() + 1);
         cursorMinutes = dayStartMinutes;
+        if (endDate && cursorDate > endDate) break;
+      }
+      if (endDate && cursorDate > endDate) break;
+
+      if (getSportDateMatchCount(toDateInputValue(cursorDate), sportDoc, [...existingFixtures, ...scheduledFixtures]) >= matchesPerDay) {
+        cursorDate.setDate(cursorDate.getDate() + 1);
+        cursorMinutes = dayStartMinutes;
+        continue;
       }
 
       if (cursorMinutes + matchDurationMinutes > dayEndMinutes) {
@@ -1088,7 +1105,7 @@ export async function generateFixtures(req, res) {
 
     if (!placed) {
       return res.status(400).json({
-        message: `Could not place ${getParticipantName(competitionFixture.teamA, "Team A")} vs ${getParticipantName(competitionFixture.teamB, "Team B")} without a clash inside the next 365 weekend days.`,
+        message: `Unable to generate fixtures with the selected schedule. ${getParticipantName(competitionFixture.teamA, "Team A")} vs ${getParticipantName(competitionFixture.teamB, "Team B")} cannot be placed without a clash${endDate ? " before the selected end date" : " within the next 365 weekend days"}.`,
       });
     }
   }
@@ -1178,4 +1195,41 @@ export async function deleteFixtures(req, res) {
 export async function listPlayers(_req, res) {
   const players = await Player.find().sort({ createdAt: -1 }).lean();
   return res.json(players);
+}
+
+export async function updatePlayer(req, res) {
+  requireObjectId(req.params.id, "Player id");
+  const player = await Player.findById(req.params.id);
+  if (!player) return res.status(404).json({ message: "Player not found" });
+  const editable = ["name", "rollNo", "registrationNo", "department", "semester", "phone", "profilePhoto", "isCaptain"];
+  for (const key of editable) if (req.body[key] !== undefined) player[key] = req.body[key];
+  if (req.body.teamId !== undefined) {
+    requireObjectId(req.body.teamId, "Team id");
+    const team = await Team.findById(req.body.teamId);
+    if (!team) return res.status(400).json({ message: "Assigned team not found" });
+    player.teamId = team._id; player.sportId = team.sportId;
+  }
+  await player.save();
+  await audit(req, "Updated player", `${player.name} (${player._id})`);
+  return res.json(player);
+}
+
+export async function deletePlayer(req, res) {
+  requireObjectId(req.params.id, "Player id");
+  const player = await Player.findById(req.params.id);
+  if (!player) return res.status(404).json({ message: "Player not found" });
+  if (player.teamId) {
+    const team = await Team.findById(player.teamId);
+    if (team) {
+      team.members = (team.members || []).filter((member) => {
+        const name = typeof member === "string" ? member : member?.fullName || member?.name;
+        const regNo = typeof member === "object" ? member?.registrationNo || member?.registrationNumber : "";
+        return name !== player.name && regNo !== player.registrationNo;
+      });
+      await team.save();
+    }
+  }
+  await player.deleteOne();
+  await audit(req, "Deleted player", `${player.name} (${player._id})`);
+  return res.json({ message: "Player deleted successfully" });
 }
