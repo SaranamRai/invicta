@@ -32,10 +32,11 @@ const publicModels = {
 };
 
 function addQueryFilters(resource, req, filter) {
-  const { tournamentId, sportId, category, teamId, fixtureId } = req.query || {};
+  const { tournamentId, sportId, category, date, teamId, fixtureId } = req.query || {};
   if (tournamentId) filter.tournamentId = tournamentId;
   if (sportId) filter.sportId = sportId;
   if (category) filter.category = String(category);
+  if (date && resource === "fixtures") filter.date = String(date);
   if (fixtureId && (resource === "live-scores" || resource === "live-feeds")) filter.fixtureId = fixtureId;
   if (teamId && resource === "fixtures") filter.$or = [{ teamA: teamId }, { teamB: teamId }];
   if (teamId && resource === "teams") filter._id = teamId;
@@ -291,8 +292,8 @@ export async function registerPublicTeam(req, res) {
       return res.status(400).json({ message: `Please complete the required ${missing[0]} field.` });
     }
 
-    if (!["Male", "Female"].includes(category)) {
-      return res.status(400).json({ message: "Category must be either Male or Female" });
+    if (!["Male", "Female", "Mixed"].includes(category)) {
+      return res.status(400).json({ message: "Category must be Male, Female, or Mixed" });
     }
 
     if (fieldEnabled("captainEmail") && email && !isValidEmail(email)) {

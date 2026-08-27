@@ -406,6 +406,7 @@ function CoordinatorDashboardContent() {
           <StatCard icon={UsersRound} label="Volunteers" value={volunteers.length} />
           <StatCard icon={Shield} label="Male Teams" value={assignedTeams.filter((t) => (t.category || "Male") === "Male").length} color="blue" />
           <StatCard icon={ShieldOff} label="Female Teams" value={assignedTeams.filter((t) => (t.category || "Male") === "Female").length} color="pink" />
+          <StatCard icon={Shield} label="Mixed Teams" value={assignedTeams.filter((t) => (t.category || "Male") === "Mixed").length} color="purple" />
           <StatCard icon={UsersRound} label="Total Members" value={totalPlayers} />
         </section>
 
@@ -543,6 +544,7 @@ function CoordinatorDashboardContent() {
                 <option value="">All Categories</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
+                <option value="Mixed">Mixed</option>
               </select>
             </label>
             <label className="space-y-2">
@@ -982,9 +984,10 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
 
 function CategoryPill({ category }: { category: string }) {
   const isFemale = category === "Female";
+  const isMixed = category === "Mixed";
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
-      isFemale ? "bg-pink-500/10 text-pink-400" : "bg-blue-500/10 text-blue-400"
+      isMixed ? "bg-violet-500/10 text-violet-400" : isFemale ? "bg-pink-500/10 text-pink-400" : "bg-blue-500/10 text-blue-400"
     }`}>
       <GenderMark gender={category} className="h-3.5 w-3.5" />
       {category}

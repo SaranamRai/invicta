@@ -145,8 +145,8 @@ export async function submitRegistration(req, res) {
     // Validate required fields
     if (!sportId) return res.status(400).json({ message: "Sport is required" });
     if (!tournamentId) return res.status(400).json({ message: "Tournament is required" });
-    if (!category || !["Male", "Female"].includes(category)) {
-      return res.status(400).json({ message: "Category must be Male or Female" });
+    if (!category || !["Male", "Female", "Mixed"].includes(category)) {
+      return res.status(400).json({ message: "Category must be Male, Female, or Mixed" });
     }
     if (!trimmedDept) return res.status(400).json({ message: "Department is required" });
     if (!trimmedTeamName) return res.status(400).json({ message: "Team name is required" });
@@ -586,7 +586,7 @@ export async function exportApprovedExcel(req, res) {
       const filterSummary = [
         req.query.tournamentName ? `Tournament: ${req.query.tournamentName}` : req.query.tournamentId ? `Tournament ID: ${req.query.tournamentId}` : "Tournament: All",
         req.query.sportName ? `Sport: ${req.query.sportName}` : filters.sportId ? `Sport ID: ${filters.sportId}` : "Sport: All sports",
-        filters.category ? `Category: ${filters.category}` : "Category: Male and Female",
+        filters.category ? `Category: ${filters.category}` : "Category: Male, Female, and Mixed",
       ];
 
       const summary = workbook.addWorksheet("Summary");

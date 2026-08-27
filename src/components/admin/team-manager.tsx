@@ -100,7 +100,7 @@ export function TeamManager({
 
   const [name, setName] = useState("");
   const [sport, setSport] = useState("");
-  const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [category, setCategory] = useState<"Male" | "Female" | "Mixed">("Male");
   const [department, setDepartment] = useState("");
   const [captainName, setCaptainName] = useState("");
   const [captainRegNo, setCaptainRegNo] = useState("");
@@ -205,7 +205,7 @@ export function TeamManager({
       (s) => s.sportName?.toLowerCase().replace(/\s+/g, "-") === team.sport || s._id === team.sport
     );
     setSport(matched?._id || team.sport);
-    setCategory((team.category as "Male" | "Female") || "Male");
+    setCategory((team.category as "Male" | "Female" | "Mixed") || "Male");
     setDepartment(team.department || "");
     setCaptainName(team.coachCaptain || "");
     setCaptainRegNo(team.captainRegNo || "");
@@ -359,10 +359,11 @@ export function TeamManager({
                   </div>
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Category *</label>
-                    <select value={category} onChange={(e) => setCategory(e.target.value as "Male" | "Female")}
+                    <select value={category} onChange={(e) => setCategory(e.target.value as "Male" | "Female" | "Mixed")}
                       className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-2.5 text-white focus:outline-none focus:border-accent transition-all">
                       <option value="Male" className="bg-slate-950 text-white">Male</option>
                       <option value="Female" className="bg-slate-950 text-white">Female</option>
+                      <option value="Mixed" className="bg-slate-950 text-white">Mixed</option>
                     </select>
                   </div>
                   <div>

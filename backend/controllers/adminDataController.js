@@ -12,6 +12,7 @@ import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Result from "../models/Result.js";
 import { audit } from "../utils/audit.js";
+import { assertSupportedMatchCategory } from "../utils/matchCategories.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -873,11 +874,21 @@ export async function replaceFixtures(req, res) {
 
     const sport = normalizeSport(fixture.sport || teamA.sport);
     const sportDoc = await getOrCreateSport(sport);
+    let category;
+    try {
+      category = assertSupportedMatchCategory(fixture.category || teamA.category, sportDoc);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    if (teamA.category !== category || teamB.category !== category) {
+      return res.status(400).json({ message: "Both teams must belong to the selected match category" });
+    }
 
     const created = await Fixture.create({
       sport,
       sportName: sportDoc.name,
       sportId: sportDoc._id,
+      category,
       matchTitle: `${teamA.teamName} vs ${teamB.teamName}`,
       teamA: teamA._id,
       teamB: teamB._id,
@@ -918,12 +929,22 @@ export async function createFixture(req, res) {
   const sportDoc = await Sport.findById(sportId);
   if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
 
+  let category;
+  try {
+    category = assertSupportedMatchCategory(req.body.category || teamA.category, sportDoc);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+  if (teamA.category !== category || teamB.category !== category) {
+    return res.status(400).json({ message: "Both teams must belong to the selected match category" });
+  }
+
   const sportName = sportDoc.sportName || sportDoc.name;
   const payload = {
     sport: normalizeSport(sportName),
     sportName,
     sportId: sportDoc._id,
-    category: req.body.category || teamA.category || "Male",
+    category,
     matchTitle: normalizeText(req.body.matchTitle || `${teamA.teamName} vs ${teamB.teamName}`),
     teamA: teamA._id,
     teamB: teamB._id,
@@ -953,11 +974,6 @@ export async function generateFixtures(req, res) {
   requireObjectId(req.body.tournamentId, "Tournament id");
   requireObjectId(req.body.sportId, "Sport id");
 
-  const category = req.body.category === "Female" ? "Female" : req.body.category === "Male" ? "Male" : "";
-  if (!category) {
-    return res.status(400).json({ message: "Category must be Male or Female" });
-  }
-
   const [tournament, sportDoc] = await Promise.all([
     Tournament.findById(req.body.tournamentId),
     Sport.findById(req.body.sportId),
@@ -965,6 +981,12 @@ export async function generateFixtures(req, res) {
 
   if (!tournament) return res.status(400).json({ message: "Tournament not found" });
   if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
+  let category;
+  try {
+    category = assertSupportedMatchCategory(req.body.category, sportDoc);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 
   const venueName = normalizeText(req.body.venue);
   if (!venueName && !req.body.venueId) {
@@ -1136,6 +1158,20 @@ export async function updateFixture(req, res) {
   const existing = await Fixture.findById(req.params.id);
   if (!existing) return res.status(404).json({ message: "Fixture not found" });
 
+  let category = existing.category;
+  if (req.body.category !== undefined) {
+    const sportDoc = await Sport.findById(existing.sportId);
+    try {
+      category = assertSupportedMatchCategory(req.body.category, sportDoc);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    const [teamA, teamB] = await Promise.all([Team.findById(existing.teamA).lean(), Team.findById(existing.teamB).lean()]);
+    if (!teamA || !teamB || teamA.category !== category || teamB.category !== category) {
+      return res.status(400).json({ message: "Both teams must belong to the selected match category" });
+    }
+  }
+
   const updatePayload = {
     ...existing.toObject(),
     ...req.body,
@@ -1152,6 +1188,7 @@ export async function updateFixture(req, res) {
       endTime: end,
       fullMatchSeconds: existing.fullMatchSeconds || 90 * 60,
       matchGapMinutes: existing.matchGapMinutes || 0,
+      category,
       status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
       scoreA: Number(req.body.scoreA || 0),
       scoreB: Number(req.body.scoreB || 0),

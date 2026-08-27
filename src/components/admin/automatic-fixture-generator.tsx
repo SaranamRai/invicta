@@ -53,15 +53,15 @@ function getSportNameFromFixture(fixture: AdminFixturePayload) {
 }
 
 function getFixtureCategory(fixture: AdminFixturePayload) {
-  return fixture.category === "Female" ? "Female" : "Male";
+  return fixture.category === "Female" || fixture.category === "Mixed" ? fixture.category : "Male";
 }
 
 function getFixtureGroupName(fixture: AdminFixturePayload) {
   return `${getSportNameFromFixture(fixture)} ${getFixtureCategory(fixture)}`;
 }
 
-function getFixtureCategories(sport: MongoSport): ("Male" | "Female")[] {
-  const categories = (sport.categories || []).filter((item): item is "Male" | "Female" => item === "Male" || item === "Female");
+function getFixtureCategories(sport: MongoSport): ("Male" | "Female" | "Mixed")[] {
+  const categories = (sport.categories || []).filter((item): item is "Male" | "Female" | "Mixed" => item === "Male" || item === "Female" || item === "Mixed");
   return categories.length ? categories : ["Male", "Female"];
 }
 
@@ -379,7 +379,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
 
   const [tournamentId, setTournamentId] = useState("");
   const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
-  const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female")[]>>({});
+  const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female" | "Mixed")[]>>({});
   const [venueBySport, setVenueBySport] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState(getTodayInputValue());
   const [endDate, setEndDate] = useState("");

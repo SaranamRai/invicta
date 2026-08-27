@@ -222,7 +222,7 @@ export async function listPendingRegistrations(_req, res) {
 function normalizeSportPayload(body) {
   const sportName = String(body.sportName || body.name || "").trim().replace(/\s+/g, " ");
   const categories = Array.isArray(body.categories) && body.categories.length
-    ? body.categories.filter((category) => ["Male", "Female"].includes(category))
+    ? body.categories.filter((category) => ["Male", "Female", "Mixed"].includes(category))
     : ["Male", "Female"];
 
   return applyRecommendedPlayerCounts({

@@ -50,7 +50,7 @@ const teamRegistrationSchema = new mongoose.Schema(
     tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament", default: null },
     tournamentName: { type: String, default: "", trim: true },
     sportName: { type: String, required: true, trim: true },
-    category: { type: String, enum: ["Male", "Female"], required: true },
+    category: { type: String, enum: ["Male", "Female", "Mixed"], required: true },
     department: { type: String, required: true, trim: true, uppercase: true },
     teamName: { type: String, required: true, trim: true },
     teamLogo: { type: String, default: "" },

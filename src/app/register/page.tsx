@@ -77,7 +77,7 @@ function RegisterPageContent() {
   const [teamName, setTeamName] = useState("");
   const [tournamentId, setTournamentId] = useState("");
   const [sportId, setSportId] = useState("");
-  const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [category, setCategory] = useState<"Male" | "Female" | "Mixed">("Male");
   const [tournamentOptions, setTournamentOptions] = useState<TournamentPayload[]>([]);
   const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [members, setMembers] = useState<MemberInput[]>([]);
@@ -439,7 +439,7 @@ function RegisterPageContent() {
                   </select>
                 </Field>
                 <Field label="Category *">
-                  <select value={category} onChange={(e) => { setCategory(e.target.value as "Male" | "Female"); setMembers([]); }} className="input-light" required>
+                  <select value={category} onChange={(e) => { setCategory(e.target.value as "Male" | "Female" | "Mixed"); setMembers([]); }} className="input-light" required>
                     {sportCategories.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}

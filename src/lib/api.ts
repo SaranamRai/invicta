@@ -421,7 +421,7 @@ export function replaceAdminFixtures(fixtures: Omit<AdminFixturePayload, "id">[]
 export interface GenerateFixturesPayload {
   tournamentId: string;
   sportId: string;
-  category: "Male" | "Female";
+  category: "Male" | "Female" | "Mixed";
   venueId?: string;
   venue?: string;
   startDate: string;
@@ -496,6 +496,7 @@ export interface MongoFixture {
   sportId?: MongoRefName | string;
   sport?: string;
   sportName?: string;
+  category?: "Male" | "Female" | "Mixed";
   matchTitle?: string;
   teamA?: MongoRefName | string;
   teamB?: MongoRefName | string;
@@ -589,7 +590,7 @@ export interface MongoSport {
   _id: string;
   sportName?: string;
   name?: string;
-  categories?: ("Male" | "Female")[];
+  categories?: ("Male" | "Female" | "Mixed")[];
   type?: "indoor" | "outdoor";
   rules?: string;
   minPlayers?: number;
@@ -748,6 +749,7 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     sportName,
     tournamentId: typeof fixture.tournamentId === "string" ? fixture.tournamentId : fixture.tournamentId?._id || fixture.tournamentId?.id || "",
     tournamentName: fixture.tournamentName || getRefName(fixture.tournamentId, ""),
+    category: fixture.category,
     type: fixture.round || sportName || "Match",
     scoreA: Number(liveScore?.teamAScore ?? fixture.scoreA ?? 0),
     scoreB: Number(liveScore?.teamBScore ?? fixture.scoreB ?? 0),
@@ -1187,7 +1189,7 @@ export function getAdminSports() {
 
 export function createAdminSport(payload: {
   sportName: string;
-  categories?: ("Male" | "Female")[];
+  categories?: ("Male" | "Female" | "Mixed")[];
   type?: "indoor" | "outdoor";
   rules?: string;
   minPlayers?: number;
@@ -1243,7 +1245,7 @@ export interface TeamRegistrationPayload {
   tournamentName: string;
   sportId: string;
   sportName: string;
-  category: "Male" | "Female";
+  category: "Male" | "Female" | "Mixed";
   department: string;
   teamName: string;
   teamLogo?: string;

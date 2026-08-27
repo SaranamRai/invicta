@@ -107,7 +107,7 @@ export async function sendAccountCreatedEmail({ name, email, role, assignedSport
     `<tr><td><strong>Password</strong></td><td>${password}</td></tr>` +
     `</table>` +
     `<p><a href="${loginLink}">Login here: ${loginLink}</a></p>` +
-    (assignedSport ? `<p><strong>Important:</strong> You can access only your assigned sport and its Male/Female categories.</p>` : "") +
+    (assignedSport ? `<p><strong>Important:</strong> You can access only your assigned sport and its configured match categories.</p>` : "") +
     `<p>Please change your password after first login.</p>` +
     (role === "volunteer" ? `<p>To change your password, contact the Super Coordinator at the MSU Invicta email.</p>` : "") +
     `<hr>` +

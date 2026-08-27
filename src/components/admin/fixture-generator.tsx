@@ -152,7 +152,10 @@ export function FixtureGenerator({
                     {sport.name}
                   </label>
                   <div className="mt-3 flex gap-2">
-                    {["Male", "Female"].map((category) => (
+                    {(Array.from(new Set(teams.filter((team) => team.sport === sport.id).map((team) => team.category).filter((category): category is string => Boolean(category)))).length
+                      ? Array.from(new Set(teams.filter((team) => team.sport === sport.id).map((team) => team.category).filter((category): category is string => Boolean(category))))
+                      : ["Male", "Female"]
+                    ).map((category) => (
                       <label key={category} className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         <input
                           type="checkbox"

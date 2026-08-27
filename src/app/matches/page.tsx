@@ -35,6 +35,7 @@ export default function MatchesPage() {
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [selectedSport, setSelectedSport] = useState("All Sports");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [liveFeeds, setLiveFeeds] = useState<LiveFeedPost[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -47,7 +48,11 @@ export default function MatchesPage() {
 
     async function loadMatches() {
       const [fixtures, liveScores, feeds, publicTournaments] = await Promise.all([
-        getPublicFixtures(),
+        getPublicFixtures({
+          tournamentId: selectedTournamentId || undefined,
+          category: selectedCategory === "All" ? undefined : selectedCategory,
+          date: getDateKey(selectedDate) || undefined,
+        }),
         getPublicLiveScores(),
         getPublicLiveFeeds(),
         getPublicTournaments(),
@@ -86,7 +91,7 @@ export default function MatchesPage() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [selectedTournamentId, selectedCategory, selectedDate]);
 
   React.useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -115,6 +120,7 @@ export default function MatchesPage() {
 
   const filteredMatches = tournamentFilteredMatches.filter(match => {
     if (selectedSport !== "All Sports" && match.sport !== selectedSport) return false;
+    if (selectedCategory !== "All" && match.category !== selectedCategory) return false;
     if (activeTab === "All Matches") return true;
     return match.status === activeTab;
   });
@@ -330,6 +336,19 @@ export default function MatchesPage() {
             ))}
           </select>
         </label>
+        <label className="flex w-full flex-col gap-2 sm:max-w-xs">
+          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Category</span>
+          <select
+            value={selectedCategory}
+            onChange={(event) => { setSelectedCategory(event.target.value); setSelectedMatchId(null); }}
+            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
+          >
+            <option value="All">All</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Mixed">Mixed</option>
+          </select>
+        </label>
       </div>
 
       {/* Two-column layout: Matches (left) + Live Feed (right) */}
@@ -414,7 +433,7 @@ export default function MatchesPage() {
                               {match.status === "Upcoming" ? "00" : (match.scoreB ?? 0).toString().padStart(2, "0")}
                             </span>
                           </div>
-                          <span className="text-[10px] font-black uppercase text-accent tracking-[0.4em] sport-heading">{match.sport}</span>
+                          <span className="text-[10px] font-black uppercase text-accent tracking-[0.4em] sport-heading">{match.sport} · {match.category || "Unclassified"}</span>
                           <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.3em]">{getMatchPeriod(match)}</span>
                         </div>
 

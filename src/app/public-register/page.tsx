@@ -15,7 +15,7 @@ const phoneNumber = (value: string) => value.replace(/\D/g, "").slice(0, 10);
 export default function PublicRegisterPage() {
   const [captainName, setCaptainName] = useState(""); const [captainRegNo, setCaptainRegNo] = useState("");
   const [email, setEmail] = useState(""); const [phone, setPhone] = useState(""); const [department, setDepartment] = useState("");
-  const [tournamentId, setTournamentId] = useState(""); const [sportId, setSportId] = useState(""); const [category, setCategory] = useState<"Male" | "Female">("Male");
+  const [tournamentId, setTournamentId] = useState(""); const [sportId, setSportId] = useState(""); const [category, setCategory] = useState<"Male" | "Female" | "Mixed">("Male");
   const [members, setMembers] = useState<Member[]>([]); const [tournaments, setTournaments] = useState<TournamentPayload[]>([]); const [sports, setSports] = useState<MongoSport[]>([]);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle"); const [message, setMessage] = useState("");
   const openTournaments = useMemo(() => tournaments.filter((item) => item.registrationOpen), [tournaments]);

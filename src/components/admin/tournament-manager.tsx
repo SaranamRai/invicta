@@ -54,7 +54,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
   const [sportName, setSportName] = useState("");
   const [sportType, setSportType] = useState<"indoor" | "outdoor">("outdoor");
   const [sportStatus, setSportStatus] = useState<"active" | "inactive">("active");
-  const [sportCategories, setSportCategories] = useState<("Male" | "Female")[]>(["Male", "Female"]);
+  const [sportCategories, setSportCategories] = useState<("Male" | "Female" | "Mixed")[]>(["Male", "Female"]);
   const [venueName, setVenueName] = useState("");
   const [venueLocation, setVenueLocation] = useState("");
   const [venueSportType, setVenueSportType] = useState("both");
@@ -429,7 +429,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
               <option value="inactive">Inactive</option>
             </select>
             <div className="flex min-h-12 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/60 px-3">
-              {(["Male", "Female"] as const).map((category) => (
+              {(["Male", "Female", "Mixed"] as const).map((category) => (
                 <label key={category} className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-300">
                   <input
                     type="checkbox"

@@ -6,7 +6,7 @@ const sportSchema = new mongoose.Schema(
     name: { type: String, trim: true },
     categories: {
       type: [String],
-      enum: ["Male", "Female"],
+      enum: ["Male", "Female", "Mixed"],
       default: ["Male", "Female"],
     },
     type: { type: String, enum: ["indoor", "outdoor"], default: "outdoor" },
