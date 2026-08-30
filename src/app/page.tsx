@@ -70,26 +70,26 @@ export default function LandingPage() {
       <main>
         <section id="home" className="relative isolate overflow-hidden pt-28 pb-10 sm:pt-32 lg:pt-36">
           <div className="landing-hero-shell relative mx-auto max-w-[1400px] overflow-hidden rounded-none border-y border-[#ede2d0] bg-[#f6f1ea] px-3 pb-8 pt-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)] sm:px-6 sm:pb-10 lg:px-10 lg:pt-8 xl:px-12">
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.38)_30%,rgba(255,255,255,0.18)_48%,rgba(255,255,255,0.04)_100%)]" />
+            <div className="landing-hero-light absolute inset-0" />
             <div className="landing-hero-photo absolute inset-0">
               <div className="landing-hero-image absolute inset-0" />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.28)_0%,rgba(255,255,255,0.1)_30%,transparent_52%)]" />
+              <div className="landing-hero-overlay absolute inset-0" />
             </div>
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#f6f1ea] via-[#f6f1ea]/60 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#07111f] via-[#07111f]/55 to-transparent" />
             <div className="relative z-10 mx-auto max-w-[1280px] px-2 pb-2 pt-4 sm:px-4 lg:pb-6">
               <div className="flex flex-col gap-3 lg:gap-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.42em] text-[#d0992d] sm:text-xs lg:text-sm">
+                <p className="text-[10px] font-black uppercase tracking-[0.42em] text-[#f7d77a] sm:text-xs lg:text-sm">
                   Invicta | Sports Tournament Management Platform
                 </p>
 
                 <div className="max-w-[1050px]">
-                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#0b1420] drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] sm:text-[4.8rem] lg:text-[9rem]">
-                    <span className="block">BUILDING</span>
+                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#07111f] drop-shadow-[0_10px_22px_rgba(0,0,0,0.38)] sm:text-[4.8rem] lg:text-[9rem]">
+                    <span className="landing-building-word block">BUILDING</span>
                     <span className="landing-gold-text block">CHAMPIONS</span>
                   </h1>
                 </div>
 
-                <p className="max-w-[900px] text-[9px] font-black uppercase leading-[1.8] tracking-[0.18em] text-[#1b1b1b]/75 sm:text-[10px] lg:text-[13px]">
+                <p className="max-w-[900px] text-[9px] font-black uppercase leading-[1.8] tracking-[0.18em] text-[#e2e8f0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-[10px] lg:text-[13px]">
                   Follow live scores, explore sports, register teams,
                   <br className="hidden sm:block" />
                   and track tournament progress in one simple place.
@@ -105,7 +105,7 @@ export default function LandingPage() {
                   </Link>
                   <Link
                     href="/standings"
-                    className="inline-flex items-center justify-center gap-3 border border-[#201d1d]/10 bg-transparent px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-[#111827] transition-all hover:border-[#d99d2b] hover:text-[#d99d2b] sm:text-xs"
+                    className="inline-flex items-center justify-center gap-3 border border-[#f7d77a]/80 bg-[#07111f]/20 px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-[#e2e8f0] shadow-[0_0_0_1px_rgba(247,215,122,0.3)] backdrop-blur-[2px] transition-all hover:border-[#f7d77a] hover:text-[#fef3c7] sm:text-xs"
                   >
                     View Standings
                   </Link>

@@ -519,59 +519,89 @@ a {
 }
 
 .landing-hero-shell {
-  background: linear-gradient(180deg, rgba(250,247,242,0.94), rgba(245,239,231,0.94));
+  background: linear-gradient(180deg, rgba(250,247,242,0.96), rgba(240,236,230,0.96));
   min-height: 620px;
 }
 
 :root[data-theme="dark"] .landing-hero-shell {
-  background: linear-gradient(180deg, rgba(6,9,18,0.92), rgba(15,23,42,0.88));
+  background: linear-gradient(180deg, rgba(7,17,31,0.96), rgba(7,17,31,0.96));
+}
+
+.landing-hero-light {
+  background: linear-gradient(90deg, rgba(9, 15, 24, 0.78) 0%, rgba(9, 15, 24, 0.6) 18%, rgba(9,15,24,0.26) 38%, rgba(9,15,24,0.08) 60%, transparent 100%);
+}
+
+:root[data-theme="dark"] .landing-hero-light {
+  background: linear-gradient(90deg, rgba(7,17,31,0.92) 0%, rgba(7,17,31,0.78) 20%, rgba(7,17,31,0.34) 46%, rgba(7,17,31,0.08) 65%, transparent 100%);
 }
 
 .landing-hero-photo {
   opacity: 1;
-  filter: saturate(0.9) contrast(1.05) brightness(0.72);
   mix-blend-mode: normal;
-  background:
-    linear-gradient(90deg, rgba(8, 12, 20, 0.78) 0%, rgba(18, 20, 29, 0.62) 24%, rgba(18, 20, 29, 0.18) 52%, rgba(18, 20, 29, 0.7) 100%),
-    radial-gradient(circle at 76% 28%, rgba(251,146,60,0.18), transparent 22%),
-    radial-gradient(circle at 64% 46%, rgba(255,166,0,0.14), transparent 20%);
 }
 
 .landing-hero-image {
   background-image: url("/landingpage.jpeg");
-  background-position: center center;
+  background-position: 62% center;
   background-size: cover;
   background-repeat: no-repeat;
-  transform: scale(1.12);
-  filter: saturate(0.82) contrast(1.08) brightness(0.68);
-  opacity: 0.96;
+  transform: scale(1.15);
+  filter: grayscale(42%) contrast(1.35) brightness(0.82) sepia(0.42) hue-rotate(180deg) saturate(0.34);
+  opacity: 1;
   mask-image: none;
   -webkit-mask-image: none;
 }
 
-:root[data-theme="dark"] .landing-hero-photo {
-  filter: saturate(0.9) contrast(1.08) brightness(0.72);
+.landing-hero-overlay {
+  position: absolute;
+  inset: 0;
   background:
-    linear-gradient(90deg, rgba(5, 8, 17, 0.82) 0%, rgba(15, 23, 42, 0.72) 26%, rgba(15, 23, 42, 0.22) 52%, rgba(15, 23, 42, 0.8) 100%),
-    radial-gradient(circle at 76% 28%, rgba(251,146,60,0.18), transparent 22%),
-    radial-gradient(circle at 64% 46%, rgba(255,166,0,0.12), transparent 20%);
+    linear-gradient(90deg, rgba(7, 17, 31, 0.9) 0%, rgba(7, 17, 31, 0.76) 24%, rgba(7, 17, 31, 0.3) 52%, rgba(7, 17, 31, 0.62) 100%),
+    linear-gradient(180deg, rgba(7,17,31,0.2) 0%, rgba(7,17,31,0.12) 48%, rgba(7,17,31,0.7) 100%),
+    radial-gradient(circle at 70% 28%, rgba(252,211,77,0.14), transparent 18%);
 }
 
 :root[data-theme="dark"] .landing-hero-image {
-  filter: saturate(0.9) contrast(1.06) brightness(0.8) blur(0.12px);
+  filter: grayscale(42%) contrast(1.36) brightness(0.72) sepia(0.48) hue-rotate(180deg) saturate(0.3);
 }
 
 @media (max-width: 768px) {
-  .landing-hero-photo {
-    opacity: calc(var(--landing-photo-opacity) * 0.74);
-  }
-
   .landing-hero-image {
-    background-position: center center;
-    transform: scale(1.14);
-    mask-image: none;
-    -webkit-mask-image: none;
+    background-position: 58% center;
+    transform: scale(1.22);
+    filter: grayscale(40%) contrast(1.25) brightness(0.9) sepia(0.38) hue-rotate(180deg) saturate(0.38);
   }
+}
+
+.landing-building-word {
+  display: block;
+  color: rgba(7, 17, 31, 0.98);
+  text-shadow: 0 4px 18px rgba(12, 18, 29, 0.22);
+}
+
+.landing-gold-text {
+  background: linear-gradient(135deg, #fff0ba 0%, #f3c85a 24%, #f9ce4a 48%, #c68a1e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35));
+}
+
+:root[data-theme="dark"] .landing-display {
+  color: #f8fafc;
+  text-shadow: 0 6px 22px rgba(0,0,0,0.34);
+}
+
+:root[data-theme="dark"] .landing-gold-text {
+  filter: drop-shadow(0 6px 18px rgba(252, 211, 77, 0.22));
+}
+
+:root[data-theme="dark"] .landing-page p,
+:root[data-theme="dark"] .landing-page .landing-display,
+:root[data-theme="dark"] .landing-page .landing-slant,
+:root[data-theme="dark"] .landing-page .landing-navbar {
+  color-scheme: dark;
 }
 
 .landing-display {
