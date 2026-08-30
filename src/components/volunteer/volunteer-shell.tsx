@@ -20,7 +20,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   return (
-    <div className="dashboard-surface flex min-h-screen overflow-x-hidden bg-background text-foreground md:h-screen md:flex-row md:overflow-hidden">
+    <div className="dashboard-surface flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground md:h-screen md:flex-row md:overflow-hidden">
       <div className="flex w-full flex-col border-b border-border bg-card md:h-screen md:w-72 md:shrink-0 md:overflow-hidden md:border-b-0 md:border-r">
         <div className="border-b border-border p-3 sm:p-6">
           <div className="flex flex-wrap items-center gap-3 md:block md:space-y-4">
@@ -63,7 +63,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="relative min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
         <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-4 backdrop-blur-xl sm:px-8 md:px-12 md:py-5">
           <div className="flex min-w-0 items-center gap-4">
             <div className="min-w-0">
