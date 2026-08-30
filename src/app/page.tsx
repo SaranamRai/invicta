@@ -83,7 +83,7 @@ export default function LandingPage() {
                 </p>
 
                 <div className="max-w-[1050px]">
-                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#0b1420] sm:text-[4.8rem] lg:text-[9rem]">
+                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#0b1420] drop-shadow-[0_6px_18px_rgba(0,0,0,0.18)] sm:text-[4.8rem] lg:text-[9rem]">
                     <span className="block">BUILDING</span>
                     <span className="landing-gold-text block">CHAMPIONS</span>
                   </h1>
