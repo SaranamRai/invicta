@@ -492,6 +492,17 @@ a {
 
 .landing-page {
   color-scheme: light dark;
+  --hero-glow: rgba(245, 158, 11, 0.22);
+  --hero-veil: rgba(255, 255, 255, 0.9);
+  --hero-veil-soft: rgba(255, 247, 227, 0.68);
+  --hero-panel: rgba(255, 255, 255, 0.45);
+}
+
+:root[data-theme="dark"] .landing-page {
+  --hero-glow: rgba(245, 158, 11, 0.16);
+  --hero-veil: rgba(2, 6, 23, 0.8);
+  --hero-veil-soft: rgba(15, 23, 42, 0.66);
+  --hero-panel: rgba(15, 23, 42, 0.52);
 }
 
 .landing-navbar {
@@ -502,35 +513,43 @@ a {
 
 :root[data-theme="dark"] .landing-navbar {
   background-image:
-    linear-gradient(135deg, rgba(2, 6, 23, 0.76), rgba(15, 23, 42, 0.58)),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.8), rgba(15, 23, 42, 0.62)),
     linear-gradient(90deg, rgba(252, 211, 77, 0.16), transparent 46%);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
 .landing-hero-photo {
   opacity: var(--landing-photo-opacity);
-  filter: saturate(1.18) contrast(1.06) brightness(1.06);
+  filter: saturate(1.1) contrast(1.08) brightness(1.03);
   mix-blend-mode: multiply;
+  background: radial-gradient(circle at 24% 30%, var(--hero-glow), transparent 34%),
+    radial-gradient(circle at 76% 38%, rgba(251, 146, 60, 0.24), transparent 25%);
 }
 
 .landing-hero-image {
   background-image: url("/landingpage.jpeg");
   background-position: 72% center;
   background-size: cover;
+  background-repeat: no-repeat;
   transform: scale(1.06);
+  filter: saturate(1.15) contrast(1.05) brightness(1.04);
   mask-image:
-    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 18%, rgba(0, 0, 0, 0.82) 42%, #000 100%),
-    linear-gradient(180deg, transparent 0%, #000 14%, #000 74%, transparent 100%);
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.14) 16%, rgba(0, 0, 0, 0.76) 44%, #000 100%),
+    linear-gradient(180deg, transparent 0%, #000 12%, #000 78%, transparent 100%);
   mask-composite: intersect;
   -webkit-mask-image:
-    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.18) 18%, rgba(0, 0, 0, 0.82) 42%, #000 100%),
-    linear-gradient(180deg, transparent 0%, #000 14%, #000 74%, transparent 100%);
+    linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.14) 16%, rgba(0, 0, 0, 0.76) 44%, #000 100%),
+    linear-gradient(180deg, transparent 0%, #000 12%, #000 78%, transparent 100%);
   -webkit-mask-composite: source-in;
 }
 
 :root[data-theme="dark"] .landing-hero-photo {
-  filter: saturate(1.1) contrast(1.08) brightness(0.92);
+  filter: saturate(1.08) contrast(1.12) brightness(0.86);
   mix-blend-mode: screen;
+}
+
+:root[data-theme="dark"] .landing-hero-image {
+  filter: saturate(1.12) contrast(1.08) brightness(0.82) blur(0.2px);
 }
 
 @media (max-width: 768px) {
