@@ -82,14 +82,14 @@ export default function LandingPage() {
                   Invicta | Sports Tournament Management Platform
                 </p>
 
-                <div className="max-w-[1100px]">
-                  <h1 className="landing-display text-[4.5rem] font-black leading-[0.8] tracking-[-0.045em] text-[#0b1420] sm:text-[6rem] lg:text-[11rem]">
+                <div className="max-w-[1050px]">
+                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#0b1420] sm:text-[4.8rem] lg:text-[9rem]">
                     <span className="block">BUILDING</span>
                     <span className="landing-gold-text block">CHAMPIONS</span>
                   </h1>
                 </div>
 
-                <p className="max-w-[980px] text-[11px] font-black uppercase leading-[1.9] tracking-[0.22em] text-[#1b1b1b]/75 sm:text-[12px] lg:text-[15px]">
+                <p className="max-w-[900px] text-[9px] font-black uppercase leading-[1.8] tracking-[0.18em] text-[#1b1b1b]/75 sm:text-[10px] lg:text-[13px]">
                   Follow live scores, explore sports, register teams,
                   <br className="hidden sm:block" />
                   and track tournament progress in one simple place.
