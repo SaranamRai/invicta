@@ -33,17 +33,30 @@ export function Header() {
     let isMounted = true;
 
     async function loadNotifications() {
+      if (document.visibilityState === "hidden") return;
       const announcements = await getPublicAnnouncements();
       if (!isMounted) return;
       setNotifications(announcements.map(mapMongoAnnouncement).slice(0, 5));
     }
 
     void loadNotifications();
-    const interval = window.setInterval(loadNotifications, 15000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    }, 60000);
+    const visibilityListener = () => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    };
+
+    document.addEventListener("visibilitychange", visibilityListener);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", visibilityListener);
     };
   }, []);
 

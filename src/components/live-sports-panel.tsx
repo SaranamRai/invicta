@@ -116,13 +116,27 @@ export function LiveSportsPanel({
   };
 
   useEffect(() => {
-    loadMatches();
-    const refreshInterval = window.setInterval(loadMatches, 15000);
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        void loadMatches();
+      }
+    };
+
+    refresh();
+    const refreshInterval = window.setInterval(refresh, 60000);
     const clockInterval = window.setInterval(() => setNow(Date.now()), 1000);
+    const visibilityListener = () => {
+      if (document.visibilityState === "visible") {
+        void loadMatches();
+      }
+    };
+
+    document.addEventListener("visibilitychange", visibilityListener);
 
     return () => {
       window.clearInterval(refreshInterval);
       window.clearInterval(clockInterval);
+      document.removeEventListener("visibilitychange", visibilityListener);
     };
   }, []);
 

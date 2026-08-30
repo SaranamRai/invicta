@@ -78,6 +78,7 @@ export default function PublicDashboard() {
     let isMounted = true;
 
     async function loadPublicData() {
+      if (document.visibilityState === "hidden") return;
       const [fixtures, liveScores, teams, tournaments] = await Promise.all([
         getPublicFixtures(),
         getPublicLiveScores(),
@@ -95,14 +96,26 @@ export default function PublicDashboard() {
       );
       setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
       setTournaments(tournaments);
-    };
+    }
 
     void loadPublicData();
-    const interval = window.setInterval(loadPublicData, 15000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadPublicData();
+      }
+    }, 60000);
+    const visibilityListener = () => {
+      if (document.visibilityState === "visible") {
+        void loadPublicData();
+      }
+    };
+
+    document.addEventListener("visibilitychange", visibilityListener);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", visibilityListener);
     };
   }, []);
 
