@@ -43,18 +43,18 @@ export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
       <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-5">
-        <div className="landing-navbar mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-background/72 px-3 py-3 shadow-2xl shadow-black/10 backdrop-blur-2xl sm:gap-5 sm:px-5 lg:flex-nowrap">
+        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-3 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-5 sm:px-5 lg:flex-nowrap">
           <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center gap-3">
             <MedhaviLogo className="h-12 w-36 sm:h-14 sm:w-44 lg:h-16 lg:w-52" />
             <InvictaLogo className="h-10 w-32 sm:h-11 sm:w-40 lg:h-12 lg:w-48" />
           </Link>
 
-          <nav className="order-3 flex w-full items-center justify-center gap-1 rounded-xl border border-border/70 bg-card/55 p-1 sm:gap-2 lg:order-none lg:w-auto">
+          <nav className="order-3 flex w-full items-center justify-center gap-1 rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto">
             {navLinks.map((link, index) => (
               <Link
                 key={link.label}
                 href={link.href}
-                className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all hover:bg-accent/15 hover:text-[#d99d2b] sm:px-4 sm:text-[11px] ${index === 0 ? "bg-accent text-accent-foreground shadow-sm" : "text-foreground/72"}`}
+                className={`rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all hover:bg-[#f4d27b]/20 hover:text-[#d99d2b] sm:px-4 sm:text-[11px] ${index === 0 ? "bg-[#f2c66b] text-[#141414] shadow-sm" : "text-[#1b1b1b]/75"}`}
               >
                 {link.label}
               </Link>
@@ -68,45 +68,48 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section id="home" className="relative isolate flex min-h-screen items-center overflow-hidden pb-16 pt-40 sm:pt-36 lg:pt-32">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_34%,rgba(229,173,59,0.22),transparent_34%),linear-gradient(120deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_45%,var(--landing-overlay-photo)_100%)]" />
-          <div className="landing-hero-photo absolute inset-0">
-            <div className="landing-hero-image absolute inset-0" />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-photo-fade-solid)_0%,var(--landing-photo-fade-mid)_36%,transparent_72%)]" />
-            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[var(--landing-overlay-bottom)] via-[var(--landing-overlay-bottom-soft)] to-transparent" />
-            <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-[var(--landing-overlay-top)] to-transparent" />
-          </div>
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,var(--landing-overlay-98)_0%,var(--landing-overlay-90)_35%,var(--landing-overlay-48)_64%,var(--landing-overlay-42)_100%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(0deg,var(--landing-overlay-bottom)_0%,transparent_45%,var(--landing-overlay-top)_100%)]" />
-          <div className="landing-hero-glow absolute -left-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-[#d99d2b]/10 blur-3xl" />
+        <section id="home" className="relative isolate overflow-hidden pt-28 pb-10 sm:pt-32 lg:pt-36">
+          <div className="landing-hero-shell relative mx-auto max-w-[1400px] overflow-hidden rounded-none border-y border-[#ede2d0] bg-[#f6f1ea] px-3 pb-8 pt-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)] sm:px-6 sm:pb-10 lg:px-10 lg:pt-8 xl:px-12">
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.38)_30%,rgba(255,255,255,0.18)_48%,rgba(255,255,255,0.04)_100%)]" />
+            <div className="landing-hero-photo absolute inset-0">
+              <div className="landing-hero-image absolute inset-0" />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.28)_0%,rgba(255,255,255,0.1)_30%,transparent_52%)]" />
+            </div>
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#f6f1ea] via-[#f6f1ea]/60 to-transparent" />
+            <div className="relative z-10 mx-auto max-w-[1280px] px-2 pb-2 pt-4 sm:px-4 lg:pb-6">
+              <div className="flex flex-col gap-3 lg:gap-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.42em] text-[#d0992d] sm:text-xs lg:text-sm">
+                  Invicta | Sports Tournament Management Platform
+                </p>
 
-          <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
-            <div className="max-w-4xl">
-              <p className="mb-5 text-[10px] font-black uppercase tracking-[0.38em] text-[#f4c35a] sm:text-xs">
-                INVICTA | Sports Tournament Management Platform
-              </p>
-              <h1 className="landing-display text-[3.25rem] font-black italic leading-[0.82] tracking-[-0.035em] sm:text-8xl lg:text-[8.5rem]">
-                <span className="block">BUILDING</span>
-                <span className="landing-gold-text block">CHAMPIONS</span>
-              </h1>
-              <p className="mt-8 max-w-2xl text-sm font-semibold uppercase leading-7 tracking-[0.18em] text-foreground/70 sm:text-base">
-                Follow live scores, explore sports, register teams, and track tournament progress in one simple place.
-              </p>
+                <div className="max-w-[1100px]">
+                  <h1 className="landing-display text-[4.5rem] font-black leading-[0.8] tracking-[-0.045em] text-[#0b1420] sm:text-[6rem] lg:text-[11rem]">
+                    <span className="block">BUILDING</span>
+                    <span className="landing-gold-text block">CHAMPIONS</span>
+                  </h1>
+                </div>
 
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
-                <Link
-                  href="/matches"
-                  className="landing-slant group inline-flex items-center justify-center gap-3 bg-[#e5ad3b] px-7 py-3.5 text-xs font-black uppercase tracking-[0.22em] text-black transition-all hover:bg-[#f7cf70]"
-                >
-                  View Matches
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-                <Link
-                  href="/standings"
-                  className="inline-flex items-center justify-center gap-3 border border-white/20 bg-white/8 px-7 py-3.5 text-xs font-black uppercase tracking-[0.22em] text-foreground transition-all hover:border-[#f4c35a]/70 hover:text-[#f4c35a]"
-                >
-                  View Standings
-                </Link>
+                <p className="max-w-[980px] text-[11px] font-black uppercase leading-[1.9] tracking-[0.22em] text-[#1b1b1b]/75 sm:text-[12px] lg:text-[15px]">
+                  Follow live scores, explore sports, register teams,
+                  <br className="hidden sm:block" />
+                  and track tournament progress in one simple place.
+                </p>
+
+                <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+                  <Link
+                    href="/matches"
+                    className="landing-slant group inline-flex items-center justify-center gap-3 bg-[#e5ad3b] px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-black shadow-[0_12px_22px_rgba(229,173,59,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#f0bf59] sm:text-xs"
+                  >
+                    View Matches
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                  <Link
+                    href="/standings"
+                    className="inline-flex items-center justify-center gap-3 border border-[#201d1d]/10 bg-transparent px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-[#111827] transition-all hover:border-[#d99d2b] hover:text-[#d99d2b] sm:text-xs"
+                  >
+                    View Standings
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
