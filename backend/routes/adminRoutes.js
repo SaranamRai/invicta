@@ -2,6 +2,7 @@ import { Router } from "express";
 import { adminHandlers, listIssues, listRoleAccounts, listRules, listTournaments, reviewRule, reviewTeamRegistration, tournamentReport, updateRoleAccount, deleteRoleAccount, verifyResult } from "../controllers/adminController.js";
 import {
   createTeam,
+  bulkRescheduleFixtures,
   createFixture,
   deleteFixture,
   deleteFixtures,
@@ -10,6 +11,7 @@ import {
   listFixtures,
   listTeams,
   replaceFixtures,
+  rescheduleFixture,
   updateFixture,
   updateTeam,
   listPlayers,
@@ -70,6 +72,8 @@ router.post("/fixtures/generate", superOnly, generateFixtures);
 router.post("/fixtures", superOnly, createFixture);
 router.put("/fixtures", superOnly, replaceFixtures);
 router.delete("/fixtures", superOnly, deleteFixtures);
+router.post("/fixtures/reschedule", superOnly, bulkRescheduleFixtures);
+router.post("/fixtures/:id/reschedule", superOnly, rescheduleFixture);
 router.put("/fixtures/:id", superOnly, updateFixture);
 router.delete("/fixtures/:id", superOnly, deleteFixture);
 router.post("/announcements", superOnly, adminHandlers.createAnnouncement);

@@ -453,6 +453,49 @@ export function updateAdminFixture(fixture: AdminFixturePayload) {
   });
 }
 
+export interface RescheduleFixturePayload {
+  date?: string;
+  time?: string;
+  endTime?: string;
+  venue?: string;
+  assignedVolunteer?: string;
+  maxMatchesPerDay?: number;
+  minRestMinutes?: number;
+  fullMatchSeconds?: number;
+  matchGapMinutes?: number;
+}
+
+export interface RescheduleFixtureSuggestion {
+  date: string;
+  time: string;
+  endTime: string;
+  label: string;
+}
+
+export function rescheduleAdminFixture(fixtureId: string, payload: RescheduleFixturePayload) {
+  return apiFetch<{ message: string; fixtures?: AdminFixturePayload[]; fixture?: AdminFixturePayload; suggestions?: RescheduleFixtureSuggestion[] }>(`/admin/fixtures/${encodeURIComponent(fixtureId)}/reschedule`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function bulkRescheduleAdminFixtures(payload: {
+  fixtureIds: string[];
+  date?: string;
+  time?: string;
+  endTime?: string;
+  venue?: string;
+  assignedVolunteer?: string;
+  targetDates?: string[];
+  maxMatchesPerDay?: number;
+  minRestMinutes?: number;
+}) {
+  return apiFetch<{ message: string; fixtures: AdminFixturePayload[]; suggestions?: RescheduleFixtureSuggestion[] }>("/admin/fixtures/reschedule", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteAdminFixture(fixtureId: string) {
   return apiFetch(`/admin/fixtures/${encodeURIComponent(fixtureId)}`, {
     method: "DELETE",

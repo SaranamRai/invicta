@@ -757,10 +757,16 @@ export default function AdminDashboard() {
 
   // Update fixture handler
   const handleUpdateFixture = async (updatedFixture: Fixture) => {
-    const savedFixture = await updateAdminFixture(updatedFixture);
-    const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
-    setFixtures(nextFixtures);
-    await recalculateStandings();
+    try {
+      const savedFixture = await updateAdminFixture(updatedFixture);
+      const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
+      setFixtures(nextFixtures);
+      alert("Fixture updated successfully.");
+      await recalculateStandings();
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "Unable to update fixture.";
+      alert(`Could not reschedule match: ${messageText}`);
+    }
   };
 
   const handleLogout = async () => {

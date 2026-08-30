@@ -529,7 +529,7 @@ function getFixtureWindow(fixture) {
   const start = fixture.startTime
     ? new Date(fixture.startTime)
     : fixture.date && fixture.time
-      ? new Date(`${fixture.date}T${fixture.time}`)
+      ? new Date(`${fixture.date}T${fixture.time}:00`)
       : null;
   const rawEnd = fixture.endTime ? new Date(fixture.endTime) : start ? new Date(start.getTime() + 60 * 60 * 1000) : null;
   const end = rawEnd
@@ -545,57 +545,213 @@ function getFixtureWindow(fixture) {
   return { start, end };
 }
 
-async function assertFixtureNoClash(payload, excludeId) {
-  const { start, end } = getFixtureWindow(payload);
-  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
-  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map(normalizeText);
+function getFixtureDateFromInput(value) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T12:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getFixtureTimeMinutes(value) {
+  if (!value || typeof value !== "string") return null;
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function getAllowedRescheduleDates(dateString) {
+  const anchorDate = getFixtureDateFromInput(dateString) || new Date();
+  const dates = [];
+  for (let offset = 0; offset < 28; offset += 1) {
+    const next = new Date(anchorDate);
+    next.setDate(anchorDate.getDate() + offset);
+    if (next.getDay() === 0 || next.getDay() === 6) {
+      dates.push(toDateInputValue(next));
+    }
+  }
+  return dates;
+}
+
+function toCandidateFixtureDateTime(dateString, timeString) {
+  if (!dateString || !timeString) return null;
+  const result = new Date(`${dateString}T${timeString}:00`);
+  return Number.isNaN(result.getTime()) ? null : result;
+}
+
+function getFixtureRangeFromDocument(fixture) {
+  const start = fixture.startTime
+    ? new Date(fixture.startTime)
+    : fixture.date && fixture.time
+      ? toCandidateFixtureDateTime(fixture.date, fixture.time)
+      : null;
+  const rawEnd = fixture.endTime
+    ? new Date(fixture.endTime)
+    : start
+      ? new Date(start.getTime() + (Number(fixture.fullMatchSeconds || 90 * 60) * 1000))
+      : null;
+  if (!start || !rawEnd || Number.isNaN(start.getTime()) || Number.isNaN(rawEnd.getTime())) {
+    return null;
+  }
+  return { start, end: rawEnd };
+}
+
+async function validateRescheduleCandidate(payload, excludeId, overrideOptions = {}) {
+  const dateString = payload.date || payload.scheduledDate;
+  const timeString = payload.time || payload.startTime || "09:00";
+  const start = payload.startTime && typeof payload.startTime === "string" && payload.startTime.includes("T")
+    ? new Date(payload.startTime)
+    : toCandidateFixtureDateTime(dateString, timeString);
+  const durationSeconds = Number(payload.fullMatchSeconds || 90 * 60);
+  const end = payload.endTime && typeof payload.endTime === "string" && payload.endTime.includes("T")
+    ? new Date(payload.endTime)
+    : start
+      ? toCandidateFixtureDateTime(dateString, payload.endTime || formatMinutesAsTime(Math.round(durationSeconds / 60) + getFixtureTimeMinutes(timeString)))
+      : null;
+
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    const error = new Error("Unable to reschedule this match. Please provide a valid date and time.");
+    error.status = 400;
+    throw error;
+  }
+
+  const dateValue = dateString || toDateInputValue(new Date(start));
+  const proposedDate = getFixtureDateFromInput(dateValue);
+  if (!proposedDate || (proposedDate.getDay() !== 0 && proposedDate.getDay() !== 6)) {
+    const error = new Error("Only weekend match days are allowed for fixture rescheduling.");
+    error.status = 400;
+    throw error;
+  }
+
+  const maxMatchesPerDay = Number(overrideOptions.maxMatchesPerDay || payload.maxMatchesPerDay || 8);
+  const minRestMinutes = Math.max(30, Number(overrideOptions.minRestMinutes || payload.minRestMinutes || payload.matchGapMinutes || 60));
   const query = {
     ...(excludeId ? { _id: { $ne: excludeId } } : {}),
     status: { $ne: "cancelled" },
-    startTime: { $lt: end },
-    endTime: { $gt: start },
+    ...(payload.tournamentId ? { tournamentId: payload.tournamentId } : {}),
+    ...(payload.sportId ? { sportId: payload.sportId } : {}),
+    ...(payload.category ? { category: payload.category } : {}),
   };
 
   const overlapping = await Fixture.find(query).lean();
-  const teamClash = overlapping.find((fixture) => {
+  const dateMatches = overlapping.filter((fixture) => fixture.date === dateValue && fixture.status !== "cancelled").length;
+  if (dateMatches >= maxMatchesPerDay) {
+    const error = new Error(`Unable to reschedule this match. ${dateValue} is already at the configured match-day capacity.`);
+    error.status = 400;
+    throw error;
+  }
+
+  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
+  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
+  const venue = payload.venue ? normalizeText(payload.venue).toLowerCase() : "";
+  const volunteer = payload.assignedVolunteer ? String(payload.assignedVolunteer) : "";
+
+  for (const fixture of overlapping) {
+    const range = getFixtureRangeFromDocument(fixture);
+    if (!range) continue;
+    if (start >= range.end || end <= range.start) continue;
+
     const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
-    return teamIds.some((id) => existingTeamIds.includes(id));
-  });
-  if (teamClash) {
-    const error = new Error("Fixture clash detected: this team already has another match at this time.");
-    error.status = 400;
-    throw error;
+    const sharedTeam = teamIds.find((teamId) => existingTeamIds.includes(teamId));
+    if (sharedTeam) {
+      const diffMinutes = Math.abs((start.getTime() - range.start.getTime()) / 60000);
+      if (diffMinutes < minRestMinutes) {
+        const error = new Error(`Unable to reschedule this match. Team ${fixture.teamAName || "Team A"} already has another match too close to this time. Minimum rest time is ${minRestMinutes} minutes.`);
+        error.status = 400;
+        throw error;
+      }
+    }
+
+    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
+    const sharedDepartment = departments.find((department) => existingDepartments.includes(department));
+    if (sharedDepartment) {
+      const error = new Error("Unable to reschedule this match. A department match is already scheduled in the same time window.");
+      error.status = 400;
+      throw error;
+    }
+
+    if (venue && normalizeText(fixture.venue || "").toLowerCase() === venue) {
+      const error = new Error("Unable to reschedule this match. The selected venue is already booked at that time.");
+      error.status = 400;
+      throw error;
+    }
+
+    if (volunteer && fixture.assignedVolunteer?.toString?.() === volunteer) {
+      const error = new Error("Unable to reschedule this match. The assigned volunteer is already booked for another match at that time.");
+      error.status = 400;
+      throw error;
+    }
   }
 
-  const departmentClash = overlapping.find((fixture) => {
-    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map(normalizeText);
-    return departments.some((department) => existingDepartments.includes(department));
-  });
-  if (departmentClash) {
-    const error = new Error("Fixture clash detected: this department already has another match at this time.");
-    error.status = 400;
-    throw error;
+  return { start, end, date: dateValue };
+}
+
+async function suggestRescheduleSlots(payload, excludeId, options = {}) {
+  const currentDate = payload.date || payload.scheduledDate || toDateInputValue(new Date());
+  const currentTime = payload.time || payload.startTime || "09:00";
+  const anchorDate = getFixtureDateFromInput(currentDate) || new Date();
+  const suggestions = [];
+  const maxSuggestions = Number(options.maxSuggestions || 6);
+  const daysToScan = Number(options.daysToScan || 28);
+  const durationSeconds = Number(payload.fullMatchSeconds || 90 * 60);
+
+  for (let dayOffset = 0; dayOffset < daysToScan && suggestions.length < maxSuggestions; dayOffset += 1) {
+    const candidateDate = new Date(anchorDate);
+    candidateDate.setDate(anchorDate.getDate() + dayOffset);
+    if (candidateDate.getDay() !== 0 && candidateDate.getDay() !== 6) continue;
+    const dateText = toDateInputValue(candidateDate);
+    for (let hour = 9; hour <= 18; hour += 1) {
+      for (const minute of [0, 30]) {
+        if (suggestions.length >= maxSuggestions) break;
+        const candidateTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        const nextPayload = {
+          ...payload,
+          date: dateText,
+          time: candidateTime,
+          startTime: candidateTime,
+          endTime: formatMinutesAsTime(getFixtureTimeMinutes(candidateTime) + Math.max(30, Math.round(durationSeconds / 60))),
+          assignedVolunteer: payload.assignedVolunteer,
+          venue: payload.venue,
+          maxMatchesPerDay: payload.maxMatchesPerDay || 8,
+          minRestMinutes: payload.minRestMinutes || payload.matchGapMinutes || 60,
+        };
+        try {
+          await validateRescheduleCandidate(nextPayload, excludeId, {
+            maxMatchesPerDay: nextPayload.maxMatchesPerDay,
+            minRestMinutes: nextPayload.minRestMinutes,
+          });
+          suggestions.push({
+            date: dateText,
+            time: candidateTime,
+            endTime: nextPayload.endTime,
+            label: `${new Date(dateText).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${candidateTime}`,
+          });
+        } catch {
+          // Ignore invalid slots and continue searching for real suggestions.
+        }
+      }
+      if (suggestions.length >= maxSuggestions) break;
+    }
   }
 
-  const venueClash = payload.venue ? overlapping.find((fixture) => {
-    return payload.venue && normalizeText(fixture.venue).toLowerCase() === normalizeText(payload.venue).toLowerCase();
-  }) : null;
-  if (venueClash) {
-    const error = new Error("Venue clash detected: this venue is already booked at this time.");
-    error.status = 400;
-    throw error;
+  if (suggestions.length === 0 && currentTime) {
+    const fallbackDate = getAllowedRescheduleDates(currentDate).find(Boolean);
+    if (fallbackDate) {
+      suggestions.push({
+        date: fallbackDate,
+        time: currentTime,
+        endTime: formatMinutesAsTime(getFixtureTimeMinutes(currentTime) + Math.max(30, Math.round(durationSeconds / 60))),
+        label: `${new Date(fallbackDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${currentTime}`,
+      });
+    }
   }
 
-  const volunteerClash = payload.assignedVolunteer ? overlapping.find((fixture) => {
-    return payload.assignedVolunteer && fixture.assignedVolunteer?.toString?.() === String(payload.assignedVolunteer);
-  }) : null;
-  if (volunteerClash) {
-    const error = new Error("Volunteer clash detected: this volunteer is already assigned to another match at this time.");
-    error.status = 400;
-    throw error;
-  }
+  return suggestions;
+}
 
-  return { start, end };
+async function assertFixtureNoClash(payload, excludeId) {
+  return validateRescheduleCandidate(payload, excludeId);
 }
 
 function requireObjectId(id, label) {
@@ -1176,18 +1332,38 @@ export async function updateFixture(req, res) {
     ...existing.toObject(),
     ...req.body,
   };
+
+  if (req.body.date || req.body.time || req.body.startTime || req.body.endTime || req.body.venue || req.body.assignedVolunteer) {
+    try {
+      await validateRescheduleCandidate(updatePayload, req.params.id, {
+        maxMatchesPerDay: req.body.maxMatchesPerDay,
+        minRestMinutes: req.body.minRestMinutes,
+      });
+    } catch (error) {
+      const suggestions = await suggestRescheduleSlots(updatePayload, req.params.id, {
+        maxSuggestions: 5,
+        daysToScan: 21,
+      });
+      return res.status(400).json({
+        message: error.message,
+        suggestions,
+      });
+    }
+  }
+
   const { start, end } = await assertFixtureNoClash(updatePayload, req.params.id);
 
   const fixture = await Fixture.findByIdAndUpdate(
     req.params.id,
     {
-      date: req.body.date,
-      time: req.body.time,
-      venue: req.body.venue,
+      date: req.body.date ?? existing.date,
+      time: req.body.time ?? existing.time,
+      venue: req.body.venue ?? existing.venue,
       startTime: start,
       endTime: end,
       fullMatchSeconds: existing.fullMatchSeconds || 90 * 60,
       matchGapMinutes: existing.matchGapMinutes || 0,
+      assignedVolunteer: req.body.assignedVolunteer ?? existing.assignedVolunteer,
       category,
       status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
       scoreA: Number(req.body.scoreA || 0),
@@ -1199,6 +1375,140 @@ export async function updateFixture(req, res) {
 
   if (!fixture) return res.status(404).json({ message: "Fixture not found" });
   return res.json(mapFixture(fixture));
+}
+
+export async function rescheduleFixture(req, res) {
+  requireObjectId(req.params.id, "Fixture id");
+  const fixture = await Fixture.findById(req.params.id).lean();
+  if (!fixture) return res.status(404).json({ message: "Fixture not found" });
+
+  const candidate = {
+    ...fixture,
+    ...req.body,
+    date: req.body.date || fixture.date,
+    time: req.body.time || fixture.time || "09:00",
+    venue: req.body.venue ?? fixture.venue,
+    assignedVolunteer: req.body.assignedVolunteer ?? fixture.assignedVolunteer,
+    fullMatchSeconds: Number(req.body.fullMatchSeconds ?? fixture.fullMatchSeconds ?? 90 * 60),
+    matchGapMinutes: Number(req.body.matchGapMinutes ?? fixture.matchGapMinutes ?? 0),
+    maxMatchesPerDay: req.body.maxMatchesPerDay,
+    minRestMinutes: req.body.minRestMinutes,
+  };
+
+  try {
+    const { start, end } = await validateRescheduleCandidate(candidate, fixture._id.toString(), {
+      maxMatchesPerDay: req.body.maxMatchesPerDay,
+      minRestMinutes: req.body.minRestMinutes,
+    });
+    const updated = await Fixture.findByIdAndUpdate(
+      fixture._id,
+      {
+        date: candidate.date,
+        time: candidate.time,
+        venue: candidate.venue,
+        startTime: start,
+        endTime: end,
+        assignedVolunteer: candidate.assignedVolunteer,
+        fullMatchSeconds: candidate.fullMatchSeconds,
+        matchGapMinutes: candidate.matchGapMinutes,
+        status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "upcoming",
+      },
+      { new: true }
+    );
+    return res.json({
+      message: "Fixture rescheduled successfully.",
+      fixture: updated ? mapFixture(updated) : null,
+      suggestions: [],
+    });
+  } catch (error) {
+    const suggestions = await suggestRescheduleSlots(candidate, fixture._id.toString(), {
+      maxSuggestions: 5,
+      daysToScan: 21,
+    });
+    return res.status(400).json({
+      message: error.message,
+      suggestions,
+    });
+  }
+}
+
+export async function bulkRescheduleFixtures(req, res) {
+  const fixtureIds = Array.isArray(req.body.fixtureIds) ? req.body.fixtureIds : [];
+  if (fixtureIds.length === 0) {
+    return res.status(400).json({ message: "At least one fixture must be selected for rescheduling." });
+  }
+
+  const fixtures = await Fixture.find({ _id: { $in: fixtureIds } }).lean();
+  if (fixtures.length === 0) {
+    return res.status(404).json({ message: "No valid fixtures were found for rescheduling." });
+  }
+
+  const targetDates = Array.isArray(req.body.targetDates) && req.body.targetDates.length > 0
+    ? req.body.targetDates
+    : [req.body.date || fixtures[0].date].filter(Boolean);
+  const preferredTime = req.body.time || fixtures[0].time || "09:00";
+  const allocated = [];
+
+  for (let index = 0; index < fixtures.length; index += 1) {
+    const fixture = fixtures[index];
+    const preferredDate = targetDates[Math.min(index, targetDates.length - 1)] || targetDates[targetDates.length - 1];
+    const candidate = {
+      ...fixture,
+      date: preferredDate,
+      time: preferredTime,
+      venue: req.body.venue ?? fixture.venue,
+      assignedVolunteer: req.body.assignedVolunteer ?? fixture.assignedVolunteer,
+      fullMatchSeconds: Number(req.body.fullMatchSeconds ?? fixture.fullMatchSeconds ?? 90 * 60),
+      matchGapMinutes: Number(req.body.matchGapMinutes ?? fixture.matchGapMinutes ?? 0),
+      maxMatchesPerDay: req.body.maxMatchesPerDay,
+      minRestMinutes: req.body.minRestMinutes,
+    };
+
+    try {
+      const { start, end } = await validateRescheduleCandidate(candidate, fixture._id.toString(), {
+        maxMatchesPerDay: req.body.maxMatchesPerDay,
+        minRestMinutes: req.body.minRestMinutes,
+      });
+      allocated.push({
+        fixtureId: fixture._id.toString(),
+        date: candidate.date,
+        time: candidate.time,
+        start,
+        end,
+        venue: candidate.venue,
+        assignedVolunteer: candidate.assignedVolunteer,
+      });
+    } catch (error) {
+      const suggestions = await suggestRescheduleSlots(candidate, fixture._id.toString(), {
+        maxSuggestions: 3,
+        daysToScan: 28,
+      });
+      return res.status(400).json({
+        message: `Unable to bulk reschedule selected matches. ${error.message}`,
+        suggestions,
+      });
+    }
+  }
+
+  const updates = await Promise.all(allocated.map(async (entry) => {
+    return Fixture.findByIdAndUpdate(
+      entry.fixtureId,
+      {
+        date: entry.date,
+        time: entry.time,
+        startTime: entry.start,
+        endTime: entry.end,
+        venue: entry.venue,
+        assignedVolunteer: entry.assignedVolunteer,
+      },
+      { new: true }
+    );
+  }));
+
+  return res.json({
+    message: `Rescheduled ${updates.length} fixture${updates.length === 1 ? "" : "s"} successfully.`,
+    fixtures: updates.filter(Boolean).map((fixture) => mapFixture(fixture)),
+  });
 }
 
 export async function deleteFixture(req, res) {
