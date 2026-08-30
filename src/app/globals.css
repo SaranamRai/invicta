@@ -523,6 +523,14 @@ a {
   min-height: 620px;
 }
 
+@media (max-width: 640px) {
+  .landing-hero-shell {
+    min-height: 420px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
 :root[data-theme="dark"] .landing-hero-shell {
   background: linear-gradient(180deg, rgba(7,17,31,0.96), rgba(7,17,31,0.96));
 }
@@ -591,6 +599,13 @@ a {
   color: transparent;
   text-shadow: 0 6px 18px rgba(0,0,0,0.35);
   filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35));
+}
+
+@media (max-width: 480px) {
+  .landing-building-word,
+  .landing-gold-text {
+    letter-spacing: -0.06em;
+  }
 }
 
 :root[data-theme="dark"] .landing-display {

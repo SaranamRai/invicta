@@ -42,26 +42,26 @@ const sports = [
 export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
-      <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-5 sm:pt-5">
-        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-3 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-5 sm:px-5 lg:flex-nowrap">
-          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center gap-3">
-            <MedhaviLogo className="h-12 w-36 sm:h-14 sm:w-44 lg:h-16 lg:w-52" />
-            <InvictaLogo className="h-10 w-32 sm:h-11 sm:w-40 lg:h-12 lg:w-48" />
+      <header className="fixed inset-x-0 top-0 z-40 px-2 pt-2 sm:px-5 sm:pt-5">
+        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-col items-stretch justify-between gap-2 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-2 py-2 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:flex-nowrap">
+          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center justify-center gap-3 sm:justify-start">
+            <MedhaviLogo className="h-10 w-28 sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
+            <InvictaLogo className="h-9 w-28 sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
           </Link>
 
-          <nav className="order-3 flex w-full items-center justify-center gap-1 rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto">
+          <nav className="order-3 flex w-full items-center justify-center gap-1 overflow-x-auto rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto lg:overflow-visible">
             {navLinks.map((link, index) => (
               <Link
                 key={link.label}
                 href={link.href}
-                className={`rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all hover:bg-[#f4d27b]/20 hover:text-[#d99d2b] sm:px-4 sm:text-[11px] ${index === 0 ? "bg-[#f2c66b] text-[#141414] shadow-sm" : "text-[#1b1b1b]/75"}`}
+                className={`whitespace-nowrap rounded-full px-2 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:bg-[#f4d27b]/20 hover:text-[#d99d2b] sm:px-3 sm:text-[10px] lg:px-4 lg:text-[11px] ${index === 0 ? "bg-[#f2c66b] text-[#141414] shadow-sm" : "text-[#1b1b1b]/75"}`}
               >
                 {link.label}
               </Link>
             ))}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="ml-auto flex shrink-0 items-center justify-center gap-2 sm:gap-3 lg:justify-end">
             <ThemeToggle />
           </div>
         </div>
@@ -83,29 +83,29 @@ export default function LandingPage() {
                 </p>
 
                 <div className="max-w-[1050px]">
-                  <h1 className="landing-display text-[3.1rem] font-black leading-[0.82] tracking-[-0.045em] text-[#07111f] drop-shadow-[0_10px_22px_rgba(0,0,0,0.38)] sm:text-[4.8rem] lg:text-[9rem]">
+                  <h1 className="landing-display text-[2.3rem] font-black leading-[0.82] tracking-[-0.045em] text-[#07111f] drop-shadow-[0_10px_22px_rgba(0,0,0,0.38)] sm:text-[4.8rem] lg:text-[9rem]">
                     <span className="landing-building-word block">BUILDING</span>
                     <span className="landing-gold-text block">CHAMPIONS</span>
                   </h1>
                 </div>
 
-                <p className="max-w-[900px] text-[9px] font-black uppercase leading-[1.8] tracking-[0.18em] text-[#e2e8f0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-[10px] lg:text-[13px]">
+                <p className="max-w-[900px] text-[8px] font-black uppercase leading-[1.8] tracking-[0.18em] text-[#e2e8f0] drop-shadow-[0_2px_12px_rgba(0,0,0,0.4)] sm:text-[10px] lg:text-[13px]">
                   Follow live scores, explore sports, register teams,
                   <br className="hidden sm:block" />
                   and track tournament progress in one simple place.
                 </p>
 
-                <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <Link
                     href="/matches"
-                    className="landing-slant group inline-flex items-center justify-center gap-3 bg-[#e5ad3b] px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-black shadow-[0_12px_22px_rgba(229,173,59,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#f0bf59] sm:text-xs"
+                    className="landing-slant group inline-flex w-full items-center justify-center gap-3 bg-[#e5ad3b] px-5 py-3 text-[9px] font-black uppercase tracking-[0.24em] text-black shadow-[0_12px_22px_rgba(229,173,59,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#f0bf59] sm:w-auto sm:px-6 sm:py-4 sm:text-xs"
                   >
                     View Matches
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Link>
                   <Link
                     href="/standings"
-                    className="inline-flex items-center justify-center gap-3 border border-[#f7d77a]/80 bg-[#07111f]/20 px-6 py-4 text-[10px] font-black uppercase tracking-[0.24em] text-[#e2e8f0] shadow-[0_0_0_1px_rgba(247,215,122,0.3)] backdrop-blur-[2px] transition-all hover:border-[#f7d77a] hover:text-[#fef3c7] sm:text-xs"
+                    className="inline-flex w-full items-center justify-center gap-3 border border-[#f7d77a]/80 bg-[#07111f]/20 px-5 py-3 text-[9px] font-black uppercase tracking-[0.24em] text-[#e2e8f0] shadow-[0_0_0_1px_rgba(247,215,122,0.3)] backdrop-blur-[2px] transition-all hover:border-[#f7d77a] hover:text-[#fef3c7] sm:w-auto sm:px-6 sm:py-4 sm:text-xs"
                   >
                     View Standings
                   </Link>
