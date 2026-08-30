@@ -587,9 +587,11 @@ a {
 .landing-building-word {
   display: block;
   color: rgba(8, 15, 25, 0.96);
+  -webkit-text-stroke: 1.2px rgba(255, 255, 255, 0.9);
   text-shadow:
     0 2px 0 rgba(255,255,255,0.18),
     0 8px 18px rgba(7, 17, 31, 0.28);
+  paint-order: stroke fill;
 }
 
 .landing-gold-text {
