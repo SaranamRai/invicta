@@ -8,9 +8,25 @@ import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
+  { label: "Matches", href: "/matches" },
+  { label: "Standings", href: "/standings" },
   { label: "Sports", href: "/#sports" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/#contact" },
+];
+
+const primaryActions = [
+  { label: "View Matches", href: "/matches", summary: "Upcoming and live fixtures" },
+  { label: "View Standings", href: "/standings", summary: "See league tables and rankings" },
+  { label: "Explore Sports", href: "/sports", summary: "Browse games, teams and categories" },
+  { label: "Register Team", href: "/public-register", summary: "Join the tournament" },
+];
+
+const overviewCards = [
+  { label: "Tournament status", value: "Open for participation", hint: "Check the latest updates and registration details" },
+  { label: "Upcoming fixtures", value: "Live schedule", hint: "Track match dates, venues and match status" },
+  { label: "Standings", value: "Updated results", hint: "Monitor team performance across sports" },
+  { label: "Support", value: "Staff access", hint: "Login for volunteers and coordinators" },
 ];
 
 const sports = [
@@ -35,13 +51,13 @@ export default function LandingPage() {
 
           <nav className="order-3 flex w-full items-center justify-center gap-1 rounded-xl border border-border/70 bg-card/55 p-1 sm:gap-2 lg:order-none lg:w-auto">
             {navLinks.map((link, index) => (
-              <a
+              <Link
                 key={link.label}
                 href={link.href}
                 className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all hover:bg-accent/15 hover:text-[#d99d2b] sm:px-4 sm:text-[11px] ${index === 0 ? "bg-accent text-accent-foreground shadow-sm" : "text-foreground/72"}`}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -67,26 +83,62 @@ export default function LandingPage() {
           <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
             <div className="max-w-4xl">
               <p className="mb-5 text-[10px] font-black uppercase tracking-[0.38em] text-[#f4c35a] sm:text-xs">
-                Medhavi Skills University Sports
+                INVICTA | Sports Tournament Management Platform
               </p>
               <h1 className="landing-display text-[3.25rem] font-black italic leading-[0.82] tracking-[-0.035em] sm:text-8xl lg:text-[8.5rem]">
-                <span className="block">BUILT FOR</span>
+                <span className="block">BUILDING</span>
                 <span className="landing-gold-text block">CHAMPIONS</span>
               </h1>
-              <p className="mt-8 max-w-lg text-sm font-semibold uppercase leading-7 tracking-[0.2em] text-foreground/60 sm:text-base">
-                Passion in every game.
-                <br />
-                Performance that defines you.
+              <p className="mt-8 max-w-2xl text-sm font-semibold uppercase leading-7 tracking-[0.18em] text-foreground/70 sm:text-base">
+                Follow live scores, explore sports, register teams, and track tournament progress in one simple place.
               </p>
 
-              <Link
-                href="/public-dashboard"
-                className="landing-slant group mt-10 inline-flex items-center gap-3 bg-[#e5ad3b] px-9 py-4 text-xs font-black uppercase tracking-[0.22em] text-black transition-all hover:bg-[#f7cf70]"
-              >
-                Explore Now
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+                <Link
+                  href="/matches"
+                  className="landing-slant group inline-flex items-center justify-center gap-3 bg-[#e5ad3b] px-7 py-3.5 text-xs font-black uppercase tracking-[0.22em] text-black transition-all hover:bg-[#f7cf70]"
+                >
+                  View Matches
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <Link
+                  href="/standings"
+                  className="inline-flex items-center justify-center gap-3 border border-white/20 bg-white/8 px-7 py-3.5 text-xs font-black uppercase tracking-[0.22em] text-foreground transition-all hover:border-[#f4c35a]/70 hover:text-[#f4c35a]"
+                >
+                  View Standings
+                </Link>
+              </div>
             </div>
+          </div>
+        </section>
+
+        <section className="px-5 pb-4 pt-2 sm:px-8">
+          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {overviewCards.map((card) => (
+              <div key={card.label} className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm shadow-black/5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{card.label}</p>
+                <h3 className="mt-3 text-2xl font-black text-foreground">{card.value}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{card.hint}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="px-5 pb-8 sm:px-8">
+          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {primaryActions.map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group rounded-2xl border border-border bg-card p-5 transition-all hover:border-accent hover:bg-accent/5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-foreground">{action.label}</p>
+                  <ArrowRight className="h-4 w-4 text-accent transition-transform group-hover:translate-x-1" />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{action.summary}</p>
+              </Link>
+            ))}
           </div>
         </section>
 

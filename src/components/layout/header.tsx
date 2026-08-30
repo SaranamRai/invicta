@@ -15,8 +15,8 @@ interface GuestNotification extends NotificationData {
 }
 
 const publicNavItems = [
-  { icon: Trophy, label: "Standings", href: "/standings" },
   { icon: Calendar, label: "Matches", href: "/matches" },
+  { icon: Trophy, label: "Standings", href: "/standings" },
   { icon: Target, label: "Sports", href: "/sports" },
   { icon: Radio, label: "Results", href: "/results" },
   { icon: Megaphone, label: "News", href: "/announcements" },
@@ -60,7 +60,7 @@ export function Header() {
                 : "border-border bg-card text-foreground hover:border-accent hover:text-accent"
             )}
           >
-            Dashboard
+            Home
           </Link>
           <nav className="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto rounded-full border border-border bg-card/80 p-1">
             {publicNavItems.map((item) => {
