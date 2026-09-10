@@ -8,9 +8,6 @@ import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "Matches", href: "/matches" },
-  { label: "Standings", href: "/standings" },
-  { label: "Sports", href: "/#sports" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/#contact" },
 ];
@@ -69,7 +66,7 @@ export default function LandingPage() {
 
       <main>
         <section id="home" className="relative isolate overflow-hidden pt-28 pb-10 sm:pt-32 lg:pt-36">
-          <div className="landing-hero-shell relative mx-auto max-w-[1400px] overflow-hidden rounded-none border-y border-[#ede2d0] bg-[#f6f1ea] px-3 pb-8 pt-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)] sm:px-6 sm:pb-10 lg:px-10 lg:pt-8 xl:px-12">
+          <div className="landing-hero-shell relative mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-[#ede2d0] bg-[#f6f1ea] px-3 pb-8 pt-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)] sm:px-6 sm:pb-10 lg:px-10 lg:pt-8 xl:px-12">
             <div className="landing-hero-light absolute inset-0" />
             <div className="landing-hero-photo absolute inset-0">
               <div className="landing-hero-image absolute inset-0" />
@@ -100,14 +97,8 @@ export default function LandingPage() {
                     href="/matches"
                     className="landing-slant group inline-flex w-full items-center justify-center gap-3 bg-[#e5ad3b] px-5 py-3 text-[9px] font-black uppercase tracking-[0.24em] text-black shadow-[0_12px_22px_rgba(229,173,59,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#f0bf59] sm:w-auto sm:px-6 sm:py-4 sm:text-xs"
                   >
-                    View Matches
+                    Explore Now
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                  <Link
-                    href="/standings"
-                    className="inline-flex w-full items-center justify-center gap-3 border border-[#f7d77a]/80 bg-[#07111f]/20 px-5 py-3 text-[9px] font-black uppercase tracking-[0.24em] text-[#e2e8f0] shadow-[0_0_0_1px_rgba(247,215,122,0.3)] backdrop-blur-[2px] transition-all hover:border-[#f7d77a] hover:text-[#fef3c7] sm:w-auto sm:px-6 sm:py-4 sm:text-xs"
-                  >
-                    View Standings
                   </Link>
                 </div>
               </div>

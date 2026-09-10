@@ -548,6 +548,7 @@ a {
   mix-blend-mode: normal;
   background: linear-gradient(90deg, rgba(7, 17, 31, 0.12), rgba(7, 17, 31, 0.08));
   isolation: isolate;
+  border-radius: inherit;
 }
 
 .landing-hero-image {
@@ -556,7 +557,7 @@ a {
   background-size: cover;
   background-repeat: no-repeat;
   transform: scale(1.22);
-  filter: saturate(0.94) contrast(1.12) brightness(0.88) sepia(0.06);
+  filter: blur(1px) saturate(0.94) contrast(1.12) brightness(0.88) sepia(0.06);
   opacity: 1;
   mask-image: none;
   -webkit-mask-image: none;
