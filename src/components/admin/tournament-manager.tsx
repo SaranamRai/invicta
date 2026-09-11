@@ -52,6 +52,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
   const [venues, setVenues] = useState<VenuePayload[]>([]);
   const [sportRecords, setSportRecords] = useState<MongoSport[]>([]);
   const [sportName, setSportName] = useState("");
+  const [sportMaxPlayers, setSportMaxPlayers] = useState("");
   const [sportType, setSportType] = useState<"indoor" | "outdoor">("outdoor");
   const [sportStatus, setSportStatus] = useState<"active" | "inactive">("active");
   const [sportCategories, setSportCategories] = useState<("Male" | "Female" | "Mixed")[]>(["Male", "Female"]);
@@ -191,9 +192,16 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
       setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
+    const maxPlayers = sportMaxPlayers.trim() ? Number(sportMaxPlayers) : undefined;
+    if (maxPlayers !== undefined && (!Number.isInteger(maxPlayers) || maxPlayers < 1)) {
+      setErrorMessage("Maximum players must be a whole number greater than zero.");
+      setTimeout(() => setErrorMessage(null), 4000);
+      return;
+    }
 
     const savedSport = await createAdminSport({
       sportName: sportName.trim(),
+      maxPlayers,
       categories: sportCategories,
       type: sportType,
       status: sportStatus,
@@ -201,6 +209,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
 
     setSportRecords((current) => [savedSport, ...current.filter((item) => item._id !== savedSport._id)]);
     setSportName("");
+    setSportMaxPlayers("");
     setSportType("outdoor");
     setSportStatus("active");
     setSportCategories(["Male", "Female"]);
@@ -404,12 +413,22 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreateSport} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_150px_150px_220px_auto]">
+          <form onSubmit={handleCreateSport} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(180px,1fr)_180px_150px_150px_220px_auto]">
             <input
               type="text"
               value={sportName}
               onChange={(event) => setSportName(event.target.value)}
               placeholder="Sport name"
+              className="h-12 rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
+            />
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={sportMaxPlayers}
+              onChange={(event) => setSportMaxPlayers(event.target.value)}
+              placeholder="Max players (optional)"
+              aria-label="Maximum players needed for this sport"
               className="h-12 rounded-xl border border-white/10 bg-slate-950/60 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-accent"
             />
             <select
@@ -460,7 +479,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                 <div>
                   <p className="text-sm font-black uppercase tracking-wide text-white">{item.sportName || item.name}</p>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                    {(item.categories || []).join(" / ") || "No categories"} / {item.type || "type"} / {item.status || "active"}
+                    {(item.categories || []).join(" / ") || "No categories"} / {item.type || "type"} / {item.status || "active"} / {item.maxPlayers || "auto"} players max
                   </p>
                 </div>
                 <button

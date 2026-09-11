@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { listPublic, registerPublicTeam, getSportDetailView, getPublicRegistrationFields } from "../controllers/publicController.js";
+import { chatWithInvicta } from "../controllers/aiController.js";
 
 const router = Router();
 
+// Kept for existing clients; the canonical endpoint is POST /api/ai/chat.
+router.post("/assistant", chatWithInvicta);
 router.get("/sports", listPublic("sports"));
 router.get("/fixtures", listPublic("fixtures"));
 router.get("/live-scores", listPublic("live-scores"));

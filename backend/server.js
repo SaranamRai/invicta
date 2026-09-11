@@ -15,6 +15,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
 import registrationRoutes from "./routes/registrationRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import Sport from "./models/Sport.js";
 import ApiLog from "./models/ApiLog.js";
 import ErrorLog from "./models/ErrorLog.js";
@@ -217,6 +218,7 @@ app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
 app.use("/api/registrations", registrationRoutes);
 app.use("/api/registration", registrationRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use((error, req, res, next) => {
   void next;
