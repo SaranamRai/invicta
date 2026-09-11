@@ -423,7 +423,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         setSports(nextSports);
         setTournaments(nextTournaments);
         setVenues(nextVenues);
-        setTeams(nextTeams.filter((team) => team.status === "approved" || team.status === "ready"));
+        setTeams(nextTeams.filter((team) =>
+          team.status === "approved" || team.status === "ready" || team.status === "registered"
+        ));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
         setManualSportId(nextSports[0]?._id || "");
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
@@ -446,9 +448,15 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
 
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
   const manualSport = sports.find((sport) => sport._id === manualSportId);
+  const manualTournament = tournaments.find((tournament) => getTournamentId(tournament) === manualTournamentId);
   const manualTeams = teams.filter((team) => {
-    const teamTournament = String(team.tournamentId || "");
-    if (manualTournamentId && teamTournament !== manualTournamentId) return false;
+    const teamTournamentId = String(team.tournamentId || "");
+    const teamTournamentName = String(team.tournamentName || "").trim().toLowerCase();
+    const selectedTournamentName = String(manualTournament?.name || "").trim().toLowerCase();
+    const tournamentMatches = !manualTournamentId ||
+      teamTournamentId === manualTournamentId ||
+      Boolean(selectedTournamentName && teamTournamentName === selectedTournamentName);
+    if (!tournamentMatches) return false;
     const teamSport = String(team.sportId || team.sportName || team.sport || "").toLowerCase();
     const sportName = String(manualSport?.sportName || manualSport?.name || "").toLowerCase();
     return teamSport === manualSportId.toLowerCase() || teamSport === sportName || String(team.sport || "").toLowerCase() === sportName.replace(/\s+/g, "-");
