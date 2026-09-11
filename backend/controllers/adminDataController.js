@@ -1184,6 +1184,9 @@ export async function createFixture(req, res) {
   }
 
   const sportName = sportDoc.sportName || sportDoc.name;
+  const tournament = req.body.tournamentId
+    ? await Tournament.findById(req.body.tournamentId).select("name").lean()
+    : null;
   const fullMatchMinutes = parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time");
   const manualStart = req.body.startTime
     ? new Date(req.body.startTime)
@@ -1199,7 +1202,7 @@ export async function createFixture(req, res) {
   }
   const payload = {
     tournamentId: req.body.tournamentId || undefined,
-    tournamentName: req.body.tournamentName || "",
+    tournamentName: req.body.tournamentName || tournament?.name || "",
     sport: normalizeSport(sportName),
     sportName,
     sportId: sportDoc._id,

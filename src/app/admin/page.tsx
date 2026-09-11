@@ -32,6 +32,7 @@ import {
   rejectTeamRegistration,
   deleteTeamRegistration,
   MongoSport,
+  AdminFixturePayload,
   TeamRegistrationPayload,
   TournamentPayload,
   downloadApprovedRegistrationsExcel,
@@ -751,9 +752,14 @@ export default function AdminDashboard() {
     setFixtures(nextFixtures as Fixture[]);
   };
 
-  const handleAutomaticFixturesGenerated = async () => {
-    const nextFixtures = await getAdminFixtures();
-    setFixtures(nextFixtures as Fixture[]);
+  const handleAutomaticFixturesGenerated = async (createdFixtures: AdminFixturePayload[]) => {
+    setFixtures((current) => {
+      const byId = new Map(current.map((fixture) => [fixture.id, fixture]));
+      createdFixtures.forEach((fixture) => byId.set(fixture.id, fixture as unknown as Fixture));
+      return Array.from(byId.values());
+    });
+    // Reconcile with the server in the background without delaying the new fixture display.
+    void getAdminFixtures().then((nextFixtures) => setFixtures(nextFixtures as Fixture[]));
   };
 
   const handleDeleteFixtureGroup = async (fixtureIds: string[]) => {
