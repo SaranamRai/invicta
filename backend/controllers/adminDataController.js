@@ -628,7 +628,7 @@ async function validateRescheduleCandidate(payload, excludeId, overrideOptions =
 
   const dateValue = dateString || toDateInputValue(new Date(start));
   const proposedDate = getFixtureDateFromInput(dateValue);
-  if (!proposedDate || (proposedDate.getDay() !== 0 && proposedDate.getDay() !== 6)) {
+  if (!proposedDate || (!overrideOptions.allowWeekdays && proposedDate.getDay() !== 0 && proposedDate.getDay() !== 6)) {
     const error = new Error("Only weekend match days are allowed for fixture rescheduling.");
     error.status = 400;
     throw error;
@@ -1227,7 +1227,7 @@ export async function createFixture(req, res) {
     createdBy: req.user?.id,
   };
 
-  const { start, end } = await assertFixtureNoClash(payload);
+  const { start, end } = await validateRescheduleCandidate(payload, undefined, { allowWeekdays: true });
   const fixture = await Fixture.create({ ...payload, startTime: start, endTime: end });
   return res.status(201).json(mapFixture(fixture));
 }
