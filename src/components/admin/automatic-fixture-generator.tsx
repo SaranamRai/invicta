@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, Download, GitFork, Loader2, MapPin, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
+import { CalendarDays, Clock, Download, GitFork, Loader2, MapPin, Plus, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
 import {
   AdminFixturePayload,
   generateAdminFixtures,
   getAdminSports,
   getAdminTournaments,
   getAdminVenues,
+  createAdminFixture,
+  getAdminTeams,
   MongoSport,
+  TeamSyncPayload,
   TournamentPayload,
   VenuePayload,
 } from "@/lib/api";
@@ -371,6 +374,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [sports, setSports] = useState<MongoSport[]>([]);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [venues, setVenues] = useState<VenuePayload[]>([]);
+  const [teams, setTeams] = useState<TeamSyncPayload[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState("");
@@ -388,6 +392,17 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [dayEndTime, setDayEndTime] = useState("17:00");
   const [matchDurationMinutes, setMatchDurationMinutes] = useState(45);
   const [gapMinutes, setGapMinutes] = useState(15);
+  const [playDays, setPlayDays] = useState<number[]>([0, 6]);
+  const [manualSportId, setManualSportId] = useState("");
+  const [manualCategory, setManualCategory] = useState<"Male" | "Female" | "Mixed">("Male");
+  const [manualTeamA, setManualTeamA] = useState("");
+  const [manualTeamB, setManualTeamB] = useState("");
+  const [manualDate, setManualDate] = useState(getTodayInputValue());
+  const [manualTime, setManualTime] = useState("09:00");
+  const [manualVenue, setManualVenue] = useState("");
+  const [manualRound, setManualRound] = useState("");
+  const [manualDuration, setManualDuration] = useState(45);
+  const [manualSaving, setManualSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -395,10 +410,11 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     async function loadOptions() {
       setLoadingOptions(true);
       try {
-        const [nextSports, nextTournaments, nextVenues] = await Promise.all([
+        const [nextSports, nextTournaments, nextVenues, nextTeams] = await Promise.all([
           getAdminSports(),
           getAdminTournaments(),
           getAdminVenues(),
+          getAdminTeams(),
         ]);
 
         if (!isMounted) return;
@@ -406,7 +422,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         setSports(nextSports);
         setTournaments(nextTournaments);
         setVenues(nextVenues);
+        setTeams(nextTeams.filter((team) => team.status === "approved"));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
+        setManualSportId(nextSports[0]?._id || "");
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
         setTournamentId(getTournamentId(nextTournaments[0] || {}));
         setVenueBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getVenueId(nextVenues[0] || {})])));
@@ -425,6 +443,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   }, []);
 
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
+  const manualSport = sports.find((sport) => sport._id === manualSportId);
+  const manualTeams = teams.filter((team) => {
+    const teamSport = String(team.sportId || team.sportName || team.sport || "").toLowerCase();
+    const sportName = String(manualSport?.sportName || manualSport?.name || "").toLowerCase();
+    return teamSport === manualSportId.toLowerCase() || teamSport === sportName || String(team.sport || "").toLowerCase() === sportName.replace(/\s+/g, "-");
+  }).filter((team) => !manualCategory || team.category === manualCategory);
   const selectedIncludesFootball = useMemo(() => selectedSports.some(isFootballSport), [selectedSports]);
   const fixturesBySport = useMemo(() => {
     const groups = new Map<string, { sportName: string; fixtures: AdminFixturePayload[] }>();
@@ -452,9 +476,11 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     );
 
     const missingVenueSport = selectedSports.find((sport) => !venueBySport[sport._id]);
-    if (!tournamentId || generationTargets.length === 0 || missingVenueSport) {
+    if (!tournamentId || generationTargets.length === 0 || missingVenueSport || playDays.length === 0) {
       setError(missingVenueSport
         ? `Please select a venue for ${getSportLabel(missingVenueSport)}.`
+        : playDays.length === 0
+          ? "Select at least one day of the week for fixture generation."
         : "Please select tournament and at least one sport/category before generating fixtures.");
       return;
     }
@@ -477,6 +503,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           dayEndTime,
           matchDurationMinutes,
           gapMinutes,
+          playDays,
         });
         results.push(result);
       }
@@ -507,6 +534,41 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     } finally {
       setDeletingGroup("");
     }
+
+  }
+
+  async function handleManualCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+    if (!tournamentId || !manualSportId || !manualTeamA || !manualTeamB || manualTeamA === manualTeamB || !manualVenue) {
+      setError("Select a tournament, sport, two different teams, and a venue for the manual fixture.");
+      return;
+    }
+    setManualSaving(true);
+    try {
+      const created = await createAdminFixture({
+        tournamentId,
+        sportId: manualSportId,
+        category: manualCategory,
+        teamA: manualTeamA,
+        teamB: manualTeamB,
+        date: manualDate,
+        time: manualTime,
+        venue: manualVenue,
+        round: manualRound || undefined,
+        matchDurationMinutes: manualDuration,
+        gapMinutes,
+      });
+      onGenerated([created]);
+      setMessage("Manual fixture created successfully.");
+      setManualTeamA("");
+      setManualTeamB("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the manual fixture.");
+    } finally {
+      setManualSaving(false);
+    }
   }
 
   return (
@@ -519,7 +581,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         <div>
           <h2 className="sport-heading text-2xl font-black text-foreground">Generate Fixtures</h2>
           <p className="max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Generate approved-team fixtures for multiple sports and categories. Football and volleyball use a shuffled single round-robin schedule where each team plays every other team once, while the backend validates weekends, one match per team per day, venue clashes, and volunteer assignment clashes before saving.
+            Generate approved-team fixtures for multiple sports and categories. Football and volleyball use a shuffled single round-robin schedule where each team plays every other team once, while the backend validates your selected play days, one match per team per day, venue clashes, and volunteer assignment clashes before saving.
           </p>
         </div>
       </div>
@@ -664,6 +726,35 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                 />
               </label>
 
+              <div className="space-y-2 md:col-span-2 lg:col-span-4">
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  <CalendarDays size={13} /> Days this sport will be played
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ["Sunday", 0],
+                    ["Monday", 1],
+                    ["Tuesday", 2],
+                    ["Wednesday", 3],
+                    ["Thursday", 4],
+                    ["Friday", 5],
+                    ["Saturday", 6],
+                  ].map(([label, day]) => (
+                    <label key={day} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={playDays.includes(Number(day))}
+                        onChange={(event) => setPlayDays((current) => event.target.checked
+                          ? [...new Set([...current, Number(day)])]
+                          : current.filter((item) => item !== Number(day)))}
+                        className="accent-accent"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <label className="space-y-2">
                 <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                   <CalendarDays size={13} /> End Date (optional)
@@ -732,7 +823,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                     const venue = venues.find((item) => getVenueId(item) === venueBySport[sport._id]);
                     return `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"}${venue ? `, ${venue.name}` : ", no venue"})`;
                   }).join(" / ")
-                : "Select sports and categories"}. The backend saves fixtures only on Saturdays and Sundays, allows as many matches per day as the time window permits, and keeps each team to one match per day. Each sport uses its selected venue. Full-time controls apply only to football.
+                  : "Select sports and categories"}. The schedule will use {playDays.map((day) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]).join(", ") || "the selected days"}, allows as many matches per day as the time window permits, and keeps each team to one match per day. Each sport uses its selected venue. Full-time controls apply only to football.
             </div>
 
             {(message || error) && (
@@ -757,6 +848,50 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
             </div>
           </div>
         )}
+      </form>
+
+      <form onSubmit={handleManualCreate} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-xl bg-accent/10 p-2 text-accent"><Plus size={18} /></div>
+          <div>
+            <h3 className="sport-heading text-xl font-black text-foreground">Add Manual Fixture</h3>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Enter a fixture that was prepared on paper or outside the automatic generator.</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <select value={manualSportId} onChange={(event) => { setManualSportId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">Select sport...</option>
+            {sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}
+          </select>
+          <select value={manualCategory} onChange={(event) => { setManualCategory(event.target.value as "Male" | "Female" | "Mixed"); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            {(manualSport ? getFixtureCategories(manualSport) : ["Male", "Female"]).map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <select value={manualTeamA} onChange={(event) => setManualTeamA(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">Team A...</option>
+            {manualTeams.map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
+          </select>
+          <select value={manualTeamB} onChange={(event) => setManualTeamB(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">Team B...</option>
+            {manualTeams.filter((team) => team.id !== manualTeamA).map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
+          </select>
+          <input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
+          <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
+          <select value={manualVenue} onChange={(event) => setManualVenue(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">Venue...</option>
+            {venues.map((venue) => <option key={getVenueId(venue)} value={venue.name}>{venue.name}</option>)}
+          </select>
+          <input type="text" value={manualRound} onChange={(event) => setManualRound(event.target.value)} placeholder="Round (optional)" className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground placeholder:text-muted-foreground" />
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Match duration (minutes)
+            <input type="number" min={1} value={manualDuration} onChange={(event) => setManualDuration(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
+          </label>
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button type="submit" disabled={manualSaving} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-xs font-black uppercase tracking-[0.2em] text-accent-foreground disabled:opacity-50">
+            {manualSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            {manualSaving ? "Saving..." : "Create Manual Fixture"}
+          </button>
+        </div>
       </form>
 
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">

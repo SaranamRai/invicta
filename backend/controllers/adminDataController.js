@@ -185,9 +185,15 @@ function toDateInputValue(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function isWeekend(date) {
-  const day = date.getDay();
-  return day === 0 || day === 6;
+function parsePlayDays(value) {
+  const days = Array.isArray(value) ? value.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [0, 6];
+  const uniqueDays = [...new Set(days)];
+  if (uniqueDays.length === 0) {
+    const error = new Error("Select at least one day of the week for fixture generation");
+    error.status = 400;
+    throw error;
+  }
+  return uniqueDays;
 }
 
 function isSameFixtureSport(fixture, sportDoc) {
@@ -486,17 +492,17 @@ async function syncApprovedRegistrationsForFixtureGeneration({ tournament, sport
   )));
 }
 
-function getNextWeekendDate(date) {
+function getNextAllowedDate(date, allowedDays = [0, 6]) {
   const nextDate = new Date(date);
-  while (!isWeekend(nextDate)) {
+  while (!allowedDays.includes(nextDate.getDay())) {
     nextDate.setDate(nextDate.getDate() + 1);
   }
   return nextDate;
 }
 
-function buildByeFixturePayload({ team, sportDoc, tournament, venueName, category, date, round, userId }) {
+function buildByeFixturePayload({ team, sportDoc, tournament, venueName, category, date, round, userId, allowedDays }) {
   const sportName = sportDoc.sportName || sportDoc.name || "Sport";
-  const dateString = toDateInputValue(getNextWeekendDate(date));
+  const dateString = toDateInputValue(getNextAllowedDate(date, allowedDays));
   const now = Date.now();
 
   return {
@@ -1096,7 +1102,22 @@ export async function createFixture(req, res) {
   }
 
   const sportName = sportDoc.sportName || sportDoc.name;
+  const fullMatchMinutes = parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time");
+  const manualStart = req.body.startTime
+    ? new Date(req.body.startTime)
+    : toCandidateFixtureDateTime(req.body.date, req.body.time);
+  if (!manualStart || Number.isNaN(manualStart.getTime())) {
+    return res.status(400).json({ message: "A valid fixture date and time are required" });
+  }
+  const manualEnd = req.body.endTime
+    ? new Date(req.body.endTime)
+    : new Date(manualStart.getTime() + fullMatchMinutes * 60 * 1000);
+  if (Number.isNaN(manualEnd.getTime()) || manualEnd <= manualStart) {
+    return res.status(400).json({ message: "Fixture end time must be after the start time" });
+  }
   const payload = {
+    tournamentId: req.body.tournamentId || undefined,
+    tournamentName: req.body.tournamentName || "",
     sport: normalizeSport(sportName),
     sportName,
     sportId: sportDoc._id,
@@ -1111,9 +1132,9 @@ export async function createFixture(req, res) {
     venue: normalizeText(req.body.venue),
     date: req.body.date,
     time: req.body.time,
-    startTime: req.body.startTime,
-    endTime: req.body.endTime,
-    fullMatchSeconds: parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time") * 60,
+    startTime: manualStart,
+    endTime: manualEnd,
+    fullMatchSeconds: fullMatchMinutes * 60,
     matchGapMinutes: Math.max(0, Math.floor(Number(req.body.matchGapMinutes || req.body.gapMinutes || 0))),
     round: normalizeText(req.body.round),
     status: req.body.status || "upcoming",
@@ -1159,6 +1180,7 @@ export async function generateFixtures(req, res) {
 
   const startDate = parseDateOnly(req.body.startDate);
   const endDate = req.body.endDate ? parseDateOnly(req.body.endDate) : null;
+  const playDays = parsePlayDays(req.body.playDays);
   const dayStartMinutes = parseTimeToMinutes(req.body.dayStartTime, "Day start time");
   const dayEndMinutes = parseTimeToMinutes(req.body.dayEndTime, "Day end time");
   const matchDurationMinutes = parsePositiveMinutes(req.body.matchDurationMinutes, "Match duration");
@@ -1214,6 +1236,7 @@ export async function generateFixtures(req, res) {
       date: startDate,
       round: "Default Winner",
       userId: req.user?.id,
+      allowedDays: playDays,
     }));
   }
 
@@ -1233,7 +1256,7 @@ export async function generateFixtures(req, res) {
 
     for (let dayOffset = 0; dayOffset < 365 && !placed; dayOffset += 1) {
       if (endDate && cursorDate > endDate) break;
-      while (!isWeekend(cursorDate)) {
+      while (!playDays.includes(cursorDate.getDay())) {
         cursorDate.setDate(cursorDate.getDate() + 1);
         cursorMinutes = dayStartMinutes;
         if (endDate && cursorDate > endDate) break;

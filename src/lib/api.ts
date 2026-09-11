@@ -431,6 +431,7 @@ export interface GenerateFixturesPayload {
   dayEndTime: string;
   matchDurationMinutes: number;
   gapMinutes: number;
+  playDays?: number[];
 }
 
 export interface GenerateFixturesResponse {
@@ -441,6 +442,26 @@ export interface GenerateFixturesResponse {
 
 export function generateAdminFixtures(payload: GenerateFixturesPayload) {
   return apiFetch<GenerateFixturesResponse>("/admin/fixtures/generate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createAdminFixture(payload: {
+  tournamentId?: string;
+  sportId: string;
+  category: "Male" | "Female" | "Mixed";
+  teamA: string;
+  teamB: string;
+  date: string;
+  time: string;
+  venue?: string;
+  matchTitle?: string;
+  round?: string;
+  matchDurationMinutes?: number;
+  gapMinutes?: number;
+}) {
+  return apiFetch<AdminFixturePayload>("/admin/fixtures", {
     method: "POST",
     body: JSON.stringify(payload),
   });
