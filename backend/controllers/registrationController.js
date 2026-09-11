@@ -33,12 +33,13 @@ function getRegNoList(body) {
   return regNos.filter(Boolean);
 }
 
-function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, members }) {
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainSemester, captainProfilePhoto, members }) {
   return [
     {
       name: captainName,
       email: captainEmail,
       registrationNumber: captainRegNo,
+      semester: captainSemester || "",
       role: "captain",
       profilePhoto: captainProfilePhoto || "",
     },
@@ -155,6 +156,8 @@ export async function submitRegistration(req, res) {
     if (!trimmedCaptainEmail) return res.status(400).json({ message: "Captain email is required" });
     if (!isValidEmail(trimmedCaptainEmail)) return res.status(400).json({ message: "Captain email is invalid" });
     if (!trimmedCaptainPhone) return res.status(400).json({ message: "Captain phone is required" });
+    const trimmedCaptainSemester = String(req.body.captainSemester || "").trim();
+    if (!trimmedCaptainSemester) return res.status(400).json({ message: "Captain semester is required" });
 
     // Validate sport exists
     const [sport, tournament] = await Promise.all([
@@ -192,10 +195,7 @@ export async function submitRegistration(req, res) {
         return res.status(400).json({ message: `Member ${i + 1} registration number is required` });
       }
       const memberEmail = String(member.email || "").trim().toLowerCase();
-      if (!memberEmail) {
-        return res.status(400).json({ message: `Member ${i + 1} email is required` });
-      }
-      if (!isValidEmail(memberEmail)) {
+      if (memberEmail && !isValidEmail(memberEmail)) {
         return res.status(400).json({ message: `Member ${i + 1} email is invalid` });
       }
     }
@@ -244,6 +244,7 @@ export async function submitRegistration(req, res) {
       captainName: trimmedCaptainName,
       captainEmail: trimmedCaptainEmail,
       captainRegNo: cleanCaptainRegNo,
+      captainSemester: trimmedCaptainSemester,
       captainProfilePhoto: cleanCaptainProfilePhoto,
       members: storedMembers,
     });
