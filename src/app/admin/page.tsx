@@ -425,11 +425,13 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadApprovedTeams();
+    void loadApprovedTeams();
+    const refreshInterval = window.setInterval(() => void loadApprovedTeams(true), 1000);
+    return () => window.clearInterval(refreshInterval);
   }, []);
 
-  async function loadApprovedTeams() {
-    setLoading(true);
+  async function loadApprovedTeams(silent = false) {
+    if (!silent) setLoading(true);
     setMessage("");
     try {
       const [data, setupTournaments, setupSports] = await Promise.all([
@@ -517,12 +519,12 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="sport-heading text-2xl font-black text-foreground">Approved Teams</h2>
-          <p className="text-sm text-muted-foreground">Download by tournament for all sports, or narrow to one sport and Male/Female category.</p>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Registered Teams</h2>
+          <p className="text-sm text-muted-foreground">Select a tournament to view its registered teams, then narrow by sport and category.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={loadApprovedTeams}
+            onClick={() => void loadApprovedTeams()}
             className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
           >
             Refresh
@@ -709,8 +711,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     let isMounted = true;
+    let refreshing = false;
 
     async function loadAdminData() {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const [nextTeams, nextFixtures, nextTournaments] = await Promise.all([
           getAdminTeams(),
@@ -725,13 +730,17 @@ export default function AdminDashboard() {
         setTournaments(nextTournaments);
       } catch (error) {
         console.error("Failed to load Mongo admin data:", error);
+      } finally {
+        refreshing = false;
       }
     }
 
     void loadAdminData();
+    const refreshInterval = window.setInterval(() => void loadAdminData(), 1000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(refreshInterval);
     };
   }, []);
 

@@ -394,6 +394,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [gapMinutes, setGapMinutes] = useState(15);
   const [playDays, setPlayDays] = useState<number[]>([0, 6]);
   const [manualSportId, setManualSportId] = useState("");
+  const [manualTournamentId, setManualTournamentId] = useState("");
   const [manualCategory, setManualCategory] = useState<"Male" | "Female" | "Mixed">("Male");
   const [manualTeamA, setManualTeamA] = useState("");
   const [manualTeamB, setManualTeamB] = useState("");
@@ -422,11 +423,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         setSports(nextSports);
         setTournaments(nextTournaments);
         setVenues(nextVenues);
-        setTeams(nextTeams.filter((team) => team.status === "approved"));
+        setTeams(nextTeams.filter((team) => team.status === "approved" || team.status === "ready"));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
         setManualSportId(nextSports[0]?._id || "");
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
         setTournamentId(getTournamentId(nextTournaments[0] || {}));
+        setManualTournamentId(getTournamentId(nextTournaments[0] || {}));
         setVenueBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getVenueId(nextVenues[0] || {})])));
       } catch (err) {
         if (isMounted) setError(err instanceof Error ? err.message : "Could not load fixture setup data.");
@@ -445,6 +447,8 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
   const manualSport = sports.find((sport) => sport._id === manualSportId);
   const manualTeams = teams.filter((team) => {
+    const teamTournament = String(team.tournamentId || "");
+    if (manualTournamentId && teamTournament !== manualTournamentId) return false;
     const teamSport = String(team.sportId || team.sportName || team.sport || "").toLowerCase();
     const sportName = String(manualSport?.sportName || manualSport?.name || "").toLowerCase();
     return teamSport === manualSportId.toLowerCase() || teamSport === sportName || String(team.sport || "").toLowerCase() === sportName.replace(/\s+/g, "-");
@@ -541,15 +545,15 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     event.preventDefault();
     setMessage("");
     setError("");
-    if (!tournamentId || !manualSportId || !manualTeamA || !manualTeamB || manualTeamA === manualTeamB || !manualVenue) {
+    if (!manualTournamentId || !manualSportId || !manualTeamA || !manualTeamB || manualTeamA === manualTeamB || !manualVenue) {
       setError("Select a tournament, sport, two different teams, and a venue for the manual fixture.");
       return;
     }
     setManualSaving(true);
     try {
       const created = await createAdminFixture({
-        tournamentId,
         sportId: manualSportId,
+        tournamentId: manualTournamentId || undefined,
         category: manualCategory,
         teamA: manualTeamA,
         teamB: manualTeamB,
@@ -859,6 +863,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <select value={manualTournamentId} onChange={(event) => { setManualTournamentId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">Select tournament...</option>
+            {tournaments.map((tournament) => <option key={getTournamentId(tournament)} value={getTournamentId(tournament)}>{tournament.name}</option>)}
+          </select>
           <select value={manualSportId} onChange={(event) => { setManualSportId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             <option value="">Select sport...</option>
             {sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}
