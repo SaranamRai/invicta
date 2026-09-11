@@ -404,6 +404,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [manualRound, setManualRound] = useState("");
   const [manualDuration, setManualDuration] = useState(45);
   const [manualSaving, setManualSaving] = useState(false);
+  const [fixtureMode, setFixtureMode] = useState<"automatic" | "manual">("manual");
 
   useEffect(() => {
     let isMounted = true;
@@ -594,14 +595,33 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           Fixture Scheduler
         </span>
         <div>
-          <h2 className="sport-heading text-2xl font-black text-foreground">Generate Fixtures</h2>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Create Fixtures</h2>
           <p className="max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Generate approved-team fixtures for multiple sports and categories. Football and volleyball use a shuffled single round-robin schedule where each team plays every other team once, while the backend validates your selected play days, one match per team per day, venue clashes, and volunteer assignment clashes before saving.
+            Choose one method below. Use automatic generation for a full schedule or manual creation for fixtures prepared on paper.
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setFixtureMode("automatic")}
+          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "automatic" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
+        >
+          <span className="block text-xs font-black uppercase tracking-widest">Automatic Generation</span>
+          <span className="mt-1 block text-xs font-medium opacity-80">Create a complete schedule from registered teams.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFixtureMode("manual")}
+          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "manual" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
+        >
+          <span className="block text-xs font-black uppercase tracking-widest">Manual Creation</span>
+          <span className="mt-1 block text-xs font-medium opacity-80">Add one fixture from a paper schedule.</span>
+        </button>
+      </div>
+
+      {fixtureMode === "automatic" && <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         {loadingOptions ? (
           <div className="flex items-center justify-center gap-3 py-16 text-sm font-bold text-muted-foreground">
             <Loader2 className="animate-spin text-accent" size={20} />
@@ -863,9 +883,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
             </div>
           </div>
         )}
-      </form>
+      </form>}
 
-      <form onSubmit={handleManualCreate} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      {fixtureMode === "manual" && <form onSubmit={handleManualCreate} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="mb-5 flex items-start gap-3">
           <div className="rounded-xl bg-accent/10 p-2 text-accent"><Plus size={18} /></div>
           <div>
@@ -911,7 +931,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
             {manualSaving ? "Saving..." : "Create Manual Fixture"}
           </button>
         </div>
-      </form>
+      </form>}
 
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
