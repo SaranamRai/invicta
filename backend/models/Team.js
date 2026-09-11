@@ -9,6 +9,8 @@ const teamSchema = new mongoose.Schema(
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
     tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
     tournamentName: { type: String, trim: true },
+    source: { type: String, enum: ["manual", "registration"], default: "manual" },
+    registrationId: { type: mongoose.Schema.Types.ObjectId, ref: "TeamRegistration", default: null },
     category: { type: String, enum: ["Male", "Female", "Mixed"], default: "Male" },
     captainName: { type: String, trim: true },
     captainRegNo: { type: String, trim: true, uppercase: true },
@@ -21,7 +23,7 @@ const teamSchema = new mongoose.Schema(
     viceCaptainName: { type: String, trim: true },
     members: [{ type: mongoose.Schema.Types.Mixed }],
     logo: { type: String },
-    status: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
+    status: { type: String, enum: ["draft", "ready", "registered", "pending", "approved", "completed", "withdrawn", "rejected"], default: "draft" },
     submittedAt: { type: Date },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId },
     reviewedAt: { type: Date },
@@ -36,5 +38,6 @@ const teamSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 
 export default mongoose.model("Team", teamSchema);

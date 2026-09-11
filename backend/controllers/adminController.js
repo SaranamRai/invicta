@@ -369,7 +369,7 @@ export async function reviewTeamRegistration(req, res) {
 
   if (status === "approved") {
     const sportName = registration.sportName || "";
-    await Team.findOneAndUpdate(
+    const linkedTeam = await Team.findOneAndUpdate(
       {
         sportId: registration.sportId,
         tournamentId: registration.tournamentId,
@@ -399,10 +399,14 @@ export async function reviewTeamRegistration(req, res) {
         reviewedBy: req.user.id,
         reviewedAt,
         rejectionReason: "",
+        source: "registration",
+        registrationId: registration._id,
         registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+    registration.teamId = linkedTeam?._id || null;
+    await registration.save();
 
     try {
       const emailResult = await sendTeamApprovedEmail({

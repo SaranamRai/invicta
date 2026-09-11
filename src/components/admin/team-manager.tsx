@@ -21,7 +21,7 @@ interface ExtendedTeam extends Team {
   category?: string;
   sportId?: string;
   sportName?: string;
-  status?: "approved" | "pending" | "rejected";
+  status?: "draft" | "ready" | "registered" | "approved" | "completed" | "withdrawn" | "pending" | "rejected";
   wins?: number;
   losses?: number;
   draws?: number;
@@ -258,7 +258,7 @@ export function TeamManager({
       captainPhone: normalizePhone(captainPhone),
       contactNumber: normalizePhone(captainPhone),
       logo,
-      status: "approved",
+      status: "draft",
       wins,
       losses,
       registeredAt: savedRegisteredAt,

@@ -334,7 +334,7 @@ export interface TeamSyncPayload {
   phone?: string;
   contactNumber?: string;
   logo?: string;
-  status?: string;
+  status?: "draft" | "ready" | "registered" | "approved" | "completed" | "withdrawn" | "pending" | "rejected" | string;
   reviewedAt?: string;
   wins?: number;
   losses?: number;
@@ -343,6 +343,7 @@ export interface TeamSyncPayload {
   registeredAt?: number;
   playerRegisteredAt?: number[];
   source?: string;
+  registrationId?: string;
 }
 
 type TeamWritePayload = Omit<TeamSyncPayload, "id">;
@@ -379,6 +380,24 @@ export function updateAdminTeam(team: TeamSyncPayload) {
 export function deleteAdminTeam(teamId: string) {
   return apiFetch(`/admin/teams/${encodeURIComponent(teamId)}`, {
     method: "DELETE",
+  });
+}
+
+export function getAdminTeam(teamId: string) {
+  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}`);
+}
+
+export function updateAdminTeamMembers(teamId: string, members: unknown[]) {
+  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}/members`, {
+    method: "PUT",
+    body: JSON.stringify({ members }),
+  });
+}
+
+export function assignAdminTeamCaptain(teamId: string, registrationNo: string) {
+  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}/captain`, {
+    method: "PATCH",
+    body: JSON.stringify({ registrationNo }),
   });
 }
 
@@ -645,7 +664,7 @@ export interface MongoTeam {
   points?: number;
   registeredAt?: number;
   playerRegisteredAt?: number[];
-  status?: "pending" | "approved" | "rejected";
+  status?: "draft" | "ready" | "registered" | "pending" | "approved" | "completed" | "withdrawn" | "rejected";
   reviewedAt?: string;
   createdAt?: string;
 }

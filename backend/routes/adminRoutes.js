@@ -10,6 +10,9 @@ import {
   generateFixtures,
   listFixtures,
   listTeams,
+  getTeam,
+  updateTeamMembers,
+  assignTeamCaptain,
   replaceFixtures,
   rescheduleFixture,
   updateFixture,
@@ -63,8 +66,11 @@ router.post("/departments", superOnly, adminHandlers.createDepartment);
 router.put("/departments/:id", superOnly, adminHandlers.updateDepartment);
 router.delete("/departments/:id", superOnly, adminHandlers.deleteDepartment);
 router.get("/teams", adminOrSuper, listTeams);
+router.get("/teams/:id", adminOrSuper, getTeam);
 router.post("/teams", superOnly, createTeam);
 router.put("/teams/:id", superOnly, updateTeam);
+router.put("/teams/:id/members", superOnly, updateTeamMembers);
+router.patch("/teams/:id/captain", superOnly, assignTeamCaptain);
 router.delete("/teams/:id", superOnly, deleteTeam);
 router.patch("/team-registrations/:id/review", superOnly, reviewTeamRegistration);
 router.get("/fixtures", adminOrSuper, listFixtures);

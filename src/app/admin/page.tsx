@@ -9,6 +9,7 @@ import { TournamentManager } from "@/components/admin/tournament-manager";
 import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
+import { TeamManager } from "@/components/admin/team-manager";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Download, LogOut, CheckCircle, Trash2, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -34,6 +35,9 @@ import {
   TeamRegistrationPayload,
   TournamentPayload,
   downloadApprovedRegistrationsExcel,
+  createAdminTeam,
+  updateAdminTeam,
+  deleteAdminTeam,
 } from "@/lib/api";
 
 type AdminTab =
@@ -769,6 +773,33 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAddManualTeam = async (team: Team) => {
+    try {
+      const saved = await createAdminTeam(team as never);
+      setTeams((current) => [saved as Team, ...current]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to create team.");
+    }
+  };
+
+  const handleUpdateManualTeam = async (team: Team) => {
+    try {
+      const saved = await updateAdminTeam(team as never);
+      setTeams((current) => current.map((item) => item.id === team.id ? saved as Team : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to update team.");
+    }
+  };
+
+  const handleDeleteManualTeam = async (teamId: string) => {
+    try {
+      await deleteAdminTeam(teamId);
+      setTeams((current) => current.filter((team) => team.id !== teamId));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to delete team.");
+    }
+  };
+
   const handleLogout = async () => {
     await logoutPortalSession();
     router.replace("/login");
@@ -881,28 +912,27 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "teams" && canManageSetup && (
-          <ApprovedTeamsPanel
-            onTeamDeleted={(registration) => {
-              setTeams((currentTeams) =>
-                currentTeams.filter((team) => {
+          <div className="space-y-8">
+            <TeamManager
+              teams={teams}
+              onAddTeam={handleAddManualTeam}
+              onUpdateTeam={handleUpdateManualTeam}
+              onRemoveTeam={handleDeleteManualTeam}
+            />
+            <ApprovedTeamsPanel
+              onTeamDeleted={(registration) => {
+                setTeams((currentTeams) => currentTeams.filter((team) => {
                   const mongoTeam = team as Team & { sportId?: string; captainRegNo?: string };
-                  const sameRegistration = (
+                  return !(
                     mongoTeam.sportId === registration.sportId &&
                     team.category === registration.category &&
                     team.department === registration.department &&
-                    team.name === registration.teamName
+                    (team.name === registration.teamName || mongoTeam.captainRegNo === registration.captainRegNo)
                   );
-                  const sameCaptain = (
-                    mongoTeam.sportId === registration.sportId &&
-                    team.category === registration.category &&
-                    team.department === registration.department &&
-                    mongoTeam.captainRegNo === registration.captainRegNo
-                  );
-                  return !sameRegistration && !sameCaptain;
-                })
-              );
-            }}
-          />
+                }));
+              }}
+            />
+          </div>
         )}
 
         {activeTab === "generate-fixtures" && canManageSetup && (

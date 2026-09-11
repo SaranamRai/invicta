@@ -81,11 +81,15 @@ function mapTeam(team) {
     sportId: team.sportId?.toString?.() || "",
     tournamentId: team.tournamentId?.toString?.() || "",
     tournamentName: team.tournamentName || "",
+    source: team.source || "manual",
+    registrationId: team.registrationId?.toString?.() || "",
     category: team.category || "Male",
     members: team.members || [],
     coachCaptain: team.captainName || "",
     captainRegNo: team.captainRegNo || "",
     contactNumber: team.contactNumber || "",
+    captainEmail: team.captainEmail || "",
+    captainPhone: team.captainPhone || "",
     logo: team.logo || "",
     status: team.status,
     reviewedAt: team.reviewedAt,
@@ -827,6 +831,7 @@ export async function listTeams(req, res) {
         ],
       };
     }
+
   }
   const teams = await Team.find(query).sort({ createdAt: -1 }).lean();
   return res.json(teams.map(mapTeam));
@@ -837,6 +842,7 @@ function normalizeMember(member) {
     const text = normalizeText(member);
     return text || null;
   }
+
   if (member && typeof member === "object") {
     const fullName = normalizeText(member.fullName || member.name || "");
     const registrationNumber = member.registrationNumber || member.registrationNo || member.regNo ? normalizeText(String(member.registrationNumber || member.registrationNo || member.regNo)).toUpperCase() : "";
@@ -854,6 +860,51 @@ function normalizeMember(member) {
     };
   }
   return null;
+}
+
+export async function getTeam(req, res) {
+  requireObjectId(req.params.id, "Team id");
+  const team = await Team.findById(req.params.id).lean();
+  if (!team) return res.status(404).json({ message: "Team not found" });
+  return res.json(mapTeam(team));
+}
+
+export async function updateTeamMembers(req, res) {
+  requireObjectId(req.params.id, "Team id");
+  const team = await Team.findById(req.params.id);
+  if (!team) return res.status(404).json({ message: "Team not found" });
+  if (!Array.isArray(req.body.members)) return res.status(400).json({ message: "members must be an array" });
+  const seen = new Set();
+  team.members = req.body.members.map(normalizeMember).filter(Boolean).filter((member) => {
+    const key = typeof member === "string" ? member.toUpperCase() : (member.registrationNo || member.registrationNumber || member.fullName || "").toUpperCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  await team.save();
+  await syncTeamPlayers(team);
+  return res.json(mapTeam(team));
+}
+
+export async function assignTeamCaptain(req, res) {
+  requireObjectId(req.params.id, "Team id");
+  const team = await Team.findById(req.params.id);
+  if (!team) return res.status(404).json({ message: "Team not found" });
+  const captainRegNo = normalizeText(req.body.registrationNo || req.body.captainRegNo).toUpperCase();
+  const captain = (team.members || []).find((member) => {
+    const value = typeof member === "string" ? member : member?.registrationNo || member?.registrationNumber || member?.regNo;
+    return captainRegNo && String(value || "").toUpperCase() === captainRegNo;
+  });
+  if (!captain) return res.status(400).json({ message: "Captain must be an existing team member" });
+  const captainData = typeof captain === "string" ? { fullName: captain } : captain;
+  team.captainName = normalizeText(captainData.fullName || captainData.name);
+  team.captainRegNo = captainRegNo;
+  team.captainEmail = normalizeText(captainData.email).toLowerCase();
+  team.captainPhone = normalizeText(captainData.phone);
+  team.contactNumber = team.captainPhone;
+  await team.save();
+  await syncTeamPlayers(team);
+  return res.json(mapTeam(team));
 }
 
 function hasTeamMatchOnDate(payload, fixtures) {
@@ -909,18 +960,33 @@ export async function createTeam(req, res) {
   assertSportAccess(req, sport);
 
   const sportDoc = await getOrCreateSport(sport);
+  const category = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : "Male";
+  const duplicate = await Team.findOne({
+    sportId: sportDoc._id, tournamentId: req.body.tournamentId || null, category,
+    department: { $regex: `^${escapeRegExp(department)}$`, $options: "i" },
+    teamName: { $regex: `^${escapeRegExp(teamName)}$`, $options: "i" },
+    status: { $ne: "rejected" },
+  }).lean();
+  if (duplicate) return res.status(409).json({ message: "A team with this name already exists for the department, sport, tournament, and category" });
   const team = await Team.create({
     teamName,
     department,
     sport,
     sportName: sportDoc.name,
     sportId: sportDoc._id,
+    tournamentId: req.body.tournamentId || null,
+    tournamentName: normalizeText(req.body.tournamentName),
+    category,
+    source: req.body.source === "registration" ? "registration" : "manual",
+    registrationId: req.body.registrationId || null,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName),
+    captainEmail: normalizeText(req.body.captainEmail || req.body.email).toLowerCase(),
+    captainPhone: normalizeText(req.body.captainPhone || req.body.phone || req.body.contactNumber),
     captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : "",
     contactNumber: normalizeText(req.body.contactNumber || req.body.phone),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember) : [],
     logo: req.body.logo || "",
-    status: req.body.status || "approved",
+    status: req.body.status || "draft",
     wins: Number(req.body.wins || 0),
     losses: Number(req.body.losses || 0),
     draws: Number(req.body.draws || 0),
@@ -947,16 +1013,32 @@ export async function updateTeam(req, res) {
 
   const sport = req.body.sport ? normalizeSport(req.body.sport) : existingTeam.sport;
   const sportDoc = await getOrCreateSport(sport);
+  const nextTeamName = normalizeText(req.body.name || req.body.teamName || existingTeam.teamName);
+  const nextDepartment = normalizeText(req.body.department || existingTeam.department);
+  const nextCategory = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : existingTeam.category;
+  const duplicate = await Team.findOne({
+    _id: { $ne: existingTeam._id }, sportId: sportDoc._id, tournamentId: req.body.tournamentId ?? existingTeam.tournamentId ?? null,
+    category: nextCategory, department: { $regex: `^${escapeRegExp(nextDepartment)}$`, $options: "i" },
+    teamName: { $regex: `^${escapeRegExp(nextTeamName)}$`, $options: "i" }, status: { $ne: "rejected" },
+  }).lean();
+  if (duplicate) return res.status(409).json({ message: "A team with this name already exists for the selected scope" });
 
   existingTeam.set({
-    teamName: normalizeText(req.body.name || req.body.teamName || existingTeam.teamName),
-    department: normalizeText(req.body.department || existingTeam.department),
+    teamName: nextTeamName,
+    department: nextDepartment,
     sport,
     sportName: sportDoc.name,
     sportId: sportDoc._id,
+    tournamentId: req.body.tournamentId ?? existingTeam.tournamentId,
+    tournamentName: req.body.tournamentName ?? existingTeam.tournamentName,
+    category: nextCategory,
+    source: req.body.source || existingTeam.source,
+    registrationId: req.body.registrationId ?? existingTeam.registrationId,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName || existingTeam.captainName),
     captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : existingTeam.captainRegNo,
-    contactNumber: normalizeText(req.body.contactNumber || existingTeam.contactNumber),
+    captainEmail: req.body.captainEmail !== undefined ? normalizeText(req.body.captainEmail).toLowerCase() : existingTeam.captainEmail,
+    captainPhone: req.body.captainPhone !== undefined ? normalizeText(req.body.captainPhone) : existingTeam.captainPhone,
+    contactNumber: normalizeText(req.body.contactNumber || req.body.phone || existingTeam.contactNumber),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember).filter(Boolean) : existingTeam.members,
     logo: req.body.logo ?? existingTeam.logo,
     status: req.body.status || existingTeam.status,
@@ -1212,7 +1294,7 @@ export async function generateFixtures(req, res) {
   });
 
   const teams = await Team.find({
-    status: "approved",
+    status: { $in: ["ready", "approved"] },
     tournamentId: tournament._id,
     category,
     $or: [

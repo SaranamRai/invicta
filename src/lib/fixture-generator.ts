@@ -11,7 +11,7 @@ export interface Team {
   coachCaptain?: string;
   contactNumber?: string;
   logo?: string;
-  status?: "approved" | "pending" | "rejected";
+  status?: "draft" | "ready" | "registered" | "approved" | "completed" | "withdrawn" | "pending" | "rejected";
   wins?: number;
   losses?: number;
   draws?: number;
