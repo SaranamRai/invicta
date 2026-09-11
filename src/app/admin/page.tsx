@@ -758,8 +758,6 @@ export default function AdminDashboard() {
       createdFixtures.forEach((fixture) => byId.set(fixture.id, fixture as unknown as Fixture));
       return Array.from(byId.values());
     });
-    // Reconcile with the server in the background without delaying the new fixture display.
-    void getAdminFixtures().then((nextFixtures) => setFixtures(nextFixtures as Fixture[]));
   };
 
   const handleDeleteFixtureGroup = async (fixtureIds: string[]) => {

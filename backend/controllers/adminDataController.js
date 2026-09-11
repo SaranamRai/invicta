@@ -662,6 +662,14 @@ async function validateRescheduleCandidate(payload, excludeId, overrideOptions =
     if (!range) continue;
     if (start >= range.end || end <= range.start) continue;
 
+    if (overrideOptions.rejectAnyOverlap) {
+      const error = new Error(
+        `Fixture collision warning: another match is already scheduled on ${dateValue} at ${fixture.time || "the selected time"}. Choose a different time.`
+      );
+      error.status = 409;
+      throw error;
+    }
+
     const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
     const sharedTeam = teamIds.find((teamId) => existingTeamIds.includes(teamId));
     if (sharedTeam) {
@@ -1227,7 +1235,10 @@ export async function createFixture(req, res) {
     createdBy: req.user?.id,
   };
 
-  const { start, end } = await validateRescheduleCandidate(payload, undefined, { allowWeekdays: true });
+  const { start, end } = await validateRescheduleCandidate(payload, undefined, {
+    allowWeekdays: true,
+    rejectAnyOverlap: true,
+  });
   const fixture = await Fixture.create({ ...payload, startTime: start, endTime: end });
   return res.status(201).json(mapFixture(fixture));
 }
