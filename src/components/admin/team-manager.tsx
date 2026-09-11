@@ -578,6 +578,11 @@ export function TeamManager({
                         <span className="inline-block text-[9px] font-black uppercase tracking-widest text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded mt-1.5">
                           {sportName} {team.category ? `/ ${team.category}` : ""}
                         </span>
+                        {team.tournamentName && (
+                          <span className="mt-1 block truncate text-[10px] font-bold text-slate-400">
+                            Tournament: {team.tournamentName}
+                          </span>
+                        )}
                       </div>
                     </div>
 

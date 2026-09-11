@@ -424,7 +424,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         setTournaments(nextTournaments);
         setVenues(nextVenues);
         setTeams(nextTeams.filter((team) =>
-          team.status === "approved" || team.status === "ready" || team.status === "registered"
+          team.status === "draft" ||
+          team.status === "approved" ||
+          team.status === "ready" ||
+          team.status === "registered"
         ));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
         setManualSportId(nextSports[0]?._id || "");
