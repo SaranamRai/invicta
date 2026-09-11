@@ -703,6 +703,7 @@ export default function AdminDashboard() {
   const account = getRoleAccount();
   const canManageSetup = account?.role === "supercoordinator";
   const [teams, setTeams] = useState<Team[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [activeTab, setActiveTab] = useState<AdminTab>(canManageSetup ? "dashboard" : "users");
 
@@ -711,15 +712,17 @@ export default function AdminDashboard() {
 
     async function loadAdminData() {
       try {
-        const [nextTeams, nextFixtures] = await Promise.all([
+        const [nextTeams, nextFixtures, nextTournaments] = await Promise.all([
           getAdminTeams(),
           getAdminFixtures(),
+          getAdminTournaments(),
         ]);
 
         if (!isMounted) return;
 
         setTeams(nextTeams as Team[]);
         setFixtures(nextFixtures as Fixture[]);
+        setTournaments(nextTournaments);
       } catch (error) {
         console.error("Failed to load Mongo admin data:", error);
       }
@@ -915,6 +918,7 @@ export default function AdminDashboard() {
           <div className="space-y-8">
             <TeamManager
               teams={teams}
+              tournaments={tournaments}
               onAddTeam={handleAddManualTeam}
               onUpdateTeam={handleUpdateManualTeam}
               onRemoveTeam={handleDeleteManualTeam}

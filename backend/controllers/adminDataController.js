@@ -950,16 +950,16 @@ async function syncTeamPlayers(team) {
 
 export async function createTeam(req, res) {
   const teamName = normalizeText(req.body.name || req.body.teamName);
-  const department = normalizeText(req.body.department || req.body.name || req.body.teamName);
-  const sport = normalizeSport(req.body.sport);
+  const department = normalizeText(req.body.department) || "Unassigned";
+  const sport = req.body.sport ? normalizeSport(req.body.sport) : "unassigned";
 
-  if (!teamName || !department || !sport) {
-    return res.status(400).json({ message: "Team name, department, and sport are required" });
+  if (!teamName) {
+    return res.status(400).json({ message: "Team name is required" });
   }
 
-  assertSportAccess(req, sport);
+  if (sport !== "unassigned") assertSportAccess(req, sport);
 
-  const sportDoc = await getOrCreateSport(sport);
+  const sportDoc = sport !== "unassigned" ? await getOrCreateSport(sport) : null;
   const category = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : "Male";
   const duplicate = await Team.findOne({
     sportId: sportDoc._id, tournamentId: req.body.tournamentId || null, category,
@@ -972,8 +972,8 @@ export async function createTeam(req, res) {
     teamName,
     department,
     sport,
-    sportName: sportDoc.name,
-    sportId: sportDoc._id,
+    sportName: sportDoc?.name || "",
+    sportId: sportDoc?._id || null,
     tournamentId: req.body.tournamentId || null,
     tournamentName: normalizeText(req.body.tournamentName),
     category,
@@ -1012,7 +1012,7 @@ export async function updateTeam(req, res) {
   if (!existingTeam) return res.status(404).json({ message: "Team not found" });
 
   const sport = req.body.sport ? normalizeSport(req.body.sport) : existingTeam.sport;
-  const sportDoc = await getOrCreateSport(sport);
+  const sportDoc = sport !== "unassigned" ? await getOrCreateSport(sport) : null;
   const nextTeamName = normalizeText(req.body.name || req.body.teamName || existingTeam.teamName);
   const nextDepartment = normalizeText(req.body.department || existingTeam.department);
   const nextCategory = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : existingTeam.category;
@@ -1027,8 +1027,8 @@ export async function updateTeam(req, res) {
     teamName: nextTeamName,
     department: nextDepartment,
     sport,
-    sportName: sportDoc.name,
-    sportId: sportDoc._id,
+    sportName: sportDoc?.name || "",
+    sportId: sportDoc?._id || null,
     tournamentId: req.body.tournamentId ?? existingTeam.tournamentId,
     tournamentName: req.body.tournamentName ?? existingTeam.tournamentName,
     category: nextCategory,

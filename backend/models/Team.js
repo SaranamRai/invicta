@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 const teamSchema = new mongoose.Schema(
   {
     teamName: { type: String, required: true, trim: true },
-    department: { type: String, required: true, trim: true },
-    sport: { type: String, required: true, trim: true, lowercase: true },
+    department: { type: String, required: true, trim: true, default: "Unassigned" },
+    sport: { type: String, required: true, trim: true, lowercase: true, default: "unassigned" },
     sportName: { type: String, trim: true },
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport" },
     tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
