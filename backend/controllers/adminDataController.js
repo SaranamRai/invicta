@@ -1312,7 +1312,7 @@ export async function generateFixtures(req, res) {
   });
 
   const teams = await Team.find({
-    status: { $in: ["ready", "approved"] },
+    status: { $in: ["draft", "ready", "approved"] },
     tournamentId: tournament._id,
     category,
     $or: [
@@ -1322,7 +1322,7 @@ export async function generateFixtures(req, res) {
   }).sort({ teamName: 1 }).lean();
 
   if (teams.length === 0) {
-    return res.status(400).json({ message: "At least one approved team is required to generate fixtures" });
+    return res.status(400).json({ message: "At least one draft or approved team is required to generate fixtures" });
   }
 
   const byeFixtures = [];

@@ -126,12 +126,12 @@ export async function volunteerTeams(req, res) {
   const assignedSportId = req.user.assignedSportId;
 
   const teamQuery = assignedSportId && assignedSport
-    ? { $or: [{ sportId: assignedSportId }, { sport: assignedSport }], status: "approved" }
+    ? { $or: [{ sportId: assignedSportId }, { sport: assignedSport }], status: { $in: ["draft", "approved"] } }
     : assignedSportId
-      ? { sportId: assignedSportId, status: "approved" }
+      ? { sportId: assignedSportId, status: { $in: ["draft", "approved"] } }
       : assignedSport
-        ? { sport: assignedSport, status: "approved" }
-        : { status: "approved" };
+        ? { sport: assignedSport, status: { $in: ["draft", "approved"] } }
+        : { status: { $in: ["draft", "approved"] } };
 
   const regQuery = assignedSportId
     ? { sportId: assignedSportId, status: "approved" }

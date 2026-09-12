@@ -178,7 +178,7 @@ export async function getStandings({ sport } = {}) {
 }
 
 export async function getTeams({ sport, search } = {}) {
-  const teams = await Team.find({ status: "approved" })
+  const teams = await Team.find({ status: { $in: ["draft", "approved"] } })
     .select("teamName department sport sportName sportId category members")
     .populate("sportId", "sportName name")
     .sort({ teamName: 1 })
@@ -259,7 +259,7 @@ export async function getEventInfo() {
 export async function getTournamentStatistics() {
   const [sports, teams, fixtures, results, live] = await Promise.all([
     Sport.countDocuments({ status: "active" }),
-    Team.countDocuments({ status: "approved" }),
+    Team.countDocuments({ status: { $in: ["draft", "approved"] } }),
     Fixture.countDocuments({}),
     Result.countDocuments({}),
     LiveScore.countDocuments({ currentStatus: { $in: ["live", "paused", "half-time"] } }),

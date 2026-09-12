@@ -82,6 +82,11 @@ function getBracketFileName(sportName: string) {
   return `invicta-${slug}-tournament-bracket.doc`;
 }
 
+function getExcelFileName(sportName: string) {
+  const slug = sportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "sport";
+  return `invicta-${slug}-fixtures.xls`;
+}
+
 function getFixtureTeamNames(fixtures: AdminFixturePayload[]) {
   const teams: string[] = [];
   fixtures.forEach((fixture) => {
@@ -363,6 +368,41 @@ function downloadBracket(sportName: string, fixtures: AdminFixturePayload[]) {
   const link = document.createElement("a");
   link.href = url;
   link.download = getBracketFileName(sportName);
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+function downloadExcelFixtures(sportName: string, fixtures: AdminFixturePayload[]) {
+  const sortedFixtures = [...fixtures].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const rows = sortedFixtures.map((fixture, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(fixture.tournamentName || "INVICTA")}</td>
+      <td>${escapeHtml(fixture.sportName || fixture.sport || sportName)}</td>
+      <td>${escapeHtml(fixture.category || "")}</td>
+      <td>${escapeHtml(fixture.round || "")}</td>
+      <td>${escapeHtml(fixture.teamAName || fixture.teamA || "Team A")}</td>
+      <td>${escapeHtml(fixture.teamBName || fixture.teamB || "Team B")}</td>
+      <td>${escapeHtml(fixture.date || "")}</td>
+      <td>${escapeHtml(fixture.time || "")}</td>
+      <td>${escapeHtml(fixture.venue || "")}</td>
+      <td>${escapeHtml(fixture.status || "upcoming")}</td>
+    </tr>
+  `).join("");
+  const html = `<html><head><meta charset="utf-8" /></head><body>
+    <table border="1">
+      <thead><tr><th>#</th><th>Tournament</th><th>Sport</th><th>Category</th><th>Round</th><th>Team A</th><th>Team B</th><th>Date</th><th>Time</th><th>Venue</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </body></html>`;
+  const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = getExcelFileName(sportName);
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();
@@ -966,6 +1006,15 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                     </span>
                   </span>
                   <Download size={18} className="shrink-0 text-accent" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadExcelFixtures(group.sportName, group.fixtures)}
+                  aria-label={`Download ${group.sportName} fixtures as Excel`}
+                  title={`Download ${group.sportName} fixtures as Excel`}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 transition-colors hover:bg-emerald-500/20"
+                >
+                  <span className="text-[10px] font-black">XLS</span>
                 </button>
                 <button
                   type="button"

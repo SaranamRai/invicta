@@ -4,7 +4,7 @@ import Fixture from "../models/Fixture.js";
 const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
 export async function buildLeagueTable(filters = {}) {
-  const teamFilter = { status: "approved", ...filters };
+  const teamFilter = { status: { $in: ["draft", "approved"] }, ...filters };
   const fixtureFilter = { ...filters, status: "completed", isCompleted: { $in: [true, undefined] } };
   // Some older completed fixtures do not contain isCompleted.
   delete fixtureFilter.isCompleted;
