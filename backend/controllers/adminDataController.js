@@ -644,7 +644,7 @@ async function validateRescheduleCandidate(payload, excludeId, overrideOptions =
     ...(payload.category ? { category: payload.category } : {}),
   };
 
-  const overlapping = await Fixture.find(query).lean();
+  const overlapping = await Fixture.find({ ...query, date: dateValue }).lean();
   const dateMatches = overlapping.filter((fixture) => fixture.date === dateValue && fixture.status !== "cancelled").length;
   if (dateMatches >= maxMatchesPerDay) {
     const error = new Error(`Unable to reschedule this match. ${dateValue} is already at the configured match-day capacity.`);

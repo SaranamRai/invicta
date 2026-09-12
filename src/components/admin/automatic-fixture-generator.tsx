@@ -603,6 +603,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     }
     setManualSaving(true);
     try {
+      setMessage("Saving manual fixture...");
       const created = await createAdminFixture({
         sportId: manualSportId,
         tournamentId: manualTournamentId || undefined,
@@ -617,7 +618,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         gapMinutes,
       });
       onGenerated([created]);
-      setMessage("Manual fixture created successfully.");
+      setMessage("Manual fixture created successfully and added to the schedule.");
       setManualTeamA("");
       setManualTeamB("");
     } catch (err) {

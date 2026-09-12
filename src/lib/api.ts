@@ -197,13 +197,25 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   const fullUrl = `${API_BASE_URL}${path}`;
   const requestStartedAt = performance.now();
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
   let response: Response;
   try {
-    response = await fetch(fullUrl, { ...options, headers, credentials: "include" });
+    response = await fetch(fullUrl, {
+      ...options,
+      headers,
+      credentials: "include",
+      signal: options.signal || controller.signal,
+    });
   } catch (error) {
     apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: true });
     if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The request took too long. Please check the connection and try again.");
+    }
     throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
   apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: !response.ok });
   if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
