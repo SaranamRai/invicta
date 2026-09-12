@@ -44,6 +44,7 @@ const fixtureSchema = new mongoose.Schema(
 );
 
 fixtureSchema.index({ date: 1, time: 1 });
+fixtureSchema.index({ date: 1, status: 1, tournamentId: 1, sportId: 1, category: 1 });
 fixtureSchema.index({ tournamentId: 1, sportId: 1, status: 1 });
 fixtureSchema.index({ tournamentId: 1, sportId: 1, category: 1, status: 1 });
 

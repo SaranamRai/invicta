@@ -10,13 +10,17 @@ interface JwtPayload {
 
 const AUTH_COOKIE_NAME = "sportsAuthToken";
 const roleHomePath: Record<PortalRole, string> = {
-  admin: "/admin-dashboard",
-  supercoordinator: "/admin",
-  volunteer: "/volunteer-dashboard",
-  coordinator: "/coordinator-dashboard",
+  admin: "/portal/7fK2mQ",
+  supercoordinator: "/portal/9xP4sL",
+  volunteer: "/portal/3vN8rT",
+  coordinator: "/portal/5qH6bW",
 };
 
 const protectedRoutes: Array<{ prefix: string; roles: PortalRole[] }> = [
+  { prefix: "/portal/7fK2mQ", roles: ["admin"] },
+  { prefix: "/portal/9xP4sL", roles: ["supercoordinator"] },
+  { prefix: "/portal/3vN8rT", roles: ["volunteer"] },
+  { prefix: "/portal/5qH6bW", roles: ["coordinator"] },
   { prefix: "/admin-dashboard", roles: ["admin"] },
   { prefix: "/admin", roles: ["supercoordinator"] },
   { prefix: "/volunteer", roles: ["volunteer"] },
@@ -64,7 +68,24 @@ function redirectToLogin(request: NextRequest) {
 
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const opaqueRoute = Object.entries(roleHomePath).find(([, path]) => path === pathname);
   const session = verifySessionToken(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+
+  if (opaqueRoute) {
+    const requiredRole = opaqueRoute[0] as PortalRole;
+    if (!session?.role) return redirectToLogin(request);
+    if (session.role !== requiredRole) {
+      return NextResponse.redirect(new URL(roleHomePath[session.role], request.url));
+    }
+    const internalPath = requiredRole === "admin"
+      ? "/admin-dashboard"
+      : requiredRole === "supercoordinator"
+        ? "/admin"
+        : requiredRole === "volunteer"
+          ? "/volunteer-dashboard"
+          : "/coordinator-dashboard";
+    return NextResponse.rewrite(new URL(internalPath, request.url));
+  }
 
   if (pathname === "/login" && session?.role) {
     return NextResponse.redirect(new URL(roleHomePath[session.role], request.url));
@@ -89,6 +110,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/login",
+    "/portal/:path*",
     "/admin/:path*",
     "/admin-dashboard/:path*",
     "/volunteer/:path*",

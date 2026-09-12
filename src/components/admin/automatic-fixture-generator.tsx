@@ -601,6 +601,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
       setError("Select a tournament, sport, two different teams, and a venue for the manual fixture.");
       return;
     }
+    if (!manualDate || !manualTime || !Number.isFinite(manualDuration) || manualDuration < 1) {
+      setError("Enter a valid fixture date, time, and match duration.");
+      return;
+    }
     setManualSaving(true);
     try {
       setMessage("Saving manual fixture...");
@@ -935,39 +939,54 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <select value={manualTournamentId} onChange={(event) => { setManualTournamentId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Tournament
+            <select aria-label="Tournament" value={manualTournamentId} onChange={(event) => { setManualTournamentId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             <option value="">Select tournament...</option>
             {tournaments.map((tournament) => <option key={getTournamentId(tournament)} value={getTournamentId(tournament)}>{tournament.name}</option>)}
-          </select>
-          <select value={manualSportId} onChange={(event) => { setManualSportId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Sport
+            <select aria-label="Sport" value={manualSportId} onChange={(event) => { setManualSportId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             <option value="">Select sport...</option>
             {sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}
-          </select>
-          <select value={manualCategory} onChange={(event) => { setManualCategory(event.target.value as "Male" | "Female" | "Mixed"); setManualTeamA(""); setManualTeamB(""); }} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Category
+            <select aria-label="Category" value={manualCategory} onChange={(event) => { setManualCategory(event.target.value as "Male" | "Female" | "Mixed"); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             {(manualSport ? getFixtureCategories(manualSport) : ["Male", "Female"]).map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-          <select value={manualTeamA} onChange={(event) => setManualTeamA(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Team A
+            <select aria-label="Team A" value={manualTeamA} onChange={(event) => setManualTeamA(event.target.value)} disabled={loadingOptions || manualTeams.length === 0} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground disabled:opacity-50">
             <option value="">Team A...</option>
             {manualTeams.map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
-          </select>
-          <select value={manualTeamB} onChange={(event) => setManualTeamB(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">
+            Team B
+            <select aria-label="Team B" value={manualTeamB} onChange={(event) => setManualTeamB(event.target.value)} disabled={loadingOptions || manualTeams.length < 2} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground disabled:opacity-50">
             <option value="">Team B...</option>
             {manualTeams.filter((team) => team.id !== manualTeamA).map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
-          </select>
-          <input type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
-          <input type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
-          <select value={manualVenue} onChange={(event) => setManualVenue(event.target.value)} className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">Date<input aria-label="Fixture date" type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" /></label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">Time<input aria-label="Fixture time" type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" /></label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">Venue<select aria-label="Venue" value={manualVenue} onChange={(event) => setManualVenue(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             <option value="">Venue...</option>
             {venues.map((venue) => <option key={getVenueId(venue)} value={venue.name}>{venue.name}</option>)}
-          </select>
-          <input type="text" value={manualRound} onChange={(event) => setManualRound(event.target.value)} placeholder="Round (optional)" className="h-12 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground placeholder:text-muted-foreground" />
+          </select></label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">Round<input type="text" aria-label="Round" value={manualRound} onChange={(event) => setManualRound(event.target.value)} placeholder="Optional" className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground placeholder:text-muted-foreground" /></label>
           <label className="space-y-1 text-xs font-bold text-muted-foreground">
             Match duration (minutes)
             <input type="number" min={1} value={manualDuration} onChange={(event) => setManualDuration(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
           </label>
         </div>
         <div className="mt-5 flex justify-end">
-          <button type="submit" disabled={manualSaving} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-xs font-black uppercase tracking-[0.2em] text-accent-foreground disabled:opacity-50">
+          <button type="submit" disabled={manualSaving || loadingOptions || manualTeams.length < 2} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-xs font-black uppercase tracking-[0.2em] text-accent-foreground disabled:opacity-50">
             {manualSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
             {manualSaving ? "Saving..." : "Create Manual Fixture"}
           </button>
