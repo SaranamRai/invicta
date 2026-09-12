@@ -628,10 +628,14 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         matchDurationMinutes: manualDuration,
         gapMinutes,
       });
+      if (!created?.id) {
+        throw new Error("The server did not return a saved fixture. Please try again.");
+      }
       onGenerated([created]);
       setMessage("Manual fixture created successfully and added to the schedule.");
       setManualTeamA("");
       setManualTeamB("");
+      setManualVolunteer("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the manual fixture.");
     } finally {
@@ -996,6 +1000,20 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
             <input type="number" min={1} value={manualDuration} onChange={(event) => setManualDuration(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
           </label>
         </div>
+        {!loadingOptions && manualTeams.length < 2 && (
+          <div className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-500">
+            At least two eligible teams are required for this tournament, sport, and category.
+          </div>
+        )}
+        {(message || error) && (
+          <div className={`mt-4 rounded-xl border px-4 py-3 text-sm font-bold ${
+            error
+              ? "border-red-400/40 bg-red-500/10 text-red-500"
+              : "border-emerald-400/40 bg-emerald-500/10 text-emerald-500"
+          }`}>
+            {error || message}
+          </div>
+        )}
         <div className="mt-5 flex justify-end">
           <button type="submit" disabled={manualSaving || loadingOptions || manualTeams.length < 2} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-xs font-black uppercase tracking-[0.2em] text-accent-foreground disabled:opacity-50">
             {manualSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}

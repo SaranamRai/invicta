@@ -612,12 +612,16 @@ function getFixtureRangeFromDocument(fixture) {
 async function validateRescheduleCandidate(payload, excludeId, overrideOptions = {}) {
   const dateString = payload.date || payload.scheduledDate;
   const timeString = payload.time || payload.startTime || "09:00";
-  const start = payload.startTime && typeof payload.startTime === "string" && payload.startTime.includes("T")
-    ? new Date(payload.startTime)
+  const start = payload.startTime instanceof Date
+    ? payload.startTime
+    : payload.startTime && typeof payload.startTime === "string" && payload.startTime.includes("T")
+      ? new Date(payload.startTime)
     : toCandidateFixtureDateTime(dateString, timeString);
   const durationSeconds = Number(payload.fullMatchSeconds || 90 * 60);
-  const end = payload.endTime && typeof payload.endTime === "string" && payload.endTime.includes("T")
-    ? new Date(payload.endTime)
+  const end = payload.endTime instanceof Date
+    ? payload.endTime
+    : payload.endTime && typeof payload.endTime === "string" && payload.endTime.includes("T")
+      ? new Date(payload.endTime)
     : start
       ? toCandidateFixtureDateTime(dateString, payload.endTime || formatMinutesAsTime(Math.round(durationSeconds / 60) + getFixtureTimeMinutes(timeString)))
       : null;
