@@ -436,6 +436,7 @@ export interface AdminFixturePayload {
   matchGapMinutes?: number;
   round?: string;
   assignedVolunteer?: string;
+  fixtureSource?: "MANUAL" | "AUTOMATIC" | "IMPORTED" | string;
 }
 
 export function getAdminFixtures() {
@@ -455,6 +456,7 @@ export interface GenerateFixturesPayload {
   category: "Male" | "Female" | "Mixed";
   venueId?: string;
   venue?: string;
+  assignedVolunteer?: string;
   startDate: string;
   endDate?: string;
   matchesPerDay?: number;
@@ -487,6 +489,7 @@ export function createAdminFixture(payload: {
   date: string;
   time: string;
   venue?: string;
+  assignedVolunteer?: string;
   matchTitle?: string;
   round?: string;
   matchDurationMinutes?: number;

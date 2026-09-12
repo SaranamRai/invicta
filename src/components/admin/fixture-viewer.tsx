@@ -127,9 +127,12 @@ export function FixtureViewer({
       venue,
     };
 
+    if (editingFixture.status === "completed" && (scoreA !== editingFixture.scoreA || scoreB !== editingFixture.scoreB)) {
+      if (!confirm("This match is already completed. Updating the result will recalculate the public result and league table. Continue?")) return;
+    }
     onUpdateFixture(updated);
     setEditingFixture(null);
-    alert("Match updated and scores recorded successfully!");
+    alert(editingFixture.status === "completed" ? "Result updated and league data will refresh from the corrected fixture." : "Match updated and scores recorded successfully!");
   };
 
   return (

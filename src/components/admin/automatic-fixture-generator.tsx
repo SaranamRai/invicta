@@ -10,10 +10,12 @@ import {
   getAdminVenues,
   createAdminFixture,
   getAdminTeams,
+  getAdminRoleAccounts,
   MongoSport,
   TeamSyncPayload,
   TournamentPayload,
   VenuePayload,
+  RoleAccountPayload,
 } from "@/lib/api";
 
 interface AutomaticFixtureGeneratorProps {
@@ -415,6 +417,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [venues, setVenues] = useState<VenuePayload[]>([]);
   const [teams, setTeams] = useState<TeamSyncPayload[]>([]);
+  const [volunteers, setVolunteers] = useState<RoleAccountPayload[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState("");
@@ -441,6 +444,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [manualDate, setManualDate] = useState(getTodayInputValue());
   const [manualTime, setManualTime] = useState("09:00");
   const [manualVenue, setManualVenue] = useState("");
+  const [manualVolunteer, setManualVolunteer] = useState("");
   const [manualRound, setManualRound] = useState("");
   const [manualDuration, setManualDuration] = useState(45);
   const [manualSaving, setManualSaving] = useState(false);
@@ -452,11 +456,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     async function loadOptions() {
       setLoadingOptions(true);
       try {
-        const [nextSports, nextTournaments, nextVenues, nextTeams] = await Promise.all([
+        const [nextSports, nextTournaments, nextVenues, nextTeams, nextAccounts] = await Promise.all([
           getAdminSports(),
           getAdminTournaments(),
           getAdminVenues(),
           getAdminTeams(),
+          getAdminRoleAccounts(),
         ]);
 
         if (!isMounted) return;
@@ -470,6 +475,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           team.status === "ready" ||
           team.status === "registered"
         ));
+        setVolunteers(nextAccounts.filter((account) => account.role === "volunteer" && account.status !== "inactive"));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
         setManualSportId(nextSports[0]?._id || "");
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
@@ -617,6 +623,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         date: manualDate,
         time: manualTime,
         venue: manualVenue,
+        assignedVolunteer: manualVolunteer || undefined,
         round: manualRound || undefined,
         matchDurationMinutes: manualDuration,
         gapMinutes,
@@ -978,6 +985,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           <label className="space-y-1 text-xs font-bold text-muted-foreground">Venue<select aria-label="Venue" value={manualVenue} onChange={(event) => setManualVenue(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
             <option value="">Venue...</option>
             {venues.map((venue) => <option key={getVenueId(venue)} value={venue.name}>{venue.name}</option>)}
+          </select></label>
+          <label className="space-y-1 text-xs font-bold text-muted-foreground">Volunteer (optional)<select aria-label="Volunteer" value={manualVolunteer} onChange={(event) => setManualVolunteer(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
+            <option value="">No volunteer assigned</option>
+            {volunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.fullName || volunteer.email}</option>)}
           </select></label>
           <label className="space-y-1 text-xs font-bold text-muted-foreground">Round<input type="text" aria-label="Round" value={manualRound} onChange={(event) => setManualRound(event.target.value)} placeholder="Optional" className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground placeholder:text-muted-foreground" /></label>
           <label className="space-y-1 text-xs font-bold text-muted-foreground">

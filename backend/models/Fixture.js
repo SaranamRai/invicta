@@ -5,6 +5,7 @@ const fixtureSchema = new mongoose.Schema(
     sportId: { type: mongoose.Schema.Types.ObjectId, ref: "Sport", required: true },
     tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
     tournamentName: { type: String, trim: true },
+    fixtureSource: { type: String, enum: ["MANUAL", "AUTOMATIC", "IMPORTED"], default: "AUTOMATIC" },
     sport: { type: String, required: true, trim: true, lowercase: true },
     sportName: { type: String, trim: true },
     // Competition category is match identity, not a player-gender inference.

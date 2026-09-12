@@ -11,6 +11,7 @@ import Announcement from "../models/Announcement.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Result from "../models/Result.js";
+import Volunteer from "../models/Volunteer.js";
 import { audit } from "../utils/audit.js";
 import { assertSupportedMatchCategory } from "../utils/matchCategories.js";
 
@@ -107,6 +108,7 @@ function mapFixture(fixture) {
     id: fixture._id.toString(),
     tournamentId: fixture.tournamentId?.toString?.() || "",
     tournamentName: fixture.tournamentName || "",
+    fixtureSource: fixture.fixtureSource || "AUTOMATIC",
     teamA: fixture.teamA?.toString?.() || "",
     teamB: fixture.teamB?.toString?.() || "",
     teamAName: fixture.teamAName || "",
@@ -1199,6 +1201,13 @@ export async function createFixture(req, res) {
   if (req.body.tournamentId && !tournament) {
     return res.status(400).json({ message: "Tournament not found. Refresh the tournament list and try again." });
   }
+  if (req.body.assignedVolunteer) {
+    const volunteer = await Volunteer.findById(req.body.assignedVolunteer).select("_id status").lean();
+    if (!volunteer) return res.status(400).json({ message: "Selected volunteer was not found." });
+    if (volunteer.status && volunteer.status !== "active") {
+      return res.status(400).json({ message: "Selected volunteer is not active." });
+    }
+  }
   const fullMatchMinutes = parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time");
   const manualStart = req.body.startTime
     ? new Date(req.body.startTime)
@@ -1236,6 +1245,7 @@ export async function createFixture(req, res) {
     round: normalizeText(req.body.round),
     status: req.body.status || "upcoming",
     assignedVolunteer: req.body.assignedVolunteer || undefined,
+    fixtureSource: "MANUAL",
     createdBy: req.user?.id,
   };
 
@@ -1456,6 +1466,14 @@ export async function updateFixture(req, res) {
     ...req.body,
   };
 
+  if (existing.status === "completed" && (req.body.scoreA !== undefined || req.body.scoreB !== undefined || req.body.status !== undefined)) {
+    await audit(
+      req,
+      "RESULT_UPDATED",
+      `${existing.teamAName || "Team A"} ${existing.scoreA || 0}-${existing.scoreB || 0} ${existing.teamBName || "Team B"} -> ${req.body.scoreA ?? existing.scoreA ?? 0}-${req.body.scoreB ?? existing.scoreB ?? 0}; fixture ${existing._id}`
+    );
+  }
+
   if (req.body.date || req.body.time || req.body.startTime || req.body.endTime || req.body.venue || req.body.assignedVolunteer) {
     try {
       await validateRescheduleCandidate(updatePayload, req.params.id, {
@@ -1492,6 +1510,7 @@ export async function updateFixture(req, res) {
       scoreA: Number(req.body.scoreA || 0),
       scoreB: Number(req.body.scoreB || 0),
       endedAt: req.body.endedAt,
+      fixtureSource: existing.fixtureSource || "AUTOMATIC",
     },
     { new: true }
   );
