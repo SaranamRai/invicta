@@ -56,7 +56,7 @@ export default function VolunteerDashboard() {
     }
 
     void loadDashboardData();
-    const interval = window.setInterval(loadDashboardData, 5000);
+    const interval = window.setInterval(loadDashboardData, 1000);
 
     return () => {
       isMounted = false;

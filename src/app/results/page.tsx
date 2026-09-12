@@ -42,7 +42,7 @@ export default function ResultsPage() {
     }
 
     void loadResults();
-    const interval = window.setInterval(loadResults, 15000);
+    const interval = window.setInterval(loadResults, 1000);
 
     return () => {
       isMounted = false;

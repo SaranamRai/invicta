@@ -1192,9 +1192,13 @@ export async function createFixture(req, res) {
   }
 
   const sportName = sportDoc.sportName || sportDoc.name;
+  if (req.body.tournamentId) requireObjectId(req.body.tournamentId, "Tournament id");
   const tournament = req.body.tournamentId
     ? await Tournament.findById(req.body.tournamentId).select("name").lean()
     : null;
+  if (req.body.tournamentId && !tournament) {
+    return res.status(400).json({ message: "Tournament not found. Refresh the tournament list and try again." });
+  }
   const fullMatchMinutes = parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time");
   const manualStart = req.body.startTime
     ? new Date(req.body.startTime)

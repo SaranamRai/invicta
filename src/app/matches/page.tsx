@@ -85,7 +85,7 @@ export default function MatchesPage() {
     void loadMatches();
     const interval = window.setInterval(() => {
       if (!document.hidden) void loadMatches();
-    }, 5000);
+    }, 1000);
 
     return () => {
       isMounted = false;

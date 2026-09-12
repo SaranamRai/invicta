@@ -41,7 +41,7 @@ export default function StandingsPage() {
     };
 
     void loadStandingsData();
-    const interval = window.setInterval(loadStandingsData, 15000);
+    const interval = window.setInterval(loadStandingsData, 1000);
 
     return () => {
       isMounted = false;

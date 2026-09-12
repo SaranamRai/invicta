@@ -53,7 +53,9 @@ export function listPublic(resource) {
       return res.json(await buildLeagueTable(filters));
     }
     const model = publicModels[resource];
-    const filter = addQueryFilters(resource, req, resource === "announcements"
+    const filter = addQueryFilters(resource, req, resource === "fixtures"
+      ? { status: { $ne: "cancelled" } }
+      : resource === "announcements"
       ? { visibleToPublic: true }
       : resource === "rules"
       ? { $or: [{ status: "approved" }, { status: { $exists: false } }] }

@@ -76,26 +76,33 @@ export default function PublicDashboard() {
 
   useEffect(() => {
     let isMounted = true;
+    let loading = false;
 
     async function loadPublicData() {
       if (document.visibilityState === "hidden") return;
-      const [fixtures, liveScores, teams, tournaments] = await Promise.all([
-        getPublicFixtures(),
-        getPublicLiveScores(),
-        getPublicTeams(),
-        getPublicTournaments(),
-      ]);
+      if (loading) return;
+      loading = true;
+      try {
+        const [fixtures, liveScores, teams, tournaments] = await Promise.all([
+          getPublicFixtures(),
+          getPublicLiveScores(),
+          getPublicTeams(),
+          getPublicTournaments(),
+        ]);
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-      setMatchesData(
-        fixtures
-          .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
-          .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
-      );
-      setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
-      setTournaments(tournaments);
+        const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+        setMatchesData(
+          fixtures
+            .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+            .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
+        );
+        setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
+        setTournaments(tournaments);
+      } finally {
+        loading = false;
+      }
     }
 
     void loadPublicData();
@@ -103,7 +110,7 @@ export default function PublicDashboard() {
       if (document.visibilityState === "visible") {
         void loadPublicData();
       }
-    }, 60000);
+    }, 1000);
     const visibilityListener = () => {
       if (document.visibilityState === "visible") {
         void loadPublicData();

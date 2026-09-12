@@ -119,7 +119,7 @@ function CoordinatorDashboardContent() {
     }
 
     void loadDashboardData();
-    const interval = window.setInterval(loadDashboardData, 15000);
+    const interval = window.setInterval(loadDashboardData, 1000);
 
     return () => {
       isMounted = false;
