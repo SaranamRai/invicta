@@ -60,7 +60,7 @@ export function listPublic(resource) {
       : resource === "rules"
       ? { $or: [{ status: "approved" }, { status: { $exists: false } }] }
       : resource === "teams"
-      ? { status: "approved" }
+      ? { status: { $in: ["draft", "ready", "registered", "approved"] } }
       : {});
 
     let query = model.find(filter);
@@ -456,8 +456,11 @@ export async function getSportDetailView(req, res) {
       return res.status(404).json({ message: "Sport not found" });
     }
 
-    // Collect approved teams from both models
-    const teamModelTeams = await Team.find({ sportId, status: "approved" }).lean();
+    // Include coordinator-created draft teams so they are visible before member registration is complete.
+    const teamModelTeams = await Team.find({
+      sportId,
+      status: { $in: ["draft", "ready", "registered", "approved"] },
+    }).lean();
     const registrationTeams = await TeamRegistration.find({ sportId, status: "approved" }).lean();
 
     // Deduplicate by teamName+department+category, prefer TeamRegistration
