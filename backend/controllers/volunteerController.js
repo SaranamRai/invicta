@@ -79,8 +79,8 @@ export async function assignedMatches(req, res) {
     ],
   };
   const query = Object.keys(sportQuery).length
-    ? { $and: [sportQuery, assignmentQuery] }
-    : assignmentQuery;
+    ? { $and: [sportQuery, assignmentQuery], status: { $ne: "cancelled" } }
+    : { ...assignmentQuery, status: { $ne: "cancelled" } };
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
   return res.json(fixtures);
 }

@@ -115,7 +115,10 @@ export async function updatePlayer(req, res) {
 }
 
 export async function coordinatorFixtures(req, res) {
-  const query = await buildAssignedSportQuery(req);
+  const query = {
+    ...(await buildAssignedSportQuery(req)),
+    status: { $ne: "cancelled" },
+  };
   if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
   if (req.query.category) query.category = String(req.query.category);
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
