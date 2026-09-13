@@ -579,9 +579,7 @@ function getAllowedRescheduleDates(dateString) {
   for (let offset = 0; offset < 28; offset += 1) {
     const next = new Date(anchorDate);
     next.setDate(anchorDate.getDate() + offset);
-    if (next.getDay() === 0 || next.getDay() === 6) {
-      dates.push(toDateInputValue(next));
-    }
+    dates.push(toDateInputValue(next));
   }
   return dates;
 }
@@ -634,8 +632,8 @@ async function validateRescheduleCandidate(payload, excludeId, overrideOptions =
 
   const dateValue = dateString || toDateInputValue(new Date(start));
   const proposedDate = getFixtureDateFromInput(dateValue);
-  if (!proposedDate || (!overrideOptions.allowWeekdays && proposedDate.getDay() !== 0 && proposedDate.getDay() !== 6)) {
-    const error = new Error("Only weekend match days are allowed for fixture rescheduling.");
+  if (!proposedDate) {
+    const error = new Error("Unable to reschedule this match. Please provide a valid date.");
     error.status = 400;
     throw error;
   }
