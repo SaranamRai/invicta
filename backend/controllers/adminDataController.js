@@ -1510,16 +1510,67 @@ export async function updateFixture(req, res) {
       matchGapMinutes: existing.matchGapMinutes || 0,
       assignedVolunteer: req.body.assignedVolunteer ?? existing.assignedVolunteer,
       category,
-      status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
-      scoreA: Number(req.body.scoreA || 0),
-      scoreB: Number(req.body.scoreB || 0),
-      endedAt: req.body.endedAt,
+      status: req.body.status === "scheduled"
+        ? "upcoming"
+        : ["upcoming", "live", "paused", "half-time", "completed", "delayed", "cancelled"].includes(req.body.status)
+          ? req.body.status
+        : existing.status,
+      scoreA: req.body.scoreA === undefined ? existing.scoreA : Number(req.body.scoreA),
+      scoreB: req.body.scoreB === undefined ? existing.scoreB : Number(req.body.scoreB),
+      endedAt: req.body.endedAt ?? existing.endedAt,
+      isCompleted: req.body.status === "completed" ? true : req.body.status === undefined ? existing.isCompleted : false,
       fixtureSource: existing.fixtureSource || "AUTOMATIC",
     },
     { new: true }
   );
 
   if (!fixture) return res.status(404).json({ message: "Fixture not found" });
+
+  // Keep the records consumed by live/public pages in lockstep with an
+  // administrator's corrected fixture result. Only update an existing live
+  // record so editing a schedule does not create a phantom live match.
+  await LiveScore.findOneAndUpdate(
+    { fixtureId: fixture._id },
+    {
+      tournamentId: fixture.tournamentId,
+      sportId: fixture.sportId,
+      category: fixture.category,
+      teamAName: fixture.teamAName,
+      teamBName: fixture.teamBName,
+      teamAScore: fixture.scoreA,
+      teamBScore: fixture.scoreB,
+      currentStatus: fixture.status,
+      endedAt: fixture.status === "completed" ? Date.now() : undefined,
+      winner: fixture.status === "completed"
+        ? fixture.scoreA > fixture.scoreB ? "A" : fixture.scoreB > fixture.scoreA ? "B" : ""
+        : "",
+      winnerName: fixture.status === "completed"
+        ? fixture.scoreA > fixture.scoreB ? fixture.teamAName : fixture.scoreB > fixture.scoreA ? fixture.teamBName : ""
+        : "",
+      updatedBy: req.user?.id,
+      updatedAt: new Date(),
+    },
+    { new: true, runValidators: true }
+  );
+
+  const resultWinner = fixture.scoreA > fixture.scoreB ? fixture.teamA : fixture.scoreB > fixture.scoreA ? fixture.teamB : null;
+  const resultLoser = fixture.scoreA > fixture.scoreB ? fixture.teamB : fixture.scoreB > fixture.scoreA ? fixture.teamA : null;
+  if (fixture.status === "completed") {
+    await Result.findOneAndUpdate(
+      { fixtureId: fixture._id },
+      {
+        fixtureId: fixture._id,
+        winnerTeam: resultWinner,
+        loserTeam: resultLoser,
+        finalScore: `${fixture.scoreA}-${fixture.scoreB}`,
+        submittedBy: req.user?.id,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } else {
+    await Result.deleteOne({ fixtureId: fixture._id });
+  }
+
   return res.json(mapFixture(fixture));
 }
 

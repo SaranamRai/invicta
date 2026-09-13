@@ -4,10 +4,12 @@ import Fixture from "../models/Fixture.js";
 const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 
 export async function buildLeagueTable(filters = {}) {
-  const teamFilter = { status: { $in: ["draft", "approved"] }, ...filters };
-  const fixtureFilter = { ...filters, status: "completed", isCompleted: { $in: [true, undefined] } };
-  // Some older completed fixtures do not contain isCompleted.
-  delete fixtureFilter.isCompleted;
+  // Teams can be promoted through several valid workflow states before and
+  // during competition. Standings must not disappear when that state changes.
+  const teamFilter = {
+    status: { $in: ["draft", "ready", "registered", "approved", "completed"] },
+    ...filters,
+  };
   const [teams, fixtures] = await Promise.all([
     Team.find(teamFilter).lean(),
     Fixture.find({ ...filters, $or: [{ status: "completed" }, { isCompleted: true }] }).lean(),
@@ -24,7 +26,7 @@ export async function buildLeagueTable(filters = {}) {
     const b = rows.get(String(fixture.teamB));
     if (!a || !b) continue;
     // Never allow a result to cross from one competition category into another.
-    if (!fixture.category || fixture.category !== a.category || fixture.category !== b.category) continue;
+    if (fixture.category && (fixture.category !== a.category || fixture.category !== b.category)) continue;
     const scoreA = number(fixture.scoreA); const scoreB = number(fixture.scoreB);
     a.played += 1; b.played += 1; a.goalsFor += scoreA; a.goalsAgainst += scoreB; b.goalsFor += scoreB; b.goalsAgainst += scoreA;
     if (scoreA > scoreB) { a.wins += 1; b.losses += 1; a.points += 3; }
