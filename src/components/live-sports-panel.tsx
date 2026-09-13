@@ -123,7 +123,7 @@ export function LiveSportsPanel({
     };
 
     refresh();
-    const refreshInterval = window.setInterval(refresh, 60000);
+    const refreshInterval = window.setInterval(refresh, 1000);
     const clockInterval = window.setInterval(() => setNow(Date.now()), 1000);
     const visibilityListener = () => {
       if (document.visibilityState === "visible") {

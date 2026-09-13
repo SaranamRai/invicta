@@ -98,7 +98,7 @@ export default function VolunteerTeamsPage() {
     }
 
     void loadTeams();
-    const interval = window.setInterval(loadTeams, 15000);
+    const interval = window.setInterval(loadTeams, 1000);
 
     return () => {
       isMounted = false;

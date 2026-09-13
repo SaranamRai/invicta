@@ -44,7 +44,7 @@ export function Header() {
       if (document.visibilityState === "visible") {
         void loadNotifications();
       }
-    }, 60000);
+    }, 1000);
     const visibilityListener = () => {
       if (document.visibilityState === "visible") {
         void loadNotifications();

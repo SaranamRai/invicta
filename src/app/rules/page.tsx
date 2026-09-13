@@ -48,7 +48,7 @@ export default function RulesPage() {
     }
 
     void loadRules();
-    const interval = window.setInterval(loadRules, 15000);
+    const interval = window.setInterval(loadRules, 1000);
 
     return () => {
       isMounted = false;

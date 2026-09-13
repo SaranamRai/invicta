@@ -38,7 +38,7 @@ export default function GalleryPage() {
       if (document.visibilityState === "visible") {
         void loadGallery();
       }
-    }, 60000);
+    }, 1000);
     const visibilityListener = () => {
       if (document.visibilityState === "visible") {
         void loadGallery();

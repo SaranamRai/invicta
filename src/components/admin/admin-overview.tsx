@@ -164,7 +164,7 @@ export function AdminOverview({
     }
 
     void loadSystemHealth();
-    const interval = window.setInterval(loadSystemHealth, 30000);
+    const interval = window.setInterval(loadSystemHealth, 1000);
 
     return () => {
       isMounted = false;

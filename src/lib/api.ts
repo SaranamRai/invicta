@@ -12,9 +12,8 @@ export function getApiClientMetrics() {
 }
 
 function publicCacheTtl(path: string) {
-  if (path.includes("live-score") || path.includes("live-feed")) return 5_000;
-  if (path.includes("/fixtures") || path.includes("points-table")) return 2_000;
-  return 20_000;
+  // Public screens poll every second; do not serve stale dashboard data.
+  return 0;
 }
 const VERIFY_ID_CARD_TIMEOUT_MS = 15000;
 const BROWSER_OCR_INIT_TIMEOUT_MS = 12000;

@@ -314,7 +314,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
     const initialLoad = window.setTimeout(() => {
       void fetchDetail();
     }, 0);
-    const interval = window.setInterval(fetchDetail, 15000);
+    const interval = window.setInterval(fetchDetail, 1000);
     return () => {
       window.clearTimeout(initialLoad);
       window.clearInterval(interval);

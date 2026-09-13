@@ -25,7 +25,7 @@ export default function MatchesSelectionPage() {
     }
 
     void loadMatches();
-    const interval = window.setInterval(loadMatches, 15000);
+    const interval = window.setInterval(loadMatches, 1000);
 
     return () => {
       isMounted = false;
