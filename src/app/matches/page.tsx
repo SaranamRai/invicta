@@ -38,6 +38,7 @@ export default function MatchesPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [liveFeeds, setLiveFeeds] = useState<LiveFeedPost[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -51,7 +52,6 @@ export default function MatchesPage() {
         getPublicFixtures({
           tournamentId: selectedTournamentId || undefined,
           category: selectedCategory === "All" ? undefined : selectedCategory,
-          date: getDateKey(selectedDate) || undefined,
         }),
         getPublicLiveScores(),
         getPublicLiveFeeds(),
@@ -91,7 +91,7 @@ export default function MatchesPage() {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [selectedTournamentId, selectedCategory, selectedDate]);
+  }, [selectedTournamentId, selectedCategory]);
 
   React.useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -121,6 +121,7 @@ export default function MatchesPage() {
   const filteredMatches = tournamentFilteredMatches.filter(match => {
     if (selectedSport !== "All Sports" && match.sport !== selectedSport) return false;
     if (selectedCategory !== "All" && match.category !== selectedCategory) return false;
+    if (isDateFilterActive && getDateKey(match.date) !== getDateKey(selectedDate)) return false;
     if (activeTab === "All Matches") return true;
     return match.status === activeTab;
   });
@@ -169,7 +170,7 @@ export default function MatchesPage() {
         <div className="flex flex-col items-end gap-4 relative">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); }}
+              onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); setIsDateFilterActive(true); }}
               className="px-4 py-2 rounded-xl bg-secondary hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-all border border-border"
             >
               Today
@@ -245,7 +246,7 @@ export default function MatchesPage() {
                       return (
                         <button
                           key={dayNumber}
-                          onClick={() => { const d = new Date(currentDate); d.setDate(dayNumber); setSelectedDate(d); setIsCalendarOpen(false); }}
+                          onClick={() => { const d = new Date(currentDate); d.setDate(dayNumber); setSelectedDate(d); setIsDateFilterActive(true); setIsCalendarOpen(false); }}
                           title={hasMatches ? `${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : undefined}
                           aria-label={`${formatFullDate(calendarDate)}${hasMatches ? `, ${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : ""}`}
                           className={cn(
