@@ -104,6 +104,11 @@ function mapTeam(team) {
 }
 
 function mapFixture(fixture) {
+  const endTime = fixture.endTime instanceof Date
+    ? `${String(fixture.endTime.getHours()).padStart(2, "0")}:${String(fixture.endTime.getMinutes()).padStart(2, "0")}`
+    : typeof fixture.endTime === "string" && fixture.endTime.includes("T")
+      ? `${String(new Date(fixture.endTime).getHours()).padStart(2, "0")}:${String(new Date(fixture.endTime).getMinutes()).padStart(2, "0")}`
+      : fixture.endTime;
   return {
     id: fixture._id.toString(),
     tournamentId: fixture.tournamentId?.toString?.() || "",
@@ -122,7 +127,7 @@ function mapFixture(fixture) {
     date: fixture.date,
     time: fixture.time,
     startTime: fixture.startTime,
-    endTime: fixture.endTime,
+    endTime,
     fullMatchSeconds: fixture.fullMatchSeconds || 90 * 60,
     matchGapMinutes: fixture.matchGapMinutes || 0,
     round: fixture.round || "",
@@ -1467,6 +1472,10 @@ export async function updateFixture(req, res) {
     ...existing.toObject(),
     ...req.body,
   };
+  if (req.body.date !== undefined || req.body.time !== undefined) {
+    delete updatePayload.startTime;
+    delete updatePayload.endTime;
+  }
 
   if (existing.status === "completed" && (req.body.scoreA !== undefined || req.body.scoreB !== undefined || req.body.status !== undefined)) {
     await audit(
@@ -1483,13 +1492,9 @@ export async function updateFixture(req, res) {
         minRestMinutes: req.body.minRestMinutes,
       });
     } catch (error) {
-      const suggestions = await suggestRescheduleSlots(updatePayload, req.params.id, {
-        maxSuggestions: 5,
-        daysToScan: 21,
-      });
       return res.status(400).json({
         message: error.message,
-        suggestions,
+        suggestions: [],
       });
     }
   }
@@ -1616,13 +1621,9 @@ export async function rescheduleFixture(req, res) {
       suggestions: [],
     });
   } catch (error) {
-    const suggestions = await suggestRescheduleSlots(candidate, fixture._id.toString(), {
-      maxSuggestions: 5,
-      daysToScan: 21,
-    });
     return res.status(400).json({
       message: error.message,
-      suggestions,
+      suggestions: [],
     });
   }
 }
@@ -1674,13 +1675,9 @@ export async function bulkRescheduleFixtures(req, res) {
         assignedVolunteer: candidate.assignedVolunteer,
       });
     } catch (error) {
-      const suggestions = await suggestRescheduleSlots(candidate, fixture._id.toString(), {
-        maxSuggestions: 3,
-        daysToScan: 28,
-      });
       return res.status(400).json({
         message: `Unable to bulk reschedule selected matches. ${error.message}`,
-        suggestions,
+        suggestions: [],
       });
     }
   }
