@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, Download, GitFork, Loader2, MapPin, Plus, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
+import { CalendarDays, Clock, Download, GitFork, ImageUp, Loader2, MapPin, Plus, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
 import {
   AdminFixturePayload,
   generateAdminFixtures,
@@ -9,6 +9,10 @@ import {
   getAdminTournaments,
   getAdminVenues,
   createAdminFixture,
+  analyzeAdminFixtureImage,
+  validateAdminFixtureImage,
+  confirmAdminFixtureImage,
+  FixtureImageCandidate,
   getAdminTeams,
   getAdminRoleAccounts,
   MongoSport,
@@ -448,7 +452,12 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   const [manualRound, setManualRound] = useState("");
   const [manualDuration, setManualDuration] = useState(45);
   const [manualSaving, setManualSaving] = useState(false);
-  const [fixtureMode, setFixtureMode] = useState<"automatic" | "manual">("manual");
+  const [fixtureMode, setFixtureMode] = useState<"automatic" | "manual" | "ai">("manual");
+  const [imageCandidate, setImageCandidate] = useState<FixtureImageCandidate | null>(null);
+  const [imageReviewToken, setImageReviewToken] = useState("");
+  const [imageErrors, setImageErrors] = useState<string[]>([]);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imagePreview, setImagePreview] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -596,8 +605,61 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     } finally {
       setDeletingGroup("");
     }
-
   }
+
+  async function handleFixtureImage(event: React.ChangeEvent<HTMLInputElement>) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        setImageErrors(["Please upload a JPG, PNG, or WEBP image smaller than 5MB."]);
+        event.target.value = "";
+        return;
+      }
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImagePreview(URL.createObjectURL(file));
+      setImageBusy(true);
+      setImageErrors([]);
+      setMessage("");
+      try {
+        const result = await analyzeAdminFixtureImage(file);
+        setImageReviewToken(result.reviewToken);
+        setImageCandidate({ ...result.candidate, category: result.candidate.category || "Male" });
+        setImageErrors(result.validation.errors);
+        setMessage("Image analyzed. Review every field before validating and creating the fixture.");
+      } catch (err) {
+        setImageErrors([err instanceof Error ? err.message : "Could not analyze the fixture image."]);
+      } finally {
+        setImageBusy(false);
+        event.target.value = "";
+      }
+    }
+
+  async function validateImageCandidate() {
+      if (!imageCandidate || !imageReviewToken) return;
+      setImageBusy(true);
+      try {
+        const result = await validateAdminFixtureImage(imageReviewToken, imageCandidate);
+        setImageCandidate(result.candidate);
+        setImageErrors(result.errors);
+        if (result.valid) setMessage("Fixture details validated. Confirm creation only after reviewing the values.");
+      } catch (err) { setImageErrors([err instanceof Error ? err.message : "Could not validate fixture details."]); }
+      finally { setImageBusy(false); }
+    }
+
+  async function confirmImageCandidate() {
+      if (!imageCandidate || !imageReviewToken || imageErrors.length) return;
+      setImageBusy(true);
+      try {
+        const created = await confirmAdminFixtureImage(imageReviewToken, imageCandidate);
+        onGenerated([created]);
+        setImageCandidate(null);
+        setImageReviewToken("");
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImagePreview("");
+        setMessage("AI fixture created after human review.");
+      } catch (err) { setImageErrors([err instanceof Error ? err.message : "Could not create the fixture."]); }
+      finally { setImageBusy(false); }
+    }
 
   async function handleManualCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -658,7 +720,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-2">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-3">
         <button
           type="button"
           onClick={() => setFixtureMode("automatic")}
@@ -675,7 +737,42 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           <span className="block text-xs font-black uppercase tracking-widest">Manual Creation</span>
           <span className="mt-1 block text-xs font-medium opacity-80">Add one fixture from a paper schedule.</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setFixtureMode("ai")}
+          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "ai" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
+        >
+          <span className="block text-xs font-black uppercase tracking-widest"><ImageUp className="mr-1 inline" size={14} /> AI Fixture From Image</span>
+          <span className="mt-1 block text-xs font-medium opacity-80">Extract one paper fixture, review it, then confirm.</span>
+        </button>
       </div>
+
+      {fixtureMode === "ai" && <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-black text-foreground">AI Fixture From Image</h3>
+            <p className="text-sm text-muted-foreground">The image is analyzed on the server. Nothing is created until you validate and confirm every field.</p>
+          </div>
+          <label className="flex w-fit cursor-pointer items-center gap-2 rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase tracking-widest text-accent-foreground">
+            <ImageUp size={16} /> {imageBusy ? "Analyzing..." : "Upload fixture image"}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => void handleFixtureImage(event)} disabled={imageBusy} />
+          </label>
+          {imagePreview && <div className="rounded-xl border border-border bg-background p-4"><img src={imagePreview} alt="Uploaded fixture schedule preview" className="max-h-72 w-full rounded-lg object-contain" /></div>}
+          {imageCandidate && <div className="grid gap-4 rounded-xl border border-border bg-background p-4 sm:grid-cols-2">
+            <label className="space-y-1 text-xs font-bold">Team A<input value={imageCandidate.teamAName || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, teamAName: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
+            <label className="space-y-1 text-xs font-bold">Team B<input value={imageCandidate.teamBName || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, teamBName: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
+            <label className="space-y-1 text-xs font-bold">Sport<select value={imageCandidate.sportId || ""} onChange={(event) => { const sport = sports.find((item) => item._id === event.target.value); setImageCandidate({ ...imageCandidate, sportId: event.target.value, sportName: sport ? getSportLabel(sport) : imageCandidate.sportName }); }} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option value="">Select sport...</option>{sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}</select></label>
+            <label className="space-y-1 text-xs font-bold">Tournament<select value={imageCandidate.tournamentId || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, tournamentId: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option value="">Select tournament...</option>{tournaments.map((item) => <option key={getTournamentId(item)} value={getTournamentId(item)}>{item.name}</option>)}</select></label>
+            <label className="space-y-1 text-xs font-bold">Category<select value={imageCandidate.category || "Male"} onChange={(event) => setImageCandidate({ ...imageCandidate, category: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option>Male</option><option>Female</option><option>Mixed</option></select></label>
+            <label className="space-y-1 text-xs font-bold">Date<input type="date" value={imageCandidate.date || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, date: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
+            <label className="space-y-1 text-xs font-bold">Time<input type="time" value={imageCandidate.time || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, time: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
+            <label className="space-y-1 text-xs font-bold">Venue<input value={imageCandidate.venue || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, venue: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
+            <div className="flex items-end gap-2"><button type="button" onClick={() => void validateImageCandidate()} disabled={imageBusy} className="rounded-lg border border-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent">Validate</button><button type="button" onClick={() => void confirmImageCandidate()} disabled={imageBusy || imageErrors.length > 0} className="rounded-lg bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent-foreground disabled:opacity-50">Confirm & Create</button></div>
+            {imageErrors.length > 0 && <div className="sm:col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">{imageErrors.map((item) => <p key={item}>{item}</p>)}</div>}
+            <p className="sm:col-span-2 text-xs text-muted-foreground">Source: {imageCandidate.source || "image"}{imageCandidate.confidence ? ` · OCR confidence ${imageCandidate.confidence}%` : ""}. Review is required.</p>
+          </div>}
+        </div>
+      </div>}
 
       {fixtureMode === "automatic" && <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         {loadingOptions ? (

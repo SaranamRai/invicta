@@ -24,6 +24,7 @@ import {
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
 import * as technicalAdmin from "../controllers/technicalAdminController.js";
+import { analyzeFixtureImageUpload, validateFixtureImageCandidate, confirmFixtureImage } from "../controllers/fixtureImageController.js";
 
 const router = Router();
 
@@ -76,6 +77,9 @@ router.patch("/team-registrations/:id/review", superOnly, reviewTeamRegistration
 router.get("/fixtures", adminOrSuper, listFixtures);
 router.post("/fixtures/generate", superOnly, generateFixtures);
 router.post("/fixtures", superOnly, createFixture);
+router.post("/fixtures/ai-image/analyze", superOnly, analyzeFixtureImageUpload);
+router.post("/fixtures/ai-image/validate", superOnly, validateFixtureImageCandidate);
+router.post("/fixtures/ai-image/confirm", superOnly, confirmFixtureImage);
 router.put("/fixtures", superOnly, replaceFixtures);
 router.delete("/fixtures", superOnly, deleteFixtures);
 router.post("/fixtures/reschedule", superOnly, bulkRescheduleFixtures);

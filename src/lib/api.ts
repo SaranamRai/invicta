@@ -188,7 +188,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const session = getStoredSession();
   const headers = new Headers(options.headers);
 
-  if (!headers.has("Content-Type") && options.body) {
+  if (!headers.has("Content-Type") && options.body && !(typeof FormData !== "undefined" && options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -499,6 +499,49 @@ export function createAdminFixture(payload: {
   return apiFetch<AdminFixturePayload>("/admin/fixtures", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export interface FixtureImageCandidate {
+  teamAName: string;
+  teamBName: string;
+  sportName?: string;
+  sportId?: string;
+  tournamentId?: string;
+  category?: "Male" | "Female" | "Mixed" | string;
+  date: string;
+  time: string;
+  venue?: string;
+  round?: string;
+  source?: "AI" | "OCR";
+  confidence?: number;
+  rawText?: string;
+}
+
+export interface FixtureImageAnalysis {
+  reviewToken: string;
+  expiresInSeconds: number;
+  candidate: FixtureImageCandidate;
+  validation: { errors: string[] };
+}
+
+export function analyzeAdminFixtureImage(file: File) {
+  const form = new FormData();
+  form.append("image", file);
+  return apiFetch<FixtureImageAnalysis>("/admin/fixtures/ai-image/analyze", { method: "POST", body: form });
+}
+
+export function validateAdminFixtureImage(reviewToken: string, candidate: FixtureImageCandidate) {
+  return apiFetch<{ candidate: FixtureImageCandidate; valid: boolean; errors: string[] }>("/admin/fixtures/ai-image/validate", {
+    method: "POST",
+    body: JSON.stringify({ reviewToken, ...candidate }),
+  });
+}
+
+export function confirmAdminFixtureImage(reviewToken: string, candidate: FixtureImageCandidate) {
+  return apiFetch<AdminFixturePayload>("/admin/fixtures/ai-image/confirm", {
+    method: "POST",
+    body: JSON.stringify({ reviewToken, ...candidate }),
   });
 }
 
