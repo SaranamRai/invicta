@@ -3,17 +3,40 @@
     {
       "source": "/api/:path*",
       "destination": "/_/backend/api/:path*"
+    },
+    {
+      "source": "/_/backend(/.*)?",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
     }
   ],
-  "experimentalServices": {
+  "services": {
     "frontend": {
-      "routePrefix": "/",
+      "root": ".",
       "framework": "nextjs"
     },
     "backend": {
       "root": "backend",
       "entrypoint": "server.js",
-      "routePrefix": "/_/backend"
+      "rewrites": [
+        {
+          "source": "/_/backend/:path(.*)?",
+          "destination": "/:path"
+        }
+      ]
+    }
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_FRONTEND_URL": "/",
+      "NEXT_PUBLIC_BACKEND_URL": "/_/backend"
     }
   }
 }
