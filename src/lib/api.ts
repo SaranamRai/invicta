@@ -1179,6 +1179,8 @@ export interface TeamRegistrationMember {
   phone?: string;
   verificationToken?: string;
   idVerification?: IdVerificationInfo;
+  profilePhoto?: string;
+  idCardImage?: string;
 }
 
 export interface IdVerificationInfo {
