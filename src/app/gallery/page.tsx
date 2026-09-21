@@ -21,7 +21,6 @@ export default function GalleryPage() {
     let isMounted = true;
 
     async function loadGallery() {
-      if (document.visibilityState === "hidden") return;
       const gallery = await getPublicGallery();
       if (!isMounted) return;
       setImages(gallery.map((image) => ({
@@ -34,23 +33,11 @@ export default function GalleryPage() {
     }
 
     void loadGallery();
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadGallery();
-      }
-    }, 1000);
-    const visibilityListener = () => {
-      if (document.visibilityState === "visible") {
-        void loadGallery();
-      }
-    };
-
-    document.addEventListener("visibilitychange", visibilityListener);
+    const interval = window.setInterval(loadGallery, 15000);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", visibilityListener);
     };
   }, []);
 

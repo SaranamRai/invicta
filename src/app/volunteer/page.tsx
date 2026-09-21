@@ -35,35 +35,28 @@ export default function VolunteerDashboard() {
 
   useEffect(() => {
     let isMounted = true;
-    let loading = false;
 
     async function loadDashboardData() {
-      if (loading) return;
-      loading = true;
-      try {
-        const [matchesData, feeds] = await Promise.all([getAssignedMatches(), getPublicLiveFeeds()]);
-        if (!isMounted) return;
+      const [matchesData, feeds] = await Promise.all([getAssignedMatches(), getPublicLiveFeeds()]);
+      if (!isMounted) return;
 
-        setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
-        const logs = feeds.map((feed) => ({
+      setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
+      const logs = feeds.map((feed) => ({
         id: feed._id,
         matchId: typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "",
         action: feed.message,
         timestamp: feed.createdAt ? Date.parse(feed.createdAt) : Date.now(),
         volunteerEmail: feed.volunteerEmail || "volunteer",
-        } as ActivityLog)).sort((a, b) => b.timestamp - a.timestamp);
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
+      } as ActivityLog)).sort((a, b) => b.timestamp - a.timestamp);
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-        setRecentLogs(logs.slice(0, 5));
-        setUpdatesToday(logs.filter((log) => log.timestamp >= startOfToday.getTime()).length);
-      } finally {
-        loading = false;
-      }
+      setRecentLogs(logs.slice(0, 5));
+      setUpdatesToday(logs.filter((log) => log.timestamp >= startOfToday.getTime()).length);
     }
 
     void loadDashboardData();
-    const interval = window.setInterval(loadDashboardData, 1000);
+    const interval = window.setInterval(loadDashboardData, 5000);
 
     return () => {
       isMounted = false;

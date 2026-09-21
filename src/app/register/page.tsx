@@ -2,10 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Upload, Users, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Upload, Users, X } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
-import { AppToast } from "@/components/ui/app-toast";
 import {
   getPublicSports,
   getPublicTournaments,
@@ -44,7 +43,6 @@ type PlayerVerification = {
   extractedRegistrationNumber: string;
   message: string;
   verificationToken: string;
-  profilePhoto: string;
   confidence?: number;
 };
 
@@ -53,7 +51,6 @@ const emptyVerification = (): PlayerVerification => ({
   extractedRegistrationNumber: "",
   message: "Upload each player's student ID card to verify the registration number.",
   verificationToken: "",
-  profilePhoto: "",
 });
 
 const emptyMember = (): MemberInput => ({
@@ -77,7 +74,7 @@ function RegisterPageContent() {
   const [teamName, setTeamName] = useState("");
   const [tournamentId, setTournamentId] = useState("");
   const [sportId, setSportId] = useState("");
-  const [category, setCategory] = useState<"Male" | "Female" | "Mixed">("Male");
+  const [category, setCategory] = useState<"Male" | "Female">("Male");
   const [tournamentOptions, setTournamentOptions] = useState<TournamentPayload[]>([]);
   const [sportOptions, setSportOptions] = useState<MongoSport[]>([]);
   const [members, setMembers] = useState<MemberInput[]>([]);
@@ -238,7 +235,6 @@ function RegisterPageContent() {
       extractedRegistrationNumber: "",
       message: "Scanning...",
       verificationToken: "",
-      profilePhoto: "",
     };
     if (playerRole === "captain") setCaptainVerification(scanningState);
     else setMemberVerification(index, scanningState);
@@ -250,7 +246,6 @@ function RegisterPageContent() {
         extractedRegistrationNumber: result.extractedRegistrationNumber || "",
         message: result.message,
         verificationToken: result.verificationToken || "",
-        profilePhoto: result.profilePhoto || result.idCardImage || "",
         confidence: result.confidence,
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
@@ -261,7 +256,6 @@ function RegisterPageContent() {
         extractedRegistrationNumber: "",
         message: error instanceof Error ? error.message : "Could not read registration number. Please upload a clearer image.",
         verificationToken: "",
-        profilePhoto: "",
       };
       if (playerRole === "captain") setCaptainVerification(nextVerification);
       else setMemberVerification(index, nextVerification);
@@ -290,8 +284,6 @@ function RegisterPageContent() {
         gender: member.gender || category,
         email: member.email.trim().toLowerCase(),
         phone: member.phone.trim(),
-        profilePhoto: member.verification.profilePhoto,
-        idCardImage: member.verification.profilePhoto,
         verificationToken: member.verification.verificationToken,
       }))
       .filter((member) => member.fullName || member.registrationNo);
@@ -365,8 +357,6 @@ function RegisterPageContent() {
         captainRegNo: cleanCaptainRegNo,
         captainEmail: cleanCaptainEmail,
         captainPhone: cleanCaptainPhone,
-        captainProfilePhoto: captainVerification.profilePhoto,
-        captainIdCardImage: captainVerification.profilePhoto,
         captainVerificationToken: captainVerification.verificationToken,
         members: cleanMembers,
       };
@@ -413,7 +403,18 @@ function RegisterPageContent() {
             </div>
           </div>
 
-          <AppToast message={message} variant={status === "success" ? "success" : status === "error" ? "error" : "info"} onClose={() => setMessage("")} />
+          {message && (
+            <div className={`mb-6 rounded-xl border px-4 py-3 text-sm font-bold ${
+              status === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}>
+              <div className="flex items-center gap-2">
+                {status === "success" && <CheckCircle2 size={18} />}
+                <span>{message}</span>
+              </div>
+            </div>
+          )}
 
           {registrationOpen ? (
             <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
@@ -439,7 +440,7 @@ function RegisterPageContent() {
                   </select>
                 </Field>
                 <Field label="Category *">
-                  <select value={category} onChange={(e) => { setCategory(e.target.value as "Male" | "Female" | "Mixed"); setMembers([]); }} className="input-light" required>
+                  <select value={category} onChange={(e) => { setCategory(e.target.value as "Male" | "Female"); setMembers([]); }} className="input-light" required>
                     {sportCategories.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}
@@ -597,7 +598,7 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <ProtectedRoute allowedRole={["coordinator", "supercoordinator"]}>
+    <ProtectedRoute allowedRole={["coordinator", "admin", "supercoordinator"]}>
       <RegisterPageContent />
     </ProtectedRoute>
   );

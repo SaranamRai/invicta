@@ -16,11 +16,9 @@ import Tournament from "../models/Tournament.js";
 import Venue from "../models/Venue.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
-import RegistrationField from "../models/RegistrationField.js";
-import { audit } from "../utils/audit.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
-import { sendTeamApprovedEmail, sendTeamRejectedEmail, getEmailErrorMessage } from "../utils/emailService.js";
+import { sendTeamApprovedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
 function getRegistrationApprovalBlockMessage(registration) {
@@ -222,7 +220,7 @@ export async function listPendingRegistrations(_req, res) {
 function normalizeSportPayload(body) {
   const sportName = String(body.sportName || body.name || "").trim().replace(/\s+/g, " ");
   const categories = Array.isArray(body.categories) && body.categories.length
-    ? body.categories.filter((category) => ["Male", "Female", "Mixed"].includes(category))
+    ? body.categories.filter((category) => ["Male", "Female"].includes(category))
     : ["Male", "Female"];
 
   return applyRecommendedPlayerCounts({
@@ -369,7 +367,7 @@ export async function reviewTeamRegistration(req, res) {
 
   if (status === "approved") {
     const sportName = registration.sportName || "";
-    const linkedTeam = await Team.findOneAndUpdate(
+    await Team.findOneAndUpdate(
       {
         sportId: registration.sportId,
         tournamentId: registration.tournamentId,
@@ -399,14 +397,10 @@ export async function reviewTeamRegistration(req, res) {
         reviewedBy: req.user.id,
         reviewedAt,
         rejectionReason: "",
-        source: "registration",
-        registrationId: registration._id,
         registeredAt: registration.submittedAt ? new Date(registration.submittedAt).getTime() : Date.now(),
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
-    registration.teamId = linkedTeam?._id || null;
-    await registration.save();
 
     try {
       const emailResult = await sendTeamApprovedEmail({
@@ -431,51 +425,7 @@ export async function reviewTeamRegistration(req, res) {
     }
   }
 
-  try {
-    const emailRecipients = [
-      registration.captainEmail,
-      ...(registration.members || []).map((member) => member.email),
-    ]
-      .map((email) => String(email || "").trim().toLowerCase())
-      .filter(Boolean);
-    const uniqueRecipients = [...new Set(emailRecipients)];
-    let emailResult = { sent: false, skipped: true };
-    const failedEmails = [];
-
-    for (const email of uniqueRecipients) {
-      try {
-        const result = await sendTeamRejectedEmail({
-          teamName: registration.teamName,
-          captainName: registration.captainName,
-          email,
-          sportName: registration.sportName,
-          tournamentName: registration.tournamentName,
-          rejectionReason: registration.rejectionReason,
-        });
-        emailResult = {
-          sent: Boolean(emailResult.sent || result.sent),
-          skipped: Boolean(emailResult.skipped && result.skipped),
-        };
-      } catch (emailError) {
-        failedEmails.push({ email, message: getEmailErrorMessage(emailError) });
-        console.error("Team rejection email recipient error:", email, emailError);
-      }
-    }
-
-    return res.json({
-      ...registration.toObject(),
-      emailSent: emailResult.sent,
-      emailSkipped: emailResult.skipped,
-      emailFailedCount: failedEmails.length,
-    });
-  } catch (emailError) {
-    console.error("Team rejection email error:", emailError);
-    return res.json({
-      ...registration.toObject(),
-      emailSent: false,
-      emailWarning: getEmailErrorMessage(emailError),
-    });
-  }
+  return res.json(registration);
 }
 
 export async function listRoleAccounts(_req, res) {
@@ -659,25 +609,7 @@ export async function deleteRoleAccount(req, res) {
   const account = await model.findByIdAndDelete(id);
   if (!account) return res.status(404).json({ message: "Account not found" });
 
-  await audit(req, "Deleted role account", `${role}: ${account.email}`);
   return res.json({ message: "Account deleted successfully" });
-}
-
-export async function listRegistrationFields(_req, res) {
-  return res.json(await RegistrationField.find().sort({ order: 1, name: 1 }).lean());
-}
-
-export async function replaceRegistrationFields(req, res) {
-  const fields = Array.isArray(req.body.fields) ? req.body.fields : [];
-  const names = new Set(["department", "teamName", "captainName", "captainRegNo", "captainEmail", "captainPhone"]);
-  if (fields.some((field) => !names.has(String(field.name)))) return res.status(400).json({ message: "One or more registration fields are invalid" });
-  await Promise.all(fields.map((field, index) => RegistrationField.findOneAndUpdate(
-    { name: String(field.name) },
-    { name: String(field.name), label: String(field.label || field.name), type: ["text", "email", "tel"].includes(field.type) ? field.type : "text", enabled: field.enabled !== false, required: field.required === true, order: Number.isFinite(Number(field.order)) ? Number(field.order) : index + 1 },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  )));
-  await audit(req, "Updated registration form", `${fields.length} fields configured`);
-  return res.json(await RegistrationField.find().sort({ order: 1, name: 1 }).lean());
 }
 
 export async function listRules(_req, res) {
@@ -754,6 +686,4 @@ export const adminHandlers = {
   updateVenue,
   deleteVenue,
   listPendingRegistrations,
-  listRegistrationFields,
-  replaceRegistrationFields,
 };

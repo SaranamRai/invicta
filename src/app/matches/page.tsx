@@ -35,10 +35,8 @@ export default function MatchesPage() {
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState("");
   const [selectedSport, setSelectedSport] = useState("All Sports");
-  const [selectedCategory, setSelectedCategory] = useState("All");
   const [liveFeeds, setLiveFeeds] = useState<LiveFeedPost[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [isDateFilterActive, setIsDateFilterActive] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -49,10 +47,7 @@ export default function MatchesPage() {
 
     async function loadMatches() {
       const [fixtures, liveScores, feeds, publicTournaments] = await Promise.all([
-        getPublicFixtures({
-          tournamentId: selectedTournamentId || undefined,
-          category: selectedCategory === "All" ? undefined : selectedCategory,
-        }),
+        getPublicFixtures(),
         getPublicLiveScores(),
         getPublicLiveFeeds(),
         getPublicTournaments(),
@@ -85,13 +80,13 @@ export default function MatchesPage() {
     void loadMatches();
     const interval = window.setInterval(() => {
       if (!document.hidden) void loadMatches();
-    }, 1000);
+    }, 5000);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [selectedTournamentId, selectedCategory]);
+  }, []);
 
   React.useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -120,8 +115,6 @@ export default function MatchesPage() {
 
   const filteredMatches = tournamentFilteredMatches.filter(match => {
     if (selectedSport !== "All Sports" && match.sport !== selectedSport) return false;
-    if (selectedCategory !== "All" && match.category !== selectedCategory) return false;
-    if (isDateFilterActive && getDateKey(match.date) !== getDateKey(selectedDate)) return false;
     if (activeTab === "All Matches") return true;
     return match.status === activeTab;
   });
@@ -170,7 +163,7 @@ export default function MatchesPage() {
         <div className="flex flex-col items-end gap-4 relative">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); setIsDateFilterActive(true); }}
+              onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); }}
               className="px-4 py-2 rounded-xl bg-secondary hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-all border border-border"
             >
               Today
@@ -246,7 +239,7 @@ export default function MatchesPage() {
                       return (
                         <button
                           key={dayNumber}
-                          onClick={() => { const d = new Date(currentDate); d.setDate(dayNumber); setSelectedDate(d); setIsDateFilterActive(true); setIsCalendarOpen(false); }}
+                          onClick={() => { const d = new Date(currentDate); d.setDate(dayNumber); setSelectedDate(d); setIsCalendarOpen(false); }}
                           title={hasMatches ? `${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : undefined}
                           aria-label={`${formatFullDate(calendarDate)}${hasMatches ? `, ${matchCount} scheduled match${matchCount === 1 ? "" : "es"}` : ""}`}
                           className={cn(
@@ -337,19 +330,6 @@ export default function MatchesPage() {
             ))}
           </select>
         </label>
-        <label className="flex w-full flex-col gap-2 sm:max-w-xs">
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Category</span>
-          <select
-            value={selectedCategory}
-            onChange={(event) => { setSelectedCategory(event.target.value); setSelectedMatchId(null); }}
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
-          >
-            <option value="All">All</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Mixed">Mixed</option>
-          </select>
-        </label>
       </div>
 
       {/* Two-column layout: Matches (left) + Live Feed (right) */}
@@ -434,7 +414,7 @@ export default function MatchesPage() {
                               {match.status === "Upcoming" ? "00" : (match.scoreB ?? 0).toString().padStart(2, "0")}
                             </span>
                           </div>
-                          <span className="text-[10px] font-black uppercase text-accent tracking-[0.4em] sport-heading">{match.sport} · {match.category || "Unclassified"}</span>
+                          <span className="text-[10px] font-black uppercase text-accent tracking-[0.4em] sport-heading">{match.sport}</span>
                           <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.3em]">{getMatchPeriod(match)}</span>
                         </div>
 

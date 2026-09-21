@@ -127,12 +127,9 @@ export function FixtureViewer({
       venue,
     };
 
-    if (editingFixture.status === "completed" && (scoreA !== editingFixture.scoreA || scoreB !== editingFixture.scoreB)) {
-      if (!confirm("This match is already completed. Updating the result will recalculate the public result and league table. Continue?")) return;
-    }
     onUpdateFixture(updated);
     setEditingFixture(null);
-    alert(editingFixture.status === "completed" ? "Result updated and league data will refresh from the corrected fixture." : "Match updated and scores recorded successfully!");
+    alert("Match updated and scores recorded successfully!");
   };
 
   return (
@@ -269,7 +266,7 @@ export function FixtureViewer({
             <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-white/5">
               <CardTitle className="text-base text-white flex items-center gap-2">
                 <Edit3 size={18} className="text-accent" />
-                Reschedule Match
+                Update Match details
               </CardTitle>
               <button 
                 onClick={() => setEditingFixture(null)}
@@ -572,7 +569,7 @@ export function FixtureViewer({
                               onClick={() => openEditModal(fixture)}
                               className="flex-1 flex items-center justify-center gap-1 text-xs font-bold px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-white hover:bg-slate-700 transition-all cursor-pointer"
                             >
-                              <Edit3 size={13} /> Reschedule
+                              <Edit3 size={13} /> Update
                             </button>
                           )}
                           {onDeleteFixture && (

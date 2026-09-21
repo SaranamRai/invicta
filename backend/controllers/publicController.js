@@ -11,11 +11,10 @@ import Tournament from "../models/Tournament.js";
 import Team from "../models/Team.js";
 import TeamRegistration from "../models/TeamRegistration.js";
 import Player from "../models/Player.js";
-import RegistrationField from "../models/RegistrationField.js";
 import mongoose from "mongoose";
-import { buildLeagueTable } from "../utils/leagueTable.js";
 import { withPlayerCountFallback } from "../utils/sportPlayerCounts.js";
 import { normalizeRegNo as normalizeVerifiedRegNo, isValidEmail as isValidEmailValue } from "../utils/regNoHelper.js";
+import { buildVerifiedStatus, verifyRegistrationToken } from "../utils/idVerification.js";
 
 const publicModels = {
   sports: Sport,
@@ -32,11 +31,10 @@ const publicModels = {
 };
 
 function addQueryFilters(resource, req, filter) {
-  const { tournamentId, sportId, category, date, teamId, fixtureId } = req.query || {};
+  const { tournamentId, sportId, category, teamId, fixtureId } = req.query || {};
   if (tournamentId) filter.tournamentId = tournamentId;
   if (sportId) filter.sportId = sportId;
   if (category) filter.category = String(category);
-  if (date && resource === "fixtures") filter.date = String(date);
   if (fixtureId && (resource === "live-scores" || resource === "live-feeds")) filter.fixtureId = fixtureId;
   if (teamId && resource === "fixtures") filter.$or = [{ teamA: teamId }, { teamB: teamId }];
   if (teamId && resource === "teams") filter._id = teamId;
@@ -45,22 +43,13 @@ function addQueryFilters(resource, req, filter) {
 
 export function listPublic(resource) {
   return async (req, res) => {
-    if (resource === "points-table") {
-      const filters = {};
-      for (const key of ["tournamentId", "sportId", "category"]) {
-        if (req.query[key]) filters[key] = String(req.query[key]);
-      }
-      return res.json(await buildLeagueTable(filters));
-    }
     const model = publicModels[resource];
-    const filter = addQueryFilters(resource, req, resource === "fixtures"
-      ? { status: { $ne: "cancelled" } }
-      : resource === "announcements"
+    const filter = addQueryFilters(resource, req, resource === "announcements"
       ? { visibleToPublic: true }
       : resource === "rules"
       ? { $or: [{ status: "approved" }, { status: { $exists: false } }] }
       : resource === "teams"
-      ? { status: { $in: ["draft", "ready", "registered", "approved"] } }
+      ? { status: "approved" }
       : {});
 
     let query = model.find(filter);
@@ -119,18 +108,6 @@ function isValidEmail(value) {
   return isValidEmailValue(value);
 }
 
-const VALID_IMAGE_PREFIXES = [
-  "data:image/jpeg;base64,",
-  "data:image/png;base64,",
-  "data:image/webp;base64,",
-  "data:image/jpg;base64,",
-];
-
-function isAllowedImage(value) {
-  if (!value || typeof value !== "string") return false;
-  return VALID_IMAGE_PREFIXES.some((prefix) => value.startsWith(prefix));
-}
-
 function normalizeMember(member) {
   if (typeof member === "string") {
     return {
@@ -141,8 +118,6 @@ function normalizeMember(member) {
       gender: "",
       email: "",
       phone: "",
-      profilePhoto: "",
-      idCardImage: "",
     };
   }
 
@@ -154,41 +129,33 @@ function normalizeMember(member) {
     gender: normalizeText(member?.gender),
     email: normalizeText(member?.email).toLowerCase(),
     phone: normalizeText(member?.phone),
-    profilePhoto: isAllowedImage(member?.profilePhoto || member?.idCardImage || "") ? (member.profilePhoto || member.idCardImage) : "",
-    idCardImage: isAllowedImage(member?.idCardImage || member?.profilePhoto || "") ? (member.idCardImage || member.profilePhoto) : "",
+    verificationToken: normalizeText(member?.verificationToken),
   };
 }
 
-const DEFAULT_REGISTRATION_FIELDS = [
-  ["department", "Department", "text", true, true, 1],
-  ["teamName", "Team Name", "text", true, true, 2],
-  ["captainName", "Captain Name", "text", true, true, 3],
-  ["captainRegNo", "Captain Registration Number", "text", true, true, 4],
-  ["captainEmail", "Captain Email", "email", true, true, 5],
-  ["captainPhone", "Captain Phone Number", "tel", true, true, 6],
-];
-
-export async function getPublicRegistrationFields(_req, res) {
-  const saved = await RegistrationField.find().sort({ order: 1, name: 1 }).lean();
-  const fields = saved.length ? saved : DEFAULT_REGISTRATION_FIELDS.map(([name, label, type, enabled, required, order]) => ({ name, label, type, enabled, required, order }));
-  return res.json(fields);
+function getVerifiedStatusOrError({ token, registrationNumber, playerRole, playerIndex }) {
+  const payload = verifyRegistrationToken(token, { registrationNumber, playerRole, playerIndex });
+  if (!payload) return { error: "ID verification is required for every player." };
+  return { value: buildVerifiedStatus(payload) };
 }
 
-function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainProfilePhoto, members }) {
+function buildAllPlayers({ captainName, captainEmail, captainRegNo, captainIdVerification, members }) {
   return [
     {
       name: captainName,
       email: captainEmail,
       registrationNumber: captainRegNo,
       role: "captain",
-      profilePhoto: captainProfilePhoto || "",
+      idVerified: Boolean(captainIdVerification?.verified),
+      idVerificationStatus: captainIdVerification?.status || "pending",
     },
     ...(members || []).map((member) => ({
       name: member.fullName,
       email: member.email || "",
       registrationNumber: member.registrationNo,
       role: "member",
-      profilePhoto: member.profilePhoto || member.idCardImage || "",
+      idVerified: Boolean(member.idVerification?.verified),
+      idVerificationStatus: member.idVerification?.status || "pending",
     })),
   ];
 }
@@ -269,9 +236,6 @@ async function assertRegistrationNumbersUnused(registrationNumbers) {
 
 export async function registerPublicTeam(req, res) {
   try {
-    const configuredFields = await RegistrationField.find().lean();
-    const fieldEnabled = (name) => configuredFields.length === 0 || configuredFields.find((field) => field.name === name)?.enabled !== false;
-    const fieldRequired = (name) => configuredFields.find((field) => field.name === name)?.required === true;
     const department = normalizeText(req.body.department).toUpperCase();
     const teamName = normalizeText(req.body.teamName || req.body.name || department);
     const sportDoc = await resolveSport(req);
@@ -284,26 +248,31 @@ export async function registerPublicTeam(req, res) {
     const captainRegNo = normalizeRegNo(req.body.captainRegNo || req.body.captainRegistrationNumber);
     const email = normalizeText(req.body.captainEmail || req.body.email).toLowerCase();
     const phone = normalizeText(req.body.captainPhone || req.body.phone || req.body.contactNumber).replace(/\D/g, "");
-    const captainProfilePhoto = isAllowedImage(req.body.captainProfilePhoto || req.body.captainIdCardImage || "")
-      ? (req.body.captainProfilePhoto || req.body.captainIdCardImage)
-      : "";
 
-    const values = { department, teamName, captainName, captainRegNo, captainEmail: email, captainPhone: phone };
-    const missing = Object.entries(values).find(([name, value]) => fieldEnabled(name) && fieldRequired(name) && !value);
-    if (missing) {
-      return res.status(400).json({ message: `Please complete the required ${missing[0]} field.` });
+    if (!department || !teamName || !captainName || !captainRegNo || !email || !phone) {
+      return res.status(400).json({ message: "Department, team, captain registration number, captain email, and phone are required" });
     }
 
-    if (!["Male", "Female", "Mixed"].includes(category)) {
-      return res.status(400).json({ message: "Category must be Male, Female, or Mixed" });
+    if (!["Male", "Female"].includes(category)) {
+      return res.status(400).json({ message: "Category must be either Male or Female" });
     }
 
-    if (fieldEnabled("captainEmail") && email && !isValidEmail(email)) {
+    if (!isValidEmail(email)) {
       return res.status(400).json({ message: "Captain email is invalid" });
     }
 
-    if (fieldEnabled("captainPhone") && phone && phone.length !== 10) {
+    if (phone.length !== 10) {
       return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
+    }
+
+    const captainVerification = getVerifiedStatusOrError({
+      token: req.body.captainVerificationToken,
+      registrationNumber: captainRegNo,
+      playerRole: "captain",
+      playerIndex: 0,
+    });
+    if (captainVerification.error) {
+      return res.status(400).json({ message: captainVerification.error });
     }
 
     const members = Array.isArray(req.body.members)
@@ -341,7 +310,19 @@ export async function registerPublicTeam(req, res) {
 
     const registrationNumbers = Array.from(new Set([captainRegNo, ...memberRegNos]));
 
-    const storedMembers = members.map((member) => ({
+    const storedMembers = members.map((member, index) => {
+      const memberVerification = getVerifiedStatusOrError({
+        token: member.verificationToken,
+        registrationNumber: member.registrationNumber,
+        playerRole: "member",
+        playerIndex: index,
+      });
+      if (memberVerification.error) {
+        const error = new Error(memberVerification.error);
+        error.status = 400;
+        throw error;
+      }
+      return {
         fullName: member.fullName,
         registrationNo: member.registrationNumber,
         department: member.department || department,
@@ -349,16 +330,22 @@ export async function registerPublicTeam(req, res) {
         gender: member.gender || category,
         email: member.email || "",
         phone: member.phone || "",
-        profilePhoto: member.profilePhoto || member.idCardImage || "",
-        idCardImage: member.idCardImage || member.profilePhoto || "",
-      }));
+        idVerification: memberVerification.value,
+      };
+    });
+
+    const captainIdVerification = captainVerification.value;
     const allPlayers = buildAllPlayers({
       captainName,
       captainEmail: email,
       captainRegNo,
-      captainProfilePhoto,
+      captainIdVerification,
       members: storedMembers,
     });
+
+    if (allPlayers.some((player) => player.idVerificationStatus === "mismatch")) {
+      return res.status(400).json({ message: "Typed registration number does not match the ID card." });
+    }
 
     await assertRegistrationNumbersUnused(registrationNumbers);
 
@@ -396,8 +383,7 @@ export async function registerPublicTeam(req, res) {
       captainRegNo,
       captainEmail: email,
       captainPhone: phone,
-      captainProfilePhoto,
-      captainIdCardImage: captainProfilePhoto,
+      captainIdVerification,
       members: storedMembers,
       allPlayers,
       status: "pending",
@@ -456,11 +442,8 @@ export async function getSportDetailView(req, res) {
       return res.status(404).json({ message: "Sport not found" });
     }
 
-    // Include coordinator-created draft teams so they are visible before member registration is complete.
-    const teamModelTeams = await Team.find({
-      sportId,
-      status: { $in: ["draft", "ready", "registered", "approved"] },
-    }).lean();
+    // Collect approved teams from both models
+    const teamModelTeams = await Team.find({ sportId, status: "approved" }).lean();
     const registrationTeams = await TeamRegistration.find({ sportId, status: "approved" }).lean();
 
     // Deduplicate by teamName+department+category, prefer TeamRegistration

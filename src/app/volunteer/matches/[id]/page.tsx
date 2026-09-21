@@ -83,7 +83,7 @@ export default function LiveMatchEditPanel() {
     }
 
     void loadMatch();
-    const interval = window.setInterval(loadMatch, 1000);
+    const interval = window.setInterval(loadMatch, 5000);
 
     return () => {
       isMounted = false;

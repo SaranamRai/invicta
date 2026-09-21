@@ -9,11 +9,9 @@ import { TournamentManager } from "@/components/admin/tournament-manager";
 import { LeaderboardViewer } from "@/components/admin/leaderboard-viewer";
 import { UsersViewer } from "@/components/admin/users-viewer";
 import { RulesViewer } from "@/components/admin/rules-viewer";
-import { TeamManager } from "@/components/admin/team-manager";
 import { Team, Fixture } from "@/lib/fixture-generator";
 import { Download, LogOut, CheckCircle, Trash2, XCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { AppToast } from "@/components/ui/app-toast";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { MedhaviLogo } from "@/components/medhavi-logo";
 import { GenderMark } from "@/components/gender-mark";
@@ -24,6 +22,7 @@ import {
   getAdminFixtures,
   getAdminTeams,
   updateAdminFixture,
+  updateAdminTeam,
   getAdminSports,
   getAdminTournaments,
   getTeamPendingRegistrations,
@@ -32,13 +31,9 @@ import {
   rejectTeamRegistration,
   deleteTeamRegistration,
   MongoSport,
-  AdminFixturePayload,
   TeamRegistrationPayload,
   TournamentPayload,
   downloadApprovedRegistrationsExcel,
-  createAdminTeam,
-  updateAdminTeam,
-  deleteAdminTeam,
 } from "@/lib/api";
 
 type AdminTab =
@@ -81,7 +76,7 @@ function DownloadApprovedRegistrationsButton({ compact = false, filters }: { com
         <Download size={compact ? 14 : 16} />
         {isDownloading ? "Downloading..." : compact ? "Export Excel" : "Download Approved Registrations (Excel)"}
       </button>
-      <AppToast message={message} variant={message.startsWith("Could not") ? "error" : "success"} onClose={() => setMessage("")} />
+      {message && <p className="max-w-sm text-xs font-bold text-muted-foreground">{message}</p>}
     </div>
   );
 }
@@ -365,7 +360,6 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           role: "captain" as const,
           idVerified: registration.captainIdVerification?.verified,
           idVerificationStatus: registration.captainIdVerification?.status || "old_registration",
-          profilePhoto: registration.captainProfilePhoto || registration.captainIdCardImage || "",
         },
         ...(registration.members || []).map((member) => ({
           name: member.fullName,
@@ -374,7 +368,6 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           role: "member" as const,
           idVerified: member.idVerification?.verified,
           idVerificationStatus: member.idVerification?.status || "old_registration",
-          profilePhoto: member.profilePhoto || member.idCardImage || "",
         })),
       ];
 
@@ -385,7 +378,6 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
         {players.map((player, index) => (
           <div key={`${player.registrationNumber}-${index}`} className="rounded-lg border border-border bg-card px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <PlayerPhoto photo={player.profilePhoto} name={player.name || "Player"} />
               <p className="text-xs font-black text-foreground">
                 {player.role === "captain" ? "Captain" : `Member ${index}`} · {player.name || "Player"}
               </p>
@@ -399,15 +391,6 @@ function IdVerificationSummary({ registration }: { registration: TeamRegistratio
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function PlayerPhoto({ photo, name }: { photo?: string; name: string }) {
-  const initials = name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary text-[10px] font-black text-muted-foreground">
-      {photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : initials || "ID"}
     </div>
   );
 }
@@ -426,13 +409,11 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadApprovedTeams();
-    const refreshInterval = window.setInterval(() => void loadApprovedTeams(true), 1000);
-    return () => window.clearInterval(refreshInterval);
+    loadApprovedTeams();
   }, []);
 
-  async function loadApprovedTeams(silent = false) {
-    if (!silent) setLoading(true);
+  async function loadApprovedTeams() {
+    setLoading(true);
     setMessage("");
     try {
       const [data, setupTournaments, setupSports] = await Promise.all([
@@ -520,12 +501,12 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="sport-heading text-2xl font-black text-foreground">Registered Teams</h2>
-          <p className="text-sm text-muted-foreground">Select a tournament to view its registered teams, then narrow by sport and category.</p>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Approved Teams</h2>
+          <p className="text-sm text-muted-foreground">Download by tournament for all sports, or narrow to one sport and Male/Female category.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => void loadApprovedTeams()}
+            onClick={loadApprovedTeams}
             className="w-fit rounded-xl border border-border bg-card px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground transition-colors hover:border-accent"
           >
             Refresh
@@ -595,7 +576,11 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
           </select>
       </div>
 
-      <AppToast message={message} variant={message.startsWith("Could not") ? "error" : "success"} onClose={() => setMessage("")} />
+      {message && (
+        <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-xs font-bold text-muted-foreground">
+          {message}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -706,65 +691,83 @@ export default function AdminDashboard() {
   const account = getRoleAccount();
   const canManageSetup = account?.role === "supercoordinator";
   const [teams, setTeams] = useState<Team[]>([]);
-  const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [activeTab, setActiveTab] = useState<AdminTab>(canManageSetup ? "dashboard" : "users");
 
   useEffect(() => {
     let isMounted = true;
-    let refreshing = false;
 
     async function loadAdminData() {
-      if (refreshing) return;
-      refreshing = true;
       try {
-        const [nextTeams, nextFixtures, nextTournaments] = await Promise.all([
+        const [nextTeams, nextFixtures] = await Promise.all([
           getAdminTeams(),
           getAdminFixtures(),
-          getAdminTournaments(),
         ]);
 
         if (!isMounted) return;
 
         setTeams(nextTeams as Team[]);
         setFixtures(nextFixtures as Fixture[]);
-        setTournaments(nextTournaments);
       } catch (error) {
         console.error("Failed to load Mongo admin data:", error);
-      } finally {
-        refreshing = false;
       }
     }
 
     void loadAdminData();
-    const refreshInterval = window.setInterval(() => void loadAdminData(), 1000);
 
     return () => {
       isMounted = false;
-      window.clearInterval(refreshInterval);
     };
   }, []);
 
-  const recalculateStandings = async () => {
-    // League rows are calculated from completed MongoDB fixtures by the API.
-    const [nextTeams, nextFixtures] = await Promise.all([getAdminTeams(), getAdminFixtures()]);
-    setTeams(nextTeams as Team[]);
-    setFixtures(nextFixtures as Fixture[]);
+  // Recalculate team standings (wins/losses) based on completed fixtures
+  const recalculateStandings = (allFixtures = fixtures) => {
+    const updatedTeams = teams.map((team) => {
+      let won = 0;
+      let lost = 0;
+
+      allFixtures.forEach((fix) => {
+        if (
+          fix.status === "completed" &&
+          fix.scoreA !== undefined &&
+          fix.scoreB !== undefined
+        ) {
+          const isTeamA = fix.teamA === team.id || fix.teamA === team.name;
+          const isTeamB = fix.teamB === team.id || fix.teamB === team.name;
+
+          if (isTeamA) {
+            if (fix.scoreA > fix.scoreB) won++;
+            else if (fix.scoreA < fix.scoreB) lost++;
+          } else if (isTeamB) {
+            if (fix.scoreB > fix.scoreA) won++;
+            else if (fix.scoreB < fix.scoreA) lost++;
+          }
+        }
+      });
+
+      return {
+        ...team,
+        wins: won,
+        losses: lost,
+      };
+    });
+
+    updatedTeams.forEach((team) => {
+      void updateAdminTeam(team).catch((error) => console.error("Mongo standings update failed:", error));
+    });
+    setTeams(updatedTeams);
   };
 
-  const handleAutomaticFixturesGenerated = async (createdFixtures: AdminFixturePayload[]) => {
-    setFixtures((current) => {
-      const byId = new Map(current.map((fixture) => [fixture.id, fixture]));
-      createdFixtures.forEach((fixture) => byId.set(fixture.id, fixture as unknown as Fixture));
-      return Array.from(byId.values());
-    });
+  const handleAutomaticFixturesGenerated = async () => {
+    const nextFixtures = await getAdminFixtures();
+    setFixtures(nextFixtures as Fixture[]);
   };
 
   const handleDeleteFixtureGroup = async (fixtureIds: string[]) => {
     await deleteAdminFixtures(fixtureIds);
     const nextFixtures = await getAdminFixtures();
     setFixtures(nextFixtures as Fixture[]);
-    await recalculateStandings();
+    recalculateStandings(nextFixtures as Fixture[]);
   };
 
   // Delete single fixture
@@ -772,48 +775,15 @@ export default function AdminDashboard() {
     await deleteAdminFixture(fixtureId);
     const nextFixtures = await getAdminFixtures();
     setFixtures(nextFixtures as Fixture[]);
-    await recalculateStandings();
+    recalculateStandings(nextFixtures as Fixture[]);
   };
 
   // Update fixture handler
   const handleUpdateFixture = async (updatedFixture: Fixture) => {
-    try {
-      const savedFixture = await updateAdminFixture(updatedFixture);
-      const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
-      setFixtures(nextFixtures);
-      alert("Fixture updated successfully.");
-      await recalculateStandings();
-    } catch (error) {
-      const messageText = error instanceof Error ? error.message : "Unable to update fixture.";
-      alert(`Could not reschedule match: ${messageText}`);
-    }
-  };
-
-  const handleAddManualTeam = async (team: Team) => {
-    try {
-      const saved = await createAdminTeam(team as never);
-      setTeams((current) => [saved as Team, ...current]);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Unable to create team.");
-    }
-  };
-
-  const handleUpdateManualTeam = async (team: Team) => {
-    try {
-      const saved = await updateAdminTeam(team as never);
-      setTeams((current) => current.map((item) => item.id === team.id ? saved as Team : item));
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Unable to update team.");
-    }
-  };
-
-  const handleDeleteManualTeam = async (teamId: string) => {
-    try {
-      await deleteAdminTeam(teamId);
-      setTeams((current) => current.filter((team) => team.id !== teamId));
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Unable to delete team.");
-    }
+    const savedFixture = await updateAdminFixture(updatedFixture);
+    const nextFixtures = fixtures.map((fixture) => fixture.id === updatedFixture.id ? savedFixture as Fixture : fixture);
+    setFixtures(nextFixtures);
+    recalculateStandings(nextFixtures);
   };
 
   const handleLogout = async () => {
@@ -928,28 +898,28 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "teams" && canManageSetup && (
-          <div className="space-y-8">
-            <TeamManager
-              teams={teams}
-              tournaments={tournaments}
-              onAddTeam={handleAddManualTeam}
-              onUpdateTeam={handleUpdateManualTeam}
-              onRemoveTeam={handleDeleteManualTeam}
-            />
-            <ApprovedTeamsPanel
-              onTeamDeleted={(registration) => {
-                setTeams((currentTeams) => currentTeams.filter((team) => {
+          <ApprovedTeamsPanel
+            onTeamDeleted={(registration) => {
+              setTeams((currentTeams) =>
+                currentTeams.filter((team) => {
                   const mongoTeam = team as Team & { sportId?: string; captainRegNo?: string };
-                  return !(
+                  const sameRegistration = (
                     mongoTeam.sportId === registration.sportId &&
                     team.category === registration.category &&
                     team.department === registration.department &&
-                    (team.name === registration.teamName || mongoTeam.captainRegNo === registration.captainRegNo)
+                    team.name === registration.teamName
                   );
-                }));
-              }}
-            />
-          </div>
+                  const sameCaptain = (
+                    mongoTeam.sportId === registration.sportId &&
+                    team.category === registration.category &&
+                    team.department === registration.department &&
+                    mongoTeam.captainRegNo === registration.captainRegNo
+                  );
+                  return !sameRegistration && !sameCaptain;
+                })
+              );
+            }}
+          />
         )}
 
         {activeTab === "generate-fixtures" && canManageSetup && (

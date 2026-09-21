@@ -24,8 +24,6 @@ const memberSchema = new mongoose.Schema(
     gender: { type: String, enum: ["", "Male", "Female"], default: "" },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
-    profilePhoto: { type: String, default: "" },
-    idCardImage: { type: String, default: "" },
     idVerification: { type: idVerificationSchema, default: () => ({}) },
   },
   { _id: false }
@@ -39,7 +37,6 @@ const allPlayerSchema = new mongoose.Schema(
     role: { type: String, enum: ["captain", "member"], default: "member" },
     idVerified: { type: Boolean, default: false },
     idVerificationStatus: { type: String, default: "pending" },
-    profilePhoto: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -50,7 +47,7 @@ const teamRegistrationSchema = new mongoose.Schema(
     tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament", default: null },
     tournamentName: { type: String, default: "", trim: true },
     sportName: { type: String, required: true, trim: true },
-    category: { type: String, enum: ["Male", "Female", "Mixed"], required: true },
+    category: { type: String, enum: ["Male", "Female"], required: true },
     department: { type: String, required: true, trim: true, uppercase: true },
     teamName: { type: String, required: true, trim: true },
     teamLogo: { type: String, default: "" },
@@ -58,8 +55,6 @@ const teamRegistrationSchema = new mongoose.Schema(
     captainRegNo: { type: String, required: true, trim: true, uppercase: true },
     captainEmail: { type: String, required: true, trim: true, lowercase: true },
     captainPhone: { type: String, required: true, trim: true },
-    captainProfilePhoto: { type: String, default: "" },
-    captainIdCardImage: { type: String, default: "" },
     captainIdVerification: { type: idVerificationSchema, default: () => ({}) },
     members: { type: [memberSchema], default: [] },
     allPlayers: { type: [allPlayerSchema], default: [] },
@@ -72,7 +67,6 @@ const teamRegistrationSchema = new mongoose.Schema(
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },
     rejectionReason: { type: String, default: "" },
-    teamId: { type: mongoose.Schema.Types.ObjectId, ref: "Team", default: null },
   },
   { timestamps: true }
 );

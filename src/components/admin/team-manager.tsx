@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Team } from "@/lib/fixture-generator";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { getPublicSports, MongoSport, TournamentPayload } from "@/lib/api";
+import { getPublicSports, MongoSport } from "@/lib/api";
 
 interface ExtendedTeam extends Team {
   coachCaptain?: string;
@@ -21,7 +21,7 @@ interface ExtendedTeam extends Team {
   category?: string;
   sportId?: string;
   sportName?: string;
-  status?: "draft" | "ready" | "registered" | "approved" | "completed" | "withdrawn" | "pending" | "rejected";
+  status?: "approved" | "pending" | "rejected";
   wins?: number;
   losses?: number;
   draws?: number;
@@ -51,7 +51,6 @@ type TeamMemberObject = {
 
 interface TeamManagerProps {
   teams: Team[];
-  tournaments: TournamentPayload[];
   onAddTeam: (team: Team) => void;
   onRemoveTeam: (teamId: string) => void;
   onUpdateTeam?: (team: Team) => void;
@@ -87,7 +86,6 @@ function getMemberDisplay(member: unknown, fallbackRegNo = "") {
 
 export function TeamManager({
   teams,
-  tournaments,
   onAddTeam,
   onRemoveTeam,
   onUpdateTeam
@@ -102,8 +100,7 @@ export function TeamManager({
 
   const [name, setName] = useState("");
   const [sport, setSport] = useState("");
-  const [tournamentId, setTournamentId] = useState("");
-  const [category, setCategory] = useState<"Male" | "Female" | "Mixed">("Male");
+  const [category, setCategory] = useState<"Male" | "Female">("Male");
   const [department, setDepartment] = useState("");
   const [captainName, setCaptainName] = useState("");
   const [captainRegNo, setCaptainRegNo] = useState("");
@@ -182,7 +179,6 @@ export function TeamManager({
   const resetForm = () => {
     setName("");
     setSport(sportOptions[0]?._id || "");
-    setTournamentId("");
     setCategory("Male");
     setDepartment("");
     setCaptainName("");
@@ -209,8 +205,7 @@ export function TeamManager({
       (s) => s.sportName?.toLowerCase().replace(/\s+/g, "-") === team.sport || s._id === team.sport
     );
     setSport(matched?._id || team.sport);
-    setTournamentId(team.tournamentId || "");
-    setCategory((team.category as "Male" | "Female" | "Mixed") || "Male");
+    setCategory((team.category as "Male" | "Female") || "Male");
     setDepartment(team.department || "");
     setCaptainName(team.coachCaptain || "");
     setCaptainRegNo(team.captainRegNo || "");
@@ -237,8 +232,9 @@ export function TeamManager({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { alert("Team Name is required"); return; }
+    if (!sport) { alert("Sport is required"); return; }
+
     const savedRegisteredAt = registeredAt || Date.now();
-    const selectedTournamentData = tournaments.find((tournament) => (tournament._id || tournament.id) === tournamentId);
     const teamData: ExtendedTeam = {
       id: editingTeamId || `team-${Date.now()}`,
       name: name.trim(),
@@ -247,8 +243,6 @@ export function TeamManager({
         : sport,
       sportName: selectedSportData?.sportName || selectedSportData?.name || "",
       sportId: sport,
-      tournamentId: tournamentId || undefined,
-      tournamentName: selectedTournamentData?.name || "",
       category,
       department: department.trim(),
       members: membersList.map((m) => ({
@@ -264,7 +258,7 @@ export function TeamManager({
       captainPhone: normalizePhone(captainPhone),
       contactNumber: normalizePhone(captainPhone),
       logo,
-      status: "draft",
+      status: "approved",
       wins,
       losses,
       registeredAt: savedRegisteredAt,
@@ -352,30 +346,7 @@ export function TeamManager({
                       className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Tournament (optional)</label>
-                    <select value={tournamentId} onChange={(e) => {
-                      const nextTournamentId = e.target.value;
-                      setTournamentId(nextTournamentId);
-                      const selectedTournament = tournaments.find((tournament) => (tournament._id || tournament.id) === nextTournamentId);
-                      if (selectedTournament?.sport) {
-                        const matchingSport = sportOptions.find((option) =>
-                          option._id === selectedTournament.sport ||
-                          option.sportName?.toLowerCase().replace(/\s+/g, "-") === selectedTournament.sport.toLowerCase().replace(/\s+/g, "-")
-                        );
-                        if (matchingSport) setSport(matchingSport._id);
-                      }
-                    }}
-                      className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-2.5 text-white focus:outline-none focus:border-accent transition-all">
-                      <option value="" className="bg-slate-950 text-slate-400">Select tournament...</option>
-                      {tournaments.filter((tournament) => tournament.status !== "completed").map((tournament) => (
-                        <option key={tournament._id || tournament.id} value={tournament._id || tournament.id} className="bg-slate-950 text-white">
-                          {tournament.name} {tournament.sport ? `(${tournament.sport})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Sport (optional)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Sport *</label>
                     <select value={sport} onChange={(e) => setSport(e.target.value)}
                       className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-2.5 text-white focus:outline-none focus:border-accent transition-all">
                       <option value="" className="bg-slate-950 text-slate-400">Select sport...</option>
@@ -387,12 +358,11 @@ export function TeamManager({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Category</label>
-                    <select value={category} onChange={(e) => setCategory(e.target.value as "Male" | "Female" | "Mixed")}
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-2">Category *</label>
+                    <select value={category} onChange={(e) => setCategory(e.target.value as "Male" | "Female")}
                       className="w-full rounded-xl bg-slate-950/60 border border-white/15 px-4 py-2.5 text-white focus:outline-none focus:border-accent transition-all">
                       <option value="Male" className="bg-slate-950 text-white">Male</option>
                       <option value="Female" className="bg-slate-950 text-white">Female</option>
-                      <option value="Mixed" className="bg-slate-950 text-white">Mixed</option>
                     </select>
                   </div>
                   <div>
@@ -578,11 +548,6 @@ export function TeamManager({
                         <span className="inline-block text-[9px] font-black uppercase tracking-widest text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded mt-1.5">
                           {sportName} {team.category ? `/ ${team.category}` : ""}
                         </span>
-                        {team.tournamentName && (
-                          <span className="mt-1 block truncate text-[10px] font-bold text-slate-400">
-                            Tournament: {team.tournamentName}
-                          </span>
-                        )}
                       </div>
                     </div>
 

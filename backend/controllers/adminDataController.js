@@ -11,9 +11,6 @@ import Announcement from "../models/Announcement.js";
 import LiveScore from "../models/LiveScore.js";
 import LiveFeed from "../models/LiveFeed.js";
 import Result from "../models/Result.js";
-import Volunteer from "../models/Volunteer.js";
-import { audit } from "../utils/audit.js";
-import { assertSupportedMatchCategory } from "../utils/matchCategories.js";
 
 function normalizeText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -82,15 +79,11 @@ function mapTeam(team) {
     sportId: team.sportId?.toString?.() || "",
     tournamentId: team.tournamentId?.toString?.() || "",
     tournamentName: team.tournamentName || "",
-    source: team.source || "manual",
-    registrationId: team.registrationId?.toString?.() || "",
     category: team.category || "Male",
     members: team.members || [],
     coachCaptain: team.captainName || "",
     captainRegNo: team.captainRegNo || "",
     contactNumber: team.contactNumber || "",
-    captainEmail: team.captainEmail || "",
-    captainPhone: team.captainPhone || "",
     logo: team.logo || "",
     status: team.status,
     reviewedAt: team.reviewedAt,
@@ -104,16 +97,10 @@ function mapTeam(team) {
 }
 
 function mapFixture(fixture) {
-  const endTime = fixture.endTime instanceof Date
-    ? `${String(fixture.endTime.getHours()).padStart(2, "0")}:${String(fixture.endTime.getMinutes()).padStart(2, "0")}`
-    : typeof fixture.endTime === "string" && fixture.endTime.includes("T")
-      ? `${String(new Date(fixture.endTime).getHours()).padStart(2, "0")}:${String(new Date(fixture.endTime).getMinutes()).padStart(2, "0")}`
-      : fixture.endTime;
   return {
     id: fixture._id.toString(),
     tournamentId: fixture.tournamentId?.toString?.() || "",
     tournamentName: fixture.tournamentName || "",
-    fixtureSource: fixture.fixtureSource || "AUTOMATIC",
     teamA: fixture.teamA?.toString?.() || "",
     teamB: fixture.teamB?.toString?.() || "",
     teamAName: fixture.teamAName || "",
@@ -127,7 +114,7 @@ function mapFixture(fixture) {
     date: fixture.date,
     time: fixture.time,
     startTime: fixture.startTime,
-    endTime,
+    endTime: fixture.endTime,
     fullMatchSeconds: fixture.fullMatchSeconds || 90 * 60,
     matchGapMinutes: fixture.matchGapMinutes || 0,
     round: fixture.round || "",
@@ -196,15 +183,9 @@ function toDateInputValue(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function parsePlayDays(value) {
-  const days = Array.isArray(value) ? value.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [0, 6];
-  const uniqueDays = [...new Set(days)];
-  if (uniqueDays.length === 0) {
-    const error = new Error("Select at least one day of the week for fixture generation");
-    error.status = 400;
-    throw error;
-  }
-  return uniqueDays;
+function isWeekend(date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
 }
 
 function isSameFixtureSport(fixture, sportDoc) {
@@ -503,17 +484,17 @@ async function syncApprovedRegistrationsForFixtureGeneration({ tournament, sport
   )));
 }
 
-function getNextAllowedDate(date, allowedDays = [0, 6]) {
+function getNextWeekendDate(date) {
   const nextDate = new Date(date);
-  while (!allowedDays.includes(nextDate.getDay())) {
+  while (!isWeekend(nextDate)) {
     nextDate.setDate(nextDate.getDate() + 1);
   }
   return nextDate;
 }
 
-function buildByeFixturePayload({ team, sportDoc, tournament, venueName, category, date, round, userId, allowedDays }) {
+function buildByeFixturePayload({ team, sportDoc, tournament, venueName, category, date, round, userId }) {
   const sportName = sportDoc.sportName || sportDoc.name || "Sport";
-  const dateString = toDateInputValue(getNextAllowedDate(date, allowedDays));
+  const dateString = toDateInputValue(getNextWeekendDate(date));
   const now = Date.now();
 
   return {
@@ -546,7 +527,7 @@ function getFixtureWindow(fixture) {
   const start = fixture.startTime
     ? new Date(fixture.startTime)
     : fixture.date && fixture.time
-      ? new Date(`${fixture.date}T${fixture.time}:00`)
+      ? new Date(`${fixture.date}T${fixture.time}`)
       : null;
   const rawEnd = fixture.endTime ? new Date(fixture.endTime) : start ? new Date(start.getTime() + 60 * 60 * 1000) : null;
   const end = rawEnd
@@ -562,223 +543,57 @@ function getFixtureWindow(fixture) {
   return { start, end };
 }
 
-function getFixtureDateFromInput(value) {
-  if (!value) return null;
-  const parsed = new Date(`${value}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function getFixtureTimeMinutes(value) {
-  if (!value || typeof value !== "string") return null;
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
-}
-
-function getAllowedRescheduleDates(dateString) {
-  const anchorDate = getFixtureDateFromInput(dateString) || new Date();
-  const dates = [];
-  for (let offset = 0; offset < 28; offset += 1) {
-    const next = new Date(anchorDate);
-    next.setDate(anchorDate.getDate() + offset);
-    dates.push(toDateInputValue(next));
-  }
-  return dates;
-}
-
-function toCandidateFixtureDateTime(dateString, timeString) {
-  if (!dateString || !timeString) return null;
-  const result = new Date(`${dateString}T${timeString}:00`);
-  return Number.isNaN(result.getTime()) ? null : result;
-}
-
-function getFixtureRangeFromDocument(fixture) {
-  const start = fixture.startTime
-    ? new Date(fixture.startTime)
-    : fixture.date && fixture.time
-      ? toCandidateFixtureDateTime(fixture.date, fixture.time)
-      : null;
-  const rawEnd = fixture.endTime
-    ? new Date(fixture.endTime)
-    : start
-      ? new Date(start.getTime() + (Number(fixture.fullMatchSeconds || 90 * 60) * 1000))
-      : null;
-  if (!start || !rawEnd || Number.isNaN(start.getTime()) || Number.isNaN(rawEnd.getTime())) {
-    return null;
-  }
-  return { start, end: rawEnd };
-}
-
-async function validateRescheduleCandidate(payload, excludeId, overrideOptions = {}) {
-  const dateString = payload.date || payload.scheduledDate;
-  const timeString = payload.time || payload.startTime || "09:00";
-  const start = payload.startTime instanceof Date
-    ? payload.startTime
-    : payload.startTime && typeof payload.startTime === "string" && payload.startTime.includes("T")
-      ? new Date(payload.startTime)
-    : toCandidateFixtureDateTime(dateString, timeString);
-  const durationSeconds = Number(payload.fullMatchSeconds || 90 * 60);
-  const end = payload.endTime instanceof Date
-    ? payload.endTime
-    : payload.endTime && typeof payload.endTime === "string" && payload.endTime.includes("T")
-      ? new Date(payload.endTime)
-    : start
-      ? toCandidateFixtureDateTime(dateString, payload.endTime || formatMinutesAsTime(Math.round(durationSeconds / 60) + getFixtureTimeMinutes(timeString)))
-      : null;
-
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    const error = new Error("Unable to reschedule this match. Please provide a valid date and time.");
-    error.status = 400;
-    throw error;
-  }
-
-  const dateValue = dateString || toDateInputValue(new Date(start));
-  const proposedDate = getFixtureDateFromInput(dateValue);
-  if (!proposedDate) {
-    const error = new Error("Unable to reschedule this match. Please provide a valid date.");
-    error.status = 400;
-    throw error;
-  }
-
-  const maxMatchesPerDay = Number(overrideOptions.maxMatchesPerDay || payload.maxMatchesPerDay || 8);
-  const minRestMinutes = Math.max(30, Number(overrideOptions.minRestMinutes || payload.minRestMinutes || payload.matchGapMinutes || 60));
+async function assertFixtureNoClash(payload, excludeId) {
+  const { start, end } = getFixtureWindow(payload);
+  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
+  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map(normalizeText);
   const query = {
     ...(excludeId ? { _id: { $ne: excludeId } } : {}),
     status: { $ne: "cancelled" },
-    ...(payload.tournamentId ? { tournamentId: payload.tournamentId } : {}),
-    ...(payload.sportId ? { sportId: payload.sportId } : {}),
-    ...(payload.category ? { category: payload.category } : {}),
+    startTime: { $lt: end },
+    endTime: { $gt: start },
   };
 
-  const overlapping = await Fixture.find({ ...query, date: dateValue }).lean();
-  const dateMatches = overlapping.filter((fixture) => fixture.date === dateValue && fixture.status !== "cancelled").length;
-  if (dateMatches >= maxMatchesPerDay) {
-    const error = new Error(`Unable to reschedule this match. ${dateValue} is already at the configured match-day capacity.`);
+  const overlapping = await Fixture.find(query).lean();
+  const teamClash = overlapping.find((fixture) => {
+    const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
+    return teamIds.some((id) => existingTeamIds.includes(id));
+  });
+  if (teamClash) {
+    const error = new Error("Fixture clash detected: this team already has another match at this time.");
     error.status = 400;
     throw error;
   }
 
-  const teamIds = [payload.teamA, payload.teamB].filter(Boolean).map(String);
-  const departments = [payload.departmentA, payload.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
-  const venue = payload.venue ? normalizeText(payload.venue).toLowerCase() : "";
-  const volunteer = payload.assignedVolunteer ? String(payload.assignedVolunteer) : "";
-
-  for (const fixture of overlapping) {
-    const range = getFixtureRangeFromDocument(fixture);
-    if (!range) continue;
-    if (start >= range.end || end <= range.start) continue;
-
-    if (overrideOptions.rejectAnyOverlap) {
-      const error = new Error(
-        `Fixture collision warning: another match is already scheduled on ${dateValue} at ${fixture.time || "the selected time"}. Choose a different time.`
-      );
-      error.status = 409;
-      throw error;
-    }
-
-    const existingTeamIds = [fixture.teamA?.toString?.(), fixture.teamB?.toString?.()].filter(Boolean);
-    const sharedTeam = teamIds.find((teamId) => existingTeamIds.includes(teamId));
-    if (sharedTeam) {
-      const diffMinutes = Math.abs((start.getTime() - range.start.getTime()) / 60000);
-      if (diffMinutes < minRestMinutes) {
-        const error = new Error(`Unable to reschedule this match. Team ${fixture.teamAName || "Team A"} already has another match too close to this time. Minimum rest time is ${minRestMinutes} minutes.`);
-        error.status = 400;
-        throw error;
-      }
-    }
-
-    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map((department) => normalizeText(department).toLowerCase());
-    const sharedDepartment = departments.find((department) => existingDepartments.includes(department));
-    if (sharedDepartment) {
-      const error = new Error("Unable to reschedule this match. A department match is already scheduled in the same time window.");
-      error.status = 400;
-      throw error;
-    }
-
-    if (venue && normalizeText(fixture.venue || "").toLowerCase() === venue) {
-      const error = new Error("Unable to reschedule this match. The selected venue is already booked at that time.");
-      error.status = 400;
-      throw error;
-    }
-
-    if (volunteer && fixture.assignedVolunteer?.toString?.() === volunteer) {
-      const error = new Error("Unable to reschedule this match. The assigned volunteer is already booked for another match at that time.");
-      error.status = 400;
-      throw error;
-    }
+  const departmentClash = overlapping.find((fixture) => {
+    const existingDepartments = [fixture.departmentA, fixture.departmentB].filter(Boolean).map(normalizeText);
+    return departments.some((department) => existingDepartments.includes(department));
+  });
+  if (departmentClash) {
+    const error = new Error("Fixture clash detected: this department already has another match at this time.");
+    error.status = 400;
+    throw error;
   }
 
-  return { start, end, date: dateValue };
-}
-
-async function suggestRescheduleSlots(payload, excludeId, options = {}) {
-  const currentDate = payload.date || payload.scheduledDate || toDateInputValue(new Date());
-  const currentTime = payload.time || payload.startTime || "09:00";
-  const anchorDate = getFixtureDateFromInput(currentDate) || new Date();
-  const suggestions = [];
-  const maxSuggestions = Number(options.maxSuggestions || 6);
-  const daysToScan = Number(options.daysToScan || 28);
-  const durationSeconds = Number(payload.fullMatchSeconds || 90 * 60);
-
-  for (let dayOffset = 0; dayOffset < daysToScan && suggestions.length < maxSuggestions; dayOffset += 1) {
-    const candidateDate = new Date(anchorDate);
-    candidateDate.setDate(anchorDate.getDate() + dayOffset);
-    if (candidateDate.getDay() !== 0 && candidateDate.getDay() !== 6) continue;
-    const dateText = toDateInputValue(candidateDate);
-    for (let hour = 9; hour <= 18; hour += 1) {
-      for (const minute of [0, 30]) {
-        if (suggestions.length >= maxSuggestions) break;
-        const candidateTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-        const nextPayload = {
-          ...payload,
-          date: dateText,
-          time: candidateTime,
-          startTime: candidateTime,
-          endTime: formatMinutesAsTime(getFixtureTimeMinutes(candidateTime) + Math.max(30, Math.round(durationSeconds / 60))),
-          assignedVolunteer: payload.assignedVolunteer,
-          venue: payload.venue,
-          maxMatchesPerDay: payload.maxMatchesPerDay || 8,
-          minRestMinutes: payload.minRestMinutes || payload.matchGapMinutes || 60,
-        };
-        try {
-          await validateRescheduleCandidate(nextPayload, excludeId, {
-            maxMatchesPerDay: nextPayload.maxMatchesPerDay,
-            minRestMinutes: nextPayload.minRestMinutes,
-          });
-          suggestions.push({
-            date: dateText,
-            time: candidateTime,
-            endTime: nextPayload.endTime,
-            label: `${new Date(dateText).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${candidateTime}`,
-          });
-        } catch {
-          // Ignore invalid slots and continue searching for real suggestions.
-        }
-      }
-      if (suggestions.length >= maxSuggestions) break;
-    }
+  const venueClash = payload.venue ? overlapping.find((fixture) => {
+    return payload.venue && normalizeText(fixture.venue).toLowerCase() === normalizeText(payload.venue).toLowerCase();
+  }) : null;
+  if (venueClash) {
+    const error = new Error("Venue clash detected: this venue is already booked at this time.");
+    error.status = 400;
+    throw error;
   }
 
-  if (suggestions.length === 0 && currentTime) {
-    const fallbackDate = getAllowedRescheduleDates(currentDate).find(Boolean);
-    if (fallbackDate) {
-      suggestions.push({
-        date: fallbackDate,
-        time: currentTime,
-        endTime: formatMinutesAsTime(getFixtureTimeMinutes(currentTime) + Math.max(30, Math.round(durationSeconds / 60))),
-        label: `${new Date(fallbackDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${currentTime}`,
-      });
-    }
+  const volunteerClash = payload.assignedVolunteer ? overlapping.find((fixture) => {
+    return payload.assignedVolunteer && fixture.assignedVolunteer?.toString?.() === String(payload.assignedVolunteer);
+  }) : null;
+  if (volunteerClash) {
+    const error = new Error("Volunteer clash detected: this volunteer is already assigned to another match at this time.");
+    error.status = 400;
+    throw error;
   }
 
-  return suggestions;
-}
-
-async function assertFixtureNoClash(payload, excludeId) {
-  return validateRescheduleCandidate(payload, excludeId);
+  return { start, end };
 }
 
 function requireObjectId(id, label) {
@@ -848,7 +663,6 @@ export async function listTeams(req, res) {
         ],
       };
     }
-
   }
   const teams = await Team.find(query).sort({ createdAt: -1 }).lean();
   return res.json(teams.map(mapTeam));
@@ -859,13 +673,11 @@ function normalizeMember(member) {
     const text = normalizeText(member);
     return text || null;
   }
-
   if (member && typeof member === "object") {
     const fullName = normalizeText(member.fullName || member.name || "");
     const registrationNumber = member.registrationNumber || member.registrationNo || member.regNo ? normalizeText(String(member.registrationNumber || member.registrationNo || member.regNo)).toUpperCase() : "";
     const phone = normalizeText(member.phone || "");
     const semester = normalizeText(member.semester || "");
-    const profilePhoto = typeof member.profilePhoto === "string" ? member.profilePhoto : "";
     if (!fullName && !registrationNumber) return null;
     return {
       fullName: fullName || undefined,
@@ -873,55 +685,9 @@ function normalizeMember(member) {
       registrationNumber: registrationNumber || undefined,
       phone: phone || undefined,
       semester: semester || undefined,
-      profilePhoto: profilePhoto || undefined,
     };
   }
   return null;
-}
-
-export async function getTeam(req, res) {
-  requireObjectId(req.params.id, "Team id");
-  const team = await Team.findById(req.params.id).lean();
-  if (!team) return res.status(404).json({ message: "Team not found" });
-  return res.json(mapTeam(team));
-}
-
-export async function updateTeamMembers(req, res) {
-  requireObjectId(req.params.id, "Team id");
-  const team = await Team.findById(req.params.id);
-  if (!team) return res.status(404).json({ message: "Team not found" });
-  if (!Array.isArray(req.body.members)) return res.status(400).json({ message: "members must be an array" });
-  const seen = new Set();
-  team.members = req.body.members.map(normalizeMember).filter(Boolean).filter((member) => {
-    const key = typeof member === "string" ? member.toUpperCase() : (member.registrationNo || member.registrationNumber || member.fullName || "").toUpperCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  await team.save();
-  await syncTeamPlayers(team);
-  return res.json(mapTeam(team));
-}
-
-export async function assignTeamCaptain(req, res) {
-  requireObjectId(req.params.id, "Team id");
-  const team = await Team.findById(req.params.id);
-  if (!team) return res.status(404).json({ message: "Team not found" });
-  const captainRegNo = normalizeText(req.body.registrationNo || req.body.captainRegNo).toUpperCase();
-  const captain = (team.members || []).find((member) => {
-    const value = typeof member === "string" ? member : member?.registrationNo || member?.registrationNumber || member?.regNo;
-    return captainRegNo && String(value || "").toUpperCase() === captainRegNo;
-  });
-  if (!captain) return res.status(400).json({ message: "Captain must be an existing team member" });
-  const captainData = typeof captain === "string" ? { fullName: captain } : captain;
-  team.captainName = normalizeText(captainData.fullName || captainData.name);
-  team.captainRegNo = captainRegNo;
-  team.captainEmail = normalizeText(captainData.email).toLowerCase();
-  team.captainPhone = normalizeText(captainData.phone);
-  team.contactNumber = team.captainPhone;
-  await team.save();
-  await syncTeamPlayers(team);
-  return res.json(mapTeam(team));
 }
 
 function hasTeamMatchOnDate(payload, fixtures) {
@@ -952,7 +718,6 @@ async function syncTeamPlayers(team) {
         department: team.department,
         semester: typeof normalized === "string" ? "" : normalized.semester || "",
         phone: typeof normalized === "string" ? "" : normalized.phone || "",
-        profilePhoto: typeof normalized === "string" ? "" : normalized.profilePhoto || "",
         sportId: team.sportId,
         teamId: team._id,
         isCaptain: Boolean(team.captainName && memberName === team.captainName),
@@ -967,43 +732,28 @@ async function syncTeamPlayers(team) {
 
 export async function createTeam(req, res) {
   const teamName = normalizeText(req.body.name || req.body.teamName);
-  const department = normalizeText(req.body.department) || "Unassigned";
-  const sport = req.body.sport ? normalizeSport(req.body.sport) : "unassigned";
+  const department = normalizeText(req.body.department || req.body.name || req.body.teamName);
+  const sport = normalizeSport(req.body.sport);
 
-  if (!teamName) {
-    return res.status(400).json({ message: "Team name is required" });
+  if (!teamName || !department || !sport) {
+    return res.status(400).json({ message: "Team name, department, and sport are required" });
   }
 
-  if (sport !== "unassigned") assertSportAccess(req, sport);
+  assertSportAccess(req, sport);
 
-  const sportDoc = sport !== "unassigned" ? await getOrCreateSport(sport) : null;
-  const category = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : "Male";
-  const duplicate = await Team.findOne({
-    sportId: sportDoc._id, tournamentId: req.body.tournamentId || null, category,
-    department: { $regex: `^${escapeRegExp(department)}$`, $options: "i" },
-    teamName: { $regex: `^${escapeRegExp(teamName)}$`, $options: "i" },
-    status: { $ne: "rejected" },
-  }).lean();
-  if (duplicate) return res.status(409).json({ message: "A team with this name already exists for the department, sport, tournament, and category" });
+  const sportDoc = await getOrCreateSport(sport);
   const team = await Team.create({
     teamName,
     department,
     sport,
-    sportName: sportDoc?.name || "",
-    sportId: sportDoc?._id || null,
-    tournamentId: req.body.tournamentId || null,
-    tournamentName: normalizeText(req.body.tournamentName),
-    category,
-    source: req.body.source === "registration" ? "registration" : "manual",
-    registrationId: req.body.registrationId || null,
+    sportName: sportDoc.name,
+    sportId: sportDoc._id,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName),
-    captainEmail: normalizeText(req.body.captainEmail || req.body.email).toLowerCase(),
-    captainPhone: normalizeText(req.body.captainPhone || req.body.phone || req.body.contactNumber),
     captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : "",
     contactNumber: normalizeText(req.body.contactNumber || req.body.phone),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember) : [],
     logo: req.body.logo || "",
-    status: req.body.status || "draft",
+    status: req.body.status || "approved",
     wins: Number(req.body.wins || 0),
     losses: Number(req.body.losses || 0),
     draws: Number(req.body.draws || 0),
@@ -1029,33 +779,17 @@ export async function updateTeam(req, res) {
   if (!existingTeam) return res.status(404).json({ message: "Team not found" });
 
   const sport = req.body.sport ? normalizeSport(req.body.sport) : existingTeam.sport;
-  const sportDoc = sport !== "unassigned" ? await getOrCreateSport(sport) : null;
-  const nextTeamName = normalizeText(req.body.name || req.body.teamName || existingTeam.teamName);
-  const nextDepartment = normalizeText(req.body.department || existingTeam.department);
-  const nextCategory = ["Male", "Female", "Mixed"].includes(req.body.category) ? req.body.category : existingTeam.category;
-  const duplicate = await Team.findOne({
-    _id: { $ne: existingTeam._id }, sportId: sportDoc._id, tournamentId: req.body.tournamentId ?? existingTeam.tournamentId ?? null,
-    category: nextCategory, department: { $regex: `^${escapeRegExp(nextDepartment)}$`, $options: "i" },
-    teamName: { $regex: `^${escapeRegExp(nextTeamName)}$`, $options: "i" }, status: { $ne: "rejected" },
-  }).lean();
-  if (duplicate) return res.status(409).json({ message: "A team with this name already exists for the selected scope" });
+  const sportDoc = await getOrCreateSport(sport);
 
   existingTeam.set({
-    teamName: nextTeamName,
-    department: nextDepartment,
+    teamName: normalizeText(req.body.name || req.body.teamName || existingTeam.teamName),
+    department: normalizeText(req.body.department || existingTeam.department),
     sport,
-    sportName: sportDoc?.name || "",
-    sportId: sportDoc?._id || null,
-    tournamentId: req.body.tournamentId ?? existingTeam.tournamentId,
-    tournamentName: req.body.tournamentName ?? existingTeam.tournamentName,
-    category: nextCategory,
-    source: req.body.source || existingTeam.source,
-    registrationId: req.body.registrationId ?? existingTeam.registrationId,
+    sportName: sportDoc.name,
+    sportId: sportDoc._id,
     captainName: normalizeText(req.body.coachCaptain || req.body.captainName || existingTeam.captainName),
     captainRegNo: req.body.captainRegNo ? normalizeText(req.body.captainRegNo).toUpperCase() : existingTeam.captainRegNo,
-    captainEmail: req.body.captainEmail !== undefined ? normalizeText(req.body.captainEmail).toLowerCase() : existingTeam.captainEmail,
-    captainPhone: req.body.captainPhone !== undefined ? normalizeText(req.body.captainPhone) : existingTeam.captainPhone,
-    contactNumber: normalizeText(req.body.contactNumber || req.body.phone || existingTeam.contactNumber),
+    contactNumber: normalizeText(req.body.contactNumber || existingTeam.contactNumber),
     members: Array.isArray(req.body.members) ? req.body.members.map(normalizeMember).filter(Boolean) : existingTeam.members,
     logo: req.body.logo ?? existingTeam.logo,
     status: req.body.status || existingTeam.status,
@@ -1135,21 +869,11 @@ export async function replaceFixtures(req, res) {
 
     const sport = normalizeSport(fixture.sport || teamA.sport);
     const sportDoc = await getOrCreateSport(sport);
-    let category;
-    try {
-      category = assertSupportedMatchCategory(fixture.category || teamA.category, sportDoc);
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
-    if (teamA.category !== category || teamB.category !== category) {
-      return res.status(400).json({ message: "Both teams must belong to the selected match category" });
-    }
 
     const created = await Fixture.create({
       sport,
       sportName: sportDoc.name,
       sportId: sportDoc._id,
-      category,
       matchTitle: `${teamA.teamName} vs ${teamB.teamName}`,
       teamA: teamA._id,
       teamB: teamB._id,
@@ -1190,51 +914,12 @@ export async function createFixture(req, res) {
   const sportDoc = await Sport.findById(sportId);
   if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
 
-  let category;
-  try {
-    category = assertSupportedMatchCategory(req.body.category || teamA.category, sportDoc);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
-  }
-  if (teamA.category !== category || teamB.category !== category) {
-    return res.status(400).json({ message: "Both teams must belong to the selected match category" });
-  }
-
   const sportName = sportDoc.sportName || sportDoc.name;
-  if (req.body.tournamentId) requireObjectId(req.body.tournamentId, "Tournament id");
-  const tournament = req.body.tournamentId
-    ? await Tournament.findById(req.body.tournamentId).select("name").lean()
-    : null;
-  if (req.body.tournamentId && !tournament) {
-    return res.status(400).json({ message: "Tournament not found. Refresh the tournament list and try again." });
-  }
-  if (req.body.assignedVolunteer) {
-    const volunteer = await Volunteer.findById(req.body.assignedVolunteer).select("_id status").lean();
-    if (!volunteer) return res.status(400).json({ message: "Selected volunteer was not found." });
-    if (volunteer.status && volunteer.status !== "active") {
-      return res.status(400).json({ message: "Selected volunteer is not active." });
-    }
-  }
-  const fullMatchMinutes = parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time");
-  const manualStart = req.body.startTime
-    ? new Date(req.body.startTime)
-    : toCandidateFixtureDateTime(req.body.date, req.body.time);
-  if (!manualStart || Number.isNaN(manualStart.getTime())) {
-    return res.status(400).json({ message: "A valid fixture date and time are required" });
-  }
-  const manualEnd = req.body.endTime
-    ? new Date(req.body.endTime)
-    : new Date(manualStart.getTime() + fullMatchMinutes * 60 * 1000);
-  if (Number.isNaN(manualEnd.getTime()) || manualEnd <= manualStart) {
-    return res.status(400).json({ message: "Fixture end time must be after the start time" });
-  }
   const payload = {
-    tournamentId: req.body.tournamentId || undefined,
-    tournamentName: req.body.tournamentName || tournament?.name || "",
     sport: normalizeSport(sportName),
     sportName,
     sportId: sportDoc._id,
-    category,
+    category: req.body.category || teamA.category || "Male",
     matchTitle: normalizeText(req.body.matchTitle || `${teamA.teamName} vs ${teamB.teamName}`),
     teamA: teamA._id,
     teamB: teamB._id,
@@ -1245,21 +930,17 @@ export async function createFixture(req, res) {
     venue: normalizeText(req.body.venue),
     date: req.body.date,
     time: req.body.time,
-    startTime: manualStart,
-    endTime: manualEnd,
-    fullMatchSeconds: fullMatchMinutes * 60,
+    startTime: req.body.startTime,
+    endTime: req.body.endTime,
+    fullMatchSeconds: parsePositiveMinutes(req.body.fullMatchMinutes || req.body.matchDurationMinutes || 90, "Full match time") * 60,
     matchGapMinutes: Math.max(0, Math.floor(Number(req.body.matchGapMinutes || req.body.gapMinutes || 0))),
     round: normalizeText(req.body.round),
     status: req.body.status || "upcoming",
     assignedVolunteer: req.body.assignedVolunteer || undefined,
-    fixtureSource: "MANUAL",
     createdBy: req.user?.id,
   };
 
-  const { start, end } = await validateRescheduleCandidate(payload, undefined, {
-    allowWeekdays: true,
-    rejectAnyOverlap: true,
-  });
+  const { start, end } = await assertFixtureNoClash(payload);
   const fixture = await Fixture.create({ ...payload, startTime: start, endTime: end });
   return res.status(201).json(mapFixture(fixture));
 }
@@ -1268,6 +949,11 @@ export async function generateFixtures(req, res) {
   requireObjectId(req.body.tournamentId, "Tournament id");
   requireObjectId(req.body.sportId, "Sport id");
 
+  const category = req.body.category === "Female" ? "Female" : req.body.category === "Male" ? "Male" : "";
+  if (!category) {
+    return res.status(400).json({ message: "Category must be Male or Female" });
+  }
+
   const [tournament, sportDoc] = await Promise.all([
     Tournament.findById(req.body.tournamentId),
     Sport.findById(req.body.sportId),
@@ -1275,12 +961,6 @@ export async function generateFixtures(req, res) {
 
   if (!tournament) return res.status(400).json({ message: "Tournament not found" });
   if (!sportDoc) return res.status(400).json({ message: "Sport not found" });
-  let category;
-  try {
-    category = assertSupportedMatchCategory(req.body.category, sportDoc);
-  } catch (error) {
-    return res.status(400).json({ message: error.message });
-  }
 
   const venueName = normalizeText(req.body.venue);
   if (!venueName && !req.body.venueId) {
@@ -1296,17 +976,11 @@ export async function generateFixtures(req, res) {
   }
 
   const startDate = parseDateOnly(req.body.startDate);
-  const endDate = req.body.endDate ? parseDateOnly(req.body.endDate) : null;
-  const playDays = parsePlayDays(req.body.playDays);
   const dayStartMinutes = parseTimeToMinutes(req.body.dayStartTime, "Day start time");
   const dayEndMinutes = parseTimeToMinutes(req.body.dayEndTime, "Day end time");
   const matchDurationMinutes = parsePositiveMinutes(req.body.matchDurationMinutes, "Match duration");
   const rawGapMinutes = Number(req.body.gapMinutes || 0);
   const gapMinutes = Number.isFinite(rawGapMinutes) && rawGapMinutes > 0 ? Math.floor(rawGapMinutes) : 0;
-  const derivedDailyCapacity = Math.floor((dayEndMinutes - dayStartMinutes + gapMinutes) / (matchDurationMinutes + gapMinutes));
-  const matchesPerDay = req.body.matchesPerDay === undefined || req.body.matchesPerDay === ""
-    ? derivedDailyCapacity
-    : parsePositiveMinutes(req.body.matchesPerDay, "Matches per day");
 
   if (dayEndMinutes <= dayStartMinutes) {
     return res.status(400).json({ message: "Day end time must be after day start time" });
@@ -1315,8 +989,6 @@ export async function generateFixtures(req, res) {
   if (dayStartMinutes + matchDurationMinutes > dayEndMinutes) {
     return res.status(400).json({ message: "The match duration does not fit inside the selected day window" });
   }
-  if (matchesPerDay > derivedDailyCapacity) return res.status(400).json({ message: `Unable to generate fixtures: ${matchesPerDay} matches do not fit between the selected start and end times.` });
-  if (endDate && endDate < startDate) return res.status(400).json({ message: "End date must be on or after start date" });
 
   const sportName = sportDoc.sportName || sportDoc.name || "";
   const sport = normalizeSport(sportName);
@@ -1329,7 +1001,7 @@ export async function generateFixtures(req, res) {
   });
 
   const teams = await Team.find({
-    status: { $in: ["draft", "ready", "approved"] },
+    status: "approved",
     tournamentId: tournament._id,
     category,
     $or: [
@@ -1339,7 +1011,7 @@ export async function generateFixtures(req, res) {
   }).sort({ teamName: 1 }).lean();
 
   if (teams.length === 0) {
-    return res.status(400).json({ message: "At least one draft or approved team is required to generate fixtures" });
+    return res.status(400).json({ message: "At least one approved team is required to generate fixtures" });
   }
 
   const byeFixtures = [];
@@ -1353,7 +1025,6 @@ export async function generateFixtures(req, res) {
       date: startDate,
       round: "Default Winner",
       userId: req.user?.id,
-      allowedDays: playDays,
     }));
   }
 
@@ -1372,18 +1043,9 @@ export async function generateFixtures(req, res) {
     let placed = false;
 
     for (let dayOffset = 0; dayOffset < 365 && !placed; dayOffset += 1) {
-      if (endDate && cursorDate > endDate) break;
-      while (!playDays.includes(cursorDate.getDay())) {
+      while (!isWeekend(cursorDate)) {
         cursorDate.setDate(cursorDate.getDate() + 1);
         cursorMinutes = dayStartMinutes;
-        if (endDate && cursorDate > endDate) break;
-      }
-      if (endDate && cursorDate > endDate) break;
-
-      if (getSportDateMatchCount(toDateInputValue(cursorDate), sportDoc, [...existingFixtures, ...scheduledFixtures]) >= matchesPerDay) {
-        cursorDate.setDate(cursorDate.getDate() + 1);
-        cursorMinutes = dayStartMinutes;
-        continue;
       }
 
       if (cursorMinutes + matchDurationMinutes > dayEndMinutes) {
@@ -1423,7 +1085,7 @@ export async function generateFixtures(req, res) {
 
     if (!placed) {
       return res.status(400).json({
-        message: `Unable to generate fixtures with the selected schedule. ${getParticipantName(competitionFixture.teamA, "Team A")} vs ${getParticipantName(competitionFixture.teamB, "Team B")} cannot be placed without a clash${endDate ? " before the selected end date" : " within the next 365 weekend days"}.`,
+        message: `Could not place ${getParticipantName(competitionFixture.teamA, "Team A")} vs ${getParticipantName(competitionFixture.teamB, "Team B")} without a clash inside the next 365 weekend days.`,
       });
     }
   }
@@ -1454,253 +1116,32 @@ export async function updateFixture(req, res) {
   const existing = await Fixture.findById(req.params.id);
   if (!existing) return res.status(404).json({ message: "Fixture not found" });
 
-  let category = existing.category;
-  if (req.body.category !== undefined) {
-    const sportDoc = await Sport.findById(existing.sportId);
-    try {
-      category = assertSupportedMatchCategory(req.body.category, sportDoc);
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
-    const [teamA, teamB] = await Promise.all([Team.findById(existing.teamA).lean(), Team.findById(existing.teamB).lean()]);
-    if (!teamA || !teamB || teamA.category !== category || teamB.category !== category) {
-      return res.status(400).json({ message: "Both teams must belong to the selected match category" });
-    }
-  }
-
   const updatePayload = {
     ...existing.toObject(),
     ...req.body,
   };
-  if (req.body.date !== undefined || req.body.time !== undefined) {
-    delete updatePayload.startTime;
-    delete updatePayload.endTime;
-  }
-
-  if (existing.status === "completed" && (req.body.scoreA !== undefined || req.body.scoreB !== undefined || req.body.status !== undefined)) {
-    await audit(
-      req,
-      "RESULT_UPDATED",
-      `${existing.teamAName || "Team A"} ${existing.scoreA || 0}-${existing.scoreB || 0} ${existing.teamBName || "Team B"} -> ${req.body.scoreA ?? existing.scoreA ?? 0}-${req.body.scoreB ?? existing.scoreB ?? 0}; fixture ${existing._id}`
-    );
-  }
-
-  if (req.body.date || req.body.time || req.body.startTime || req.body.endTime || req.body.venue || req.body.assignedVolunteer) {
-    try {
-      await validateRescheduleCandidate(updatePayload, req.params.id, {
-        maxMatchesPerDay: req.body.maxMatchesPerDay,
-        minRestMinutes: req.body.minRestMinutes,
-      });
-    } catch (error) {
-      return res.status(400).json({
-        message: error.message,
-        suggestions: [],
-      });
-    }
-  }
-
   const { start, end } = await assertFixtureNoClash(updatePayload, req.params.id);
 
   const fixture = await Fixture.findByIdAndUpdate(
     req.params.id,
     {
-      date: req.body.date ?? existing.date,
-      time: req.body.time ?? existing.time,
-      venue: req.body.venue ?? existing.venue,
+      date: req.body.date,
+      time: req.body.time,
+      venue: req.body.venue,
       startTime: start,
       endTime: end,
       fullMatchSeconds: existing.fullMatchSeconds || 90 * 60,
       matchGapMinutes: existing.matchGapMinutes || 0,
-      assignedVolunteer: req.body.assignedVolunteer ?? existing.assignedVolunteer,
-      category,
-      status: req.body.status === "scheduled"
-        ? "upcoming"
-        : ["upcoming", "live", "paused", "half-time", "completed", "delayed", "cancelled"].includes(req.body.status)
-          ? req.body.status
-        : existing.status,
-      scoreA: req.body.scoreA === undefined ? existing.scoreA : Number(req.body.scoreA),
-      scoreB: req.body.scoreB === undefined ? existing.scoreB : Number(req.body.scoreB),
-      endedAt: req.body.endedAt ?? existing.endedAt,
-      isCompleted: req.body.status === "completed" ? true : req.body.status === undefined ? existing.isCompleted : false,
-      fixtureSource: existing.fixtureSource || "AUTOMATIC",
+      status: req.body.status === "completed" ? "completed" : req.body.status === "live" ? "live" : "upcoming",
+      scoreA: Number(req.body.scoreA || 0),
+      scoreB: Number(req.body.scoreB || 0),
+      endedAt: req.body.endedAt,
     },
     { new: true }
   );
 
   if (!fixture) return res.status(404).json({ message: "Fixture not found" });
-
-  // Keep the records consumed by live/public pages in lockstep with an
-  // administrator's corrected fixture result. Only update an existing live
-  // record so editing a schedule does not create a phantom live match.
-  await LiveScore.findOneAndUpdate(
-    { fixtureId: fixture._id },
-    {
-      tournamentId: fixture.tournamentId,
-      sportId: fixture.sportId,
-      category: fixture.category,
-      teamAName: fixture.teamAName,
-      teamBName: fixture.teamBName,
-      teamAScore: fixture.scoreA,
-      teamBScore: fixture.scoreB,
-      currentStatus: fixture.status,
-      endedAt: fixture.status === "completed" ? Date.now() : undefined,
-      winner: fixture.status === "completed"
-        ? fixture.scoreA > fixture.scoreB ? "A" : fixture.scoreB > fixture.scoreA ? "B" : ""
-        : "",
-      winnerName: fixture.status === "completed"
-        ? fixture.scoreA > fixture.scoreB ? fixture.teamAName : fixture.scoreB > fixture.scoreA ? fixture.teamBName : ""
-        : "",
-      updatedBy: req.user?.id,
-      updatedAt: new Date(),
-    },
-    { new: true, runValidators: true }
-  );
-
-  const resultWinner = fixture.scoreA > fixture.scoreB ? fixture.teamA : fixture.scoreB > fixture.scoreA ? fixture.teamB : null;
-  const resultLoser = fixture.scoreA > fixture.scoreB ? fixture.teamB : fixture.scoreB > fixture.scoreA ? fixture.teamA : null;
-  if (fixture.status === "completed") {
-    await Result.findOneAndUpdate(
-      { fixtureId: fixture._id },
-      {
-        fixtureId: fixture._id,
-        winnerTeam: resultWinner,
-        loserTeam: resultLoser,
-        finalScore: `${fixture.scoreA}-${fixture.scoreB}`,
-        submittedBy: req.user?.id,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-  } else {
-    await Result.deleteOne({ fixtureId: fixture._id });
-  }
-
   return res.json(mapFixture(fixture));
-}
-
-export async function rescheduleFixture(req, res) {
-  requireObjectId(req.params.id, "Fixture id");
-  const fixture = await Fixture.findById(req.params.id).lean();
-  if (!fixture) return res.status(404).json({ message: "Fixture not found" });
-
-  const candidate = {
-    ...fixture,
-    ...req.body,
-    date: req.body.date || fixture.date,
-    time: req.body.time || fixture.time || "09:00",
-    venue: req.body.venue ?? fixture.venue,
-    assignedVolunteer: req.body.assignedVolunteer ?? fixture.assignedVolunteer,
-    fullMatchSeconds: Number(req.body.fullMatchSeconds ?? fixture.fullMatchSeconds ?? 90 * 60),
-    matchGapMinutes: Number(req.body.matchGapMinutes ?? fixture.matchGapMinutes ?? 0),
-    maxMatchesPerDay: req.body.maxMatchesPerDay,
-    minRestMinutes: req.body.minRestMinutes,
-  };
-
-  try {
-    const { start, end } = await validateRescheduleCandidate(candidate, fixture._id.toString(), {
-      maxMatchesPerDay: req.body.maxMatchesPerDay,
-      minRestMinutes: req.body.minRestMinutes,
-    });
-    const updated = await Fixture.findByIdAndUpdate(
-      fixture._id,
-      {
-        date: candidate.date,
-        time: candidate.time,
-        venue: candidate.venue,
-        startTime: start,
-        endTime: end,
-        assignedVolunteer: candidate.assignedVolunteer,
-        fullMatchSeconds: candidate.fullMatchSeconds,
-        matchGapMinutes: candidate.matchGapMinutes,
-        status: fixture.status === "completed" ? "completed" : fixture.status === "live" ? "live" : "upcoming",
-      },
-      { new: true }
-    );
-    return res.json({
-      message: "Fixture rescheduled successfully.",
-      fixture: updated ? mapFixture(updated) : null,
-      suggestions: [],
-    });
-  } catch (error) {
-    return res.status(400).json({
-      message: error.message,
-      suggestions: [],
-    });
-  }
-}
-
-export async function bulkRescheduleFixtures(req, res) {
-  const fixtureIds = Array.isArray(req.body.fixtureIds) ? req.body.fixtureIds : [];
-  if (fixtureIds.length === 0) {
-    return res.status(400).json({ message: "At least one fixture must be selected for rescheduling." });
-  }
-
-  const fixtures = await Fixture.find({ _id: { $in: fixtureIds } }).lean();
-  if (fixtures.length === 0) {
-    return res.status(404).json({ message: "No valid fixtures were found for rescheduling." });
-  }
-
-  const targetDates = Array.isArray(req.body.targetDates) && req.body.targetDates.length > 0
-    ? req.body.targetDates
-    : [req.body.date || fixtures[0].date].filter(Boolean);
-  const preferredTime = req.body.time || fixtures[0].time || "09:00";
-  const allocated = [];
-
-  for (let index = 0; index < fixtures.length; index += 1) {
-    const fixture = fixtures[index];
-    const preferredDate = targetDates[Math.min(index, targetDates.length - 1)] || targetDates[targetDates.length - 1];
-    const candidate = {
-      ...fixture,
-      date: preferredDate,
-      time: preferredTime,
-      venue: req.body.venue ?? fixture.venue,
-      assignedVolunteer: req.body.assignedVolunteer ?? fixture.assignedVolunteer,
-      fullMatchSeconds: Number(req.body.fullMatchSeconds ?? fixture.fullMatchSeconds ?? 90 * 60),
-      matchGapMinutes: Number(req.body.matchGapMinutes ?? fixture.matchGapMinutes ?? 0),
-      maxMatchesPerDay: req.body.maxMatchesPerDay,
-      minRestMinutes: req.body.minRestMinutes,
-    };
-
-    try {
-      const { start, end } = await validateRescheduleCandidate(candidate, fixture._id.toString(), {
-        maxMatchesPerDay: req.body.maxMatchesPerDay,
-        minRestMinutes: req.body.minRestMinutes,
-      });
-      allocated.push({
-        fixtureId: fixture._id.toString(),
-        date: candidate.date,
-        time: candidate.time,
-        start,
-        end,
-        venue: candidate.venue,
-        assignedVolunteer: candidate.assignedVolunteer,
-      });
-    } catch (error) {
-      return res.status(400).json({
-        message: `Unable to bulk reschedule selected matches. ${error.message}`,
-        suggestions: [],
-      });
-    }
-  }
-
-  const updates = await Promise.all(allocated.map(async (entry) => {
-    return Fixture.findByIdAndUpdate(
-      entry.fixtureId,
-      {
-        date: entry.date,
-        time: entry.time,
-        startTime: entry.start,
-        endTime: entry.end,
-        venue: entry.venue,
-        assignedVolunteer: entry.assignedVolunteer,
-      },
-      { new: true }
-    );
-  }));
-
-  return res.json({
-    message: `Rescheduled ${updates.length} fixture${updates.length === 1 ? "" : "s"} successfully.`,
-    fixtures: updates.filter(Boolean).map((fixture) => mapFixture(fixture)),
-  });
 }
 
 export async function deleteFixture(req, res) {
@@ -1734,41 +1175,4 @@ export async function deleteFixtures(req, res) {
 export async function listPlayers(_req, res) {
   const players = await Player.find().sort({ createdAt: -1 }).lean();
   return res.json(players);
-}
-
-export async function updatePlayer(req, res) {
-  requireObjectId(req.params.id, "Player id");
-  const player = await Player.findById(req.params.id);
-  if (!player) return res.status(404).json({ message: "Player not found" });
-  const editable = ["name", "rollNo", "registrationNo", "department", "semester", "phone", "profilePhoto", "isCaptain"];
-  for (const key of editable) if (req.body[key] !== undefined) player[key] = req.body[key];
-  if (req.body.teamId !== undefined) {
-    requireObjectId(req.body.teamId, "Team id");
-    const team = await Team.findById(req.body.teamId);
-    if (!team) return res.status(400).json({ message: "Assigned team not found" });
-    player.teamId = team._id; player.sportId = team.sportId;
-  }
-  await player.save();
-  await audit(req, "Updated player", `${player.name} (${player._id})`);
-  return res.json(player);
-}
-
-export async function deletePlayer(req, res) {
-  requireObjectId(req.params.id, "Player id");
-  const player = await Player.findById(req.params.id);
-  if (!player) return res.status(404).json({ message: "Player not found" });
-  if (player.teamId) {
-    const team = await Team.findById(player.teamId);
-    if (team) {
-      team.members = (team.members || []).filter((member) => {
-        const name = typeof member === "string" ? member : member?.fullName || member?.name;
-        const regNo = typeof member === "object" ? member?.registrationNo || member?.registrationNumber : "";
-        return name !== player.name && regNo !== player.registrationNo;
-      });
-      await team.save();
-    }
-  }
-  await player.deleteOne();
-  await audit(req, "Deleted player", `${player.name} (${player._id})`);
-  return res.json({ message: "Player deleted successfully" });
 }

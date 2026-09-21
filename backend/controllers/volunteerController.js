@@ -79,8 +79,8 @@ export async function assignedMatches(req, res) {
     ],
   };
   const query = Object.keys(sportQuery).length
-    ? { $and: [sportQuery, assignmentQuery], status: { $ne: "cancelled" } }
-    : { ...assignmentQuery, status: { $ne: "cancelled" } };
+    ? { $and: [sportQuery, assignmentQuery] }
+    : assignmentQuery;
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
   return res.json(fixtures);
 }
@@ -99,13 +99,7 @@ function mapVolunteerTeam(team) {
     members: (team.members || []).map((m) => {
       if (typeof m === "string") return m;
       if (m && typeof m === "object") {
-        return {
-          fullName: m.fullName || m.name || m.registrationNo || m.registrationNumber || "",
-          registrationNo: m.registrationNo || m.registrationNumber || m.regNo || "",
-          registrationNumber: m.registrationNumber || m.registrationNo || m.regNo || "",
-          department: m.department || team.department || "",
-          profilePhoto: m.profilePhoto || m.idCardImage || m.photo || m.image || "",
-        };
+        return m.fullName || m.name || m.registrationNo || m.registrationNumber || "";
       }
       return "";
     }),
@@ -126,12 +120,12 @@ export async function volunteerTeams(req, res) {
   const assignedSportId = req.user.assignedSportId;
 
   const teamQuery = assignedSportId && assignedSport
-    ? { $or: [{ sportId: assignedSportId }, { sport: assignedSport }], status: { $in: ["draft", "approved"] } }
+    ? { $or: [{ sportId: assignedSportId }, { sport: assignedSport }], status: "approved" }
     : assignedSportId
-      ? { sportId: assignedSportId, status: { $in: ["draft", "approved"] } }
+      ? { sportId: assignedSportId, status: "approved" }
       : assignedSport
-        ? { sport: assignedSport, status: { $in: ["draft", "approved"] } }
-        : { status: { $in: ["draft", "approved"] } };
+        ? { sport: assignedSport, status: "approved" }
+        : { status: "approved" };
 
   const regQuery = assignedSportId
     ? { sportId: assignedSportId, status: "approved" }
@@ -170,9 +164,7 @@ export async function volunteerTeams(req, res) {
           members: (t.members || []).map((m) => ({
             fullName: m.fullName || "",
             registrationNumber: m.registrationNo || "",
-            registrationNo: m.registrationNo || "",
             department: m.department || "",
-            profilePhoto: m.profilePhoto || m.idCardImage || "",
           })),
           status: t.status,
           submittedAt: t.submittedAt,

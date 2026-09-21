@@ -76,53 +76,33 @@ export default function PublicDashboard() {
 
   useEffect(() => {
     let isMounted = true;
-    let loading = false;
 
     async function loadPublicData() {
-      if (document.visibilityState === "hidden") return;
-      if (loading) return;
-      loading = true;
-      try {
-        const [fixtures, liveScores, teams, tournaments] = await Promise.all([
-          getPublicFixtures(),
-          getPublicLiveScores(),
-          getPublicTeams(),
-          getPublicTournaments(),
-        ]);
+      const [fixtures, liveScores, teams, tournaments] = await Promise.all([
+        getPublicFixtures(),
+        getPublicLiveScores(),
+        getPublicTeams(),
+        getPublicTournaments(),
+      ]);
 
-        if (!isMounted) return;
+      if (!isMounted) return;
 
-        const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-        setMatchesData(
-          fixtures
-            .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
-            .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
-        );
-        setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
-        setTournaments(tournaments);
-      } finally {
-        loading = false;
-      }
-    }
-
-    void loadPublicData();
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadPublicData();
-      }
-    }, 1000);
-    const visibilityListener = () => {
-      if (document.visibilityState === "visible") {
-        void loadPublicData();
-      }
+      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+      setMatchesData(
+        fixtures
+          .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+          .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
+      );
+      setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
+      setTournaments(tournaments);
     };
 
-    document.addEventListener("visibilitychange", visibilityListener);
+    void loadPublicData();
+    const interval = window.setInterval(loadPublicData, 15000);
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", visibilityListener);
     };
   }, []);
 

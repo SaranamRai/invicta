@@ -1,101 +1,7 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
-const publicRequestCache = new Map<string, { expiresAt: number; value: unknown }>();
-const publicRequestInflight = new Map<string, Promise<unknown>>();
-const apiMeasurements: Array<{ at: number; duration: number; failed: boolean }> = [];
-
-export function getApiClientMetrics() {
-  const recent = apiMeasurements.filter((entry) => entry.at > Date.now() - 5 * 60_000);
-  return {
-    errorRate: recent.length ? Math.round((recent.filter((entry) => entry.failed).length / recent.length) * 100) : 0,
-    samples: recent.map((entry) => entry.duration).slice(-12),
-  };
-}
-
-function publicCacheTtl(path: string) {
-  // Public screens poll every second; do not serve stale dashboard data.
-  return 0;
-}
-const VERIFY_ID_CARD_TIMEOUT_MS = 15000;
-const BROWSER_OCR_INIT_TIMEOUT_MS = 12000;
-const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 18000;
-
-async function fileToProfilePhotoDataUrl(file: File, maxSize = 320) {
-  if (typeof document === "undefined") {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  const sourceUrl = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    image.decoding = "async";
-    const loaded = new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Could not prepare ID card image."));
-    });
-    image.src = sourceUrl;
-    await loaded;
-
-    let crop = getFallbackProfileCrop(image.width, image.height);
-    const FaceDetectorClass = (window as unknown as { FaceDetector?: new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => { detect: (source: CanvasImageSource) => Promise<{ boundingBox: DOMRectReadOnly }[]> } }).FaceDetector;
-    if (FaceDetectorClass) {
-      try {
-        const detector = new FaceDetectorClass({ fastMode: true, maxDetectedFaces: 1 });
-        const faces = await detector.detect(image);
-        const face = faces[0]?.boundingBox;
-        if (face && face.width > 0 && face.height > 0) {
-          const side = Math.min(
-            Math.max(face.width * 2.2, face.height * 1.75),
-            Math.min(image.width, image.height)
-          );
-          crop = {
-            x: clamp(face.x + face.width / 2 - side / 2, 0, image.width - side),
-            y: clamp(face.y + face.height / 2 - side * 0.44, 0, image.height - side),
-            size: side,
-          };
-        }
-      } catch {
-        /* Fall back to a simple portrait crop when face detection is unavailable. */
-      }
-    }
-
-    const scale = Math.min(1, maxSize / crop.size);
-    const width = Math.max(1, Math.round(crop.size * scale));
-    const height = width;
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Could not prepare ID card image.");
-    context.drawImage(image, crop.x, crop.y, crop.size, crop.size, 0, 0, width, height);
-    return canvas.toDataURL("image/jpeg", 0.82);
-  } finally {
-    URL.revokeObjectURL(sourceUrl);
-  }
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getFallbackProfileCrop(width: number, height: number) {
-  const isLandscapeId = width > height * 1.25;
-  const isSquareLikeIdPreview = Math.abs(width - height) / Math.max(width, height) < 0.12;
-  const size = isLandscapeId
-    ? Math.min(width * 0.28, height * 0.56)
-    : isSquareLikeIdPreview
-      ? Math.min(width, height) * 0.42
-      : Math.min(width * 0.5, height * 0.34);
-  return {
-    x: isLandscapeId ? width * 0.1 : isSquareLikeIdPreview ? width * 0.2 : (width - size) / 2,
-    y: isLandscapeId ? height * 0.16 : isSquareLikeIdPreview ? height * 0.1 : height * 0.12,
-    size,
-  };
-}
+const VERIFY_ID_CARD_TIMEOUT_MS = 50000;
+const BROWSER_OCR_INIT_TIMEOUT_MS = 25000;
+const BROWSER_OCR_RECOGNIZE_TIMEOUT_MS = 30000;
 
 function getRefName(value: MongoRefName | string | undefined, fallback = "") {
   if (!value) return fallback;
@@ -188,7 +94,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const session = getStoredSession();
   const headers = new Headers(options.headers);
 
-  if (!headers.has("Content-Type") && options.body && !(typeof FormData !== "undefined" && options.body instanceof FormData)) {
+  if (!headers.has("Content-Type") && options.body) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -197,29 +103,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   const fullUrl = `${API_BASE_URL}${path}`;
-  const requestStartedAt = performance.now();
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
-  let response: Response;
-  try {
-    response = await fetch(fullUrl, {
-      ...options,
-      headers,
-      credentials: "include",
-      signal: options.signal || controller.signal,
-    });
-  } catch (error) {
-    apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: true });
-    if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("The request took too long. Please check the connection and try again.");
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-  apiMeasurements.push({ at: Date.now(), duration: Math.round(performance.now() - requestStartedAt), failed: !response.ok });
-  if (apiMeasurements.length > 120) apiMeasurements.splice(0, apiMeasurements.length - 120);
+  const response = await fetch(fullUrl, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
 
   const data = await response.json().catch(() => null);
 
@@ -283,25 +171,10 @@ export async function apiDownload(path: string, options: RequestInit = {}) {
 }
 
 async function publicApiFetch<T>(path: string): Promise<T[]> {
-  const cached = publicRequestCache.get(path);
-  if (cached && cached.expiresAt > Date.now()) return cached.value as T[];
-
-  const inflight = publicRequestInflight.get(path);
-  if (inflight) return inflight as Promise<T[]>;
-
-  const request = apiFetch<T[]>(path)
-    .then((data) => {
-      publicRequestCache.set(path, { value: data, expiresAt: Date.now() + publicCacheTtl(path) });
-      return data;
-    })
-    .catch(() => [] as T[])
-    .finally(() => publicRequestInflight.delete(path));
-  publicRequestInflight.set(path, request);
-
   try {
-    return await request;
-  } finally {
-    // Kept for readability: the request cleanup happens in the shared promise.
+    return await apiFetch<T[]>(path);
+  } catch {
+    return [];
   }
 }
 
@@ -347,7 +220,7 @@ export interface TeamSyncPayload {
   phone?: string;
   contactNumber?: string;
   logo?: string;
-  status?: "draft" | "ready" | "registered" | "approved" | "completed" | "withdrawn" | "pending" | "rejected" | string;
+  status?: string;
   reviewedAt?: string;
   wins?: number;
   losses?: number;
@@ -356,7 +229,6 @@ export interface TeamSyncPayload {
   registeredAt?: number;
   playerRegisteredAt?: number[];
   source?: string;
-  registrationId?: string;
 }
 
 type TeamWritePayload = Omit<TeamSyncPayload, "id">;
@@ -396,24 +268,6 @@ export function deleteAdminTeam(teamId: string) {
   });
 }
 
-export function getAdminTeam(teamId: string) {
-  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}`);
-}
-
-export function updateAdminTeamMembers(teamId: string, members: unknown[]) {
-  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}/members`, {
-    method: "PUT",
-    body: JSON.stringify({ members }),
-  });
-}
-
-export function assignAdminTeamCaptain(teamId: string, registrationNo: string) {
-  return apiFetch<TeamSyncPayload>(`/admin/teams/${encodeURIComponent(teamId)}/captain`, {
-    method: "PATCH",
-    body: JSON.stringify({ registrationNo }),
-  });
-}
-
 export interface AdminFixturePayload {
   id: string;
   tournamentId?: string;
@@ -437,7 +291,6 @@ export interface AdminFixturePayload {
   matchGapMinutes?: number;
   round?: string;
   assignedVolunteer?: string;
-  fixtureSource?: "MANUAL" | "AUTOMATIC" | "IMPORTED" | string;
 }
 
 export function getAdminFixtures() {
@@ -454,18 +307,14 @@ export function replaceAdminFixtures(fixtures: Omit<AdminFixturePayload, "id">[]
 export interface GenerateFixturesPayload {
   tournamentId: string;
   sportId: string;
-  category: "Male" | "Female" | "Mixed";
+  category: "Male" | "Female";
   venueId?: string;
   venue?: string;
-  assignedVolunteer?: string;
   startDate: string;
-  endDate?: string;
-  matchesPerDay?: number;
   dayStartTime: string;
   dayEndTime: string;
   matchDurationMinutes: number;
   gapMinutes: number;
-  playDays?: number[];
 }
 
 export interface GenerateFixturesResponse {
@@ -481,117 +330,10 @@ export function generateAdminFixtures(payload: GenerateFixturesPayload) {
   });
 }
 
-export function createAdminFixture(payload: {
-  tournamentId?: string;
-  sportId: string;
-  category: "Male" | "Female" | "Mixed";
-  teamA: string;
-  teamB: string;
-  date: string;
-  time: string;
-  venue?: string;
-  assignedVolunteer?: string;
-  matchTitle?: string;
-  round?: string;
-  matchDurationMinutes?: number;
-  gapMinutes?: number;
-}) {
-  return apiFetch<AdminFixturePayload>("/admin/fixtures", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export interface FixtureImageCandidate {
-  teamAName: string;
-  teamBName: string;
-  sportName?: string;
-  sportId?: string;
-  tournamentId?: string;
-  category?: "Male" | "Female" | "Mixed" | string;
-  date: string;
-  time: string;
-  venue?: string;
-  round?: string;
-  source?: "AI" | "OCR";
-  confidence?: number;
-  rawText?: string;
-}
-
-export interface FixtureImageAnalysis {
-  reviewToken: string;
-  expiresInSeconds: number;
-  candidate: FixtureImageCandidate;
-  validation: { errors: string[] };
-}
-
-export function analyzeAdminFixtureImage(file: File) {
-  const form = new FormData();
-  form.append("image", file);
-  return apiFetch<FixtureImageAnalysis>("/admin/fixtures/ai-image/analyze", { method: "POST", body: form });
-}
-
-export function validateAdminFixtureImage(reviewToken: string, candidate: FixtureImageCandidate) {
-  return apiFetch<{ candidate: FixtureImageCandidate; valid: boolean; errors: string[] }>("/admin/fixtures/ai-image/validate", {
-    method: "POST",
-    body: JSON.stringify({ reviewToken, ...candidate }),
-  });
-}
-
-export function confirmAdminFixtureImage(reviewToken: string, candidate: FixtureImageCandidate) {
-  return apiFetch<AdminFixturePayload>("/admin/fixtures/ai-image/confirm", {
-    method: "POST",
-    body: JSON.stringify({ reviewToken, ...candidate }),
-  });
-}
-
 export function updateAdminFixture(fixture: AdminFixturePayload) {
   return apiFetch<AdminFixturePayload>(`/admin/fixtures/${encodeURIComponent(fixture.id)}`, {
     method: "PUT",
     body: JSON.stringify(fixture),
-  });
-}
-
-export interface RescheduleFixturePayload {
-  date?: string;
-  time?: string;
-  endTime?: string;
-  venue?: string;
-  assignedVolunteer?: string;
-  maxMatchesPerDay?: number;
-  minRestMinutes?: number;
-  fullMatchSeconds?: number;
-  matchGapMinutes?: number;
-}
-
-export interface RescheduleFixtureSuggestion {
-  date: string;
-  time: string;
-  endTime: string;
-  label: string;
-}
-
-export function rescheduleAdminFixture(fixtureId: string, payload: RescheduleFixturePayload) {
-  return apiFetch<{ message: string; fixtures?: AdminFixturePayload[]; fixture?: AdminFixturePayload; suggestions?: RescheduleFixtureSuggestion[] }>(`/admin/fixtures/${encodeURIComponent(fixtureId)}/reschedule`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function bulkRescheduleAdminFixtures(payload: {
-  fixtureIds: string[];
-  date?: string;
-  time?: string;
-  endTime?: string;
-  venue?: string;
-  assignedVolunteer?: string;
-  targetDates?: string[];
-  maxMatchesPerDay?: number;
-  minRestMinutes?: number;
-}) {
-  return apiFetch<{ message: string; fixtures: AdminFixturePayload[]; suggestions?: RescheduleFixtureSuggestion[] }>("/admin/fixtures/reschedule", {
-    method: "POST",
-    body: JSON.stringify(payload),
   });
 }
 
@@ -638,7 +380,6 @@ export interface MongoFixture {
   sportId?: MongoRefName | string;
   sport?: string;
   sportName?: string;
-  category?: "Male" | "Female" | "Mixed";
   matchTitle?: string;
   teamA?: MongoRefName | string;
   teamB?: MongoRefName | string;
@@ -716,14 +457,14 @@ export interface MongoTeam {
   email?: string;
   contactNumber?: string;
   category?: string;
-  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string; profilePhoto?: string }[];
+  members?: string[] | { fullName?: string; registrationNumber?: string; registrationNo?: string }[];
   wins?: number;
   losses?: number;
   draws?: number;
   points?: number;
   registeredAt?: number;
   playerRegisteredAt?: number[];
-  status?: "draft" | "ready" | "registered" | "pending" | "approved" | "completed" | "withdrawn" | "rejected";
+  status?: "pending" | "approved" | "rejected";
   reviewedAt?: string;
   createdAt?: string;
 }
@@ -732,7 +473,7 @@ export interface MongoSport {
   _id: string;
   sportName?: string;
   name?: string;
-  categories?: ("Male" | "Female" | "Mixed")[];
+  categories?: ("Male" | "Female")[];
   type?: "indoor" | "outdoor";
   rules?: string;
   minPlayers?: number;
@@ -845,16 +586,7 @@ export function mapMongoTeam(team: MongoTeam): TeamSyncPayload {
     tournamentId: typeof team.tournamentId === "string" ? team.tournamentId : team.tournamentId?._id || team.tournamentId?.id || "",
     tournamentName: team.tournamentName || getRefName(team.tournamentId, ""),
     category: team.category,
-    members: (team.members || []).map((member) => {
-      if (!member || typeof member !== "object") return getMemberName(member);
-      const value = member as { fullName?: string; name?: string; registrationNumber?: string; registrationNo?: string; regNo?: string; profilePhoto?: string; idCardImage?: string };
-      return {
-        fullName: value.fullName || value.name || value.registrationNumber || value.registrationNo || value.regNo || "",
-        registrationNo: value.registrationNo || value.registrationNumber || value.regNo || "",
-        registrationNumber: value.registrationNumber || value.registrationNo || value.regNo || "",
-        profilePhoto: value.profilePhoto || value.idCardImage || "",
-      };
-    }).filter((member) => typeof member === "string" ? Boolean(member) : Boolean(member.fullName || member.registrationNo)),
+    members: (team.members || []).map(getMemberName).filter(Boolean),
     coachCaptain: team.captainName || "",
     captainRegNo: team.captainRegNo || "",
     captainEmail: team.captainEmail || "",
@@ -891,7 +623,6 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     sportName,
     tournamentId: typeof fixture.tournamentId === "string" ? fixture.tournamentId : fixture.tournamentId?._id || fixture.tournamentId?.id || "",
     tournamentName: fixture.tournamentName || getRefName(fixture.tournamentId, ""),
-    category: fixture.category,
     type: fixture.round || sportName || "Match",
     scoreA: Number(liveScore?.teamAScore ?? fixture.scoreA ?? 0),
     scoreB: Number(liveScore?.teamBScore ?? fixture.scoreB ?? 0),
@@ -961,16 +692,6 @@ export function mapMongoRule(rule: MongoRule) {
 
 export function getPublicFixtures(params?: Record<string, string | undefined>) {
   return publicApiFetch<MongoFixture>(withQuery("/public/fixtures", params));
-}
-
-export interface LeagueTableRow {
-  position: number; teamId: string; team: string; department: string; sportId: string; sport: string;
-  tournamentId: string; tournamentName: string; category: string; played: number; wins: number;
-  draws: number; losses: number; goalsFor: number; goalsAgainst: number; goalDifference: number; points: number;
-}
-
-export function getPublicLeagueTable(params?: Record<string, string | undefined>) {
-  return publicApiFetch<LeagueTableRow>(withQuery("/public/points-table", params));
 }
 
 export function getVolunteerAssignedFixtures(params?: Record<string, string | undefined>) {
@@ -1331,7 +1052,7 @@ export function getAdminSports() {
 
 export function createAdminSport(payload: {
   sportName: string;
-  categories?: ("Male" | "Female" | "Mixed")[];
+  categories?: ("Male" | "Female")[];
   type?: "indoor" | "outdoor";
   rules?: string;
   minPlayers?: number;
@@ -1367,8 +1088,6 @@ export interface TeamRegistrationMember {
   gender?: string;
   email?: string;
   phone?: string;
-  profilePhoto?: string;
-  idCardImage?: string;
   verificationToken?: string;
   idVerification?: IdVerificationInfo;
 }
@@ -1387,7 +1106,7 @@ export interface TeamRegistrationPayload {
   tournamentName: string;
   sportId: string;
   sportName: string;
-  category: "Male" | "Female" | "Mixed";
+  category: "Male" | "Female";
   department: string;
   teamName: string;
   teamLogo?: string;
@@ -1396,8 +1115,6 @@ export interface TeamRegistrationPayload {
   captainEmail: string;
   captainPhone: string;
   captainVerificationToken?: string;
-  captainProfilePhoto?: string;
-  captainIdCardImage?: string;
   captainIdVerification?: IdVerificationInfo;
   members: TeamRegistrationMember[];
   allPlayers?: {
@@ -1407,7 +1124,6 @@ export interface TeamRegistrationPayload {
     role?: "captain" | "member";
     idVerified?: boolean;
     idVerificationStatus?: string;
-    profilePhoto?: string;
   }[];
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
@@ -1436,8 +1152,6 @@ export interface IdCardVerificationResponse {
   confidence?: number;
   message: string;
   verificationToken?: string;
-  profilePhoto?: string;
-  idCardImage?: string;
 }
 
 function normalizeRegistrationText(value: string) {
@@ -1452,28 +1166,10 @@ function extractRegistrationNumberFromText(text: string, typedRegistrationNumber
 
   const digitRuns = text.match(/\d[\d\s-]{5,}\d/g) || [];
   const typedDigits = normalizedTyped.replace(/\D/g, "");
-  if (/^\d+$/.test(normalizedTyped)) {
-    for (const run of digitRuns) {
-      const normalizedRun = normalizeRegistrationText(run);
-      if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
-        return normalizedTyped;
-      }
-    }
-  }
-
-  const alphaNumericRuns = text.match(/[A-Z0-9][A-Z0-9\s_-]{4,24}[A-Z0-9]/gi) || [];
-  for (const run of alphaNumericRuns) {
-    if (!/\d/.test(run)) continue;
-    const normalizedRun = normalizeRegistrationText(run);
-    if (/[A-Z]/.test(normalizedRun) && /\d/.test(normalizedRun) && normalizedRun.length >= 6 && normalizedRun.length <= 20) {
-      return normalizedRun;
-    }
-  }
-
   for (const run of digitRuns) {
     const normalizedRun = normalizeRegistrationText(run);
-    if (normalizedRun.length >= 10 && normalizedRun.length <= 14) {
-      return normalizedRun;
+    if (normalizedRun === normalizedTyped || normalizedRun.replace(/\D/g, "") === typedDigits) {
+      return normalizedTyped;
     }
   }
   return "";
@@ -1544,11 +1240,7 @@ async function verifyRegistrationIdCardInBrowser(payload: {
       BROWSER_OCR_INIT_TIMEOUT_MS,
       "ID scan is taking too long. Please try again with a clearer, cropped image."
     );
-    const normalizedTyped = normalizeRegistrationText(payload.typedRegistrationNumber);
-    const whitelist = /^\d+$/.test(normalizedTyped)
-      ? "0123456789 -"
-      : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -_";
-    await worker.setParameters({ tessedit_char_whitelist: whitelist });
+    await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
     const result = await withClientTimeout(
       worker.recognize(payload.idCardImage),
       BROWSER_OCR_RECOGNIZE_TIMEOUT_MS,
@@ -1576,23 +1268,6 @@ export async function verifyRegistrationIdCard(payload: {
   typedRegistrationNumber: string;
   idCardImage: File;
 }) {
-  const withImage = async (result: IdCardVerificationResponse): Promise<IdCardVerificationResponse> => {
-    const imageData = result.profilePhoto || result.idCardImage || await fileToProfilePhotoDataUrl(payload.idCardImage);
-    return {
-      ...result,
-      profilePhoto: imageData,
-      idCardImage: imageData,
-    };
-  };
-
-  try {
-    return await withImage(await verifyRegistrationIdCardInBrowser(payload));
-  } catch (browserError) {
-    if (browserError instanceof ApiError && browserError.status === 422) {
-      throw browserError;
-    }
-  }
-
   const formData = new FormData();
   formData.set("playerRole", payload.playerRole);
   formData.set("playerIndex", String(payload.playerIndex));
@@ -1611,7 +1286,7 @@ export async function verifyRegistrationIdCard(payload: {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiError("ID scan is taking too long. Please try again with a clearer, cropped image.", 408);
+      return verifyRegistrationIdCardInBrowser(payload);
     }
     throw error;
   } finally {
@@ -1626,10 +1301,13 @@ export async function verifyRegistrationIdCard(payload: {
     data = null;
   }
   if (!response.ok) {
+    if ([503, 504].includes(response.status)) {
+      return verifyRegistrationIdCardInBrowser(payload);
+    }
     const proxyFailure = responseText.includes("ECONNREFUSED") || responseText.includes("fetch failed");
     throw new ApiError(data?.message || (proxyFailure ? "Could not reach the verification service. Please try again in a moment." : "Could not verify ID card."), response.status);
   }
-  return withImage(data as IdCardVerificationResponse);
+  return data as IdCardVerificationResponse;
 }
 
 export function getTeamPendingRegistrations() {
@@ -1697,181 +1375,4 @@ export async function downloadApprovedRegistrationsExcel(params?: Record<string,
   window.URL.revokeObjectURL(downloadUrl);
 
   return filename;
-}
-
-export interface TechnicalAdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: AuthSession["role"];
-  status: "active" | "inactive";
-  assignedSport?: string;
-  department?: string;
-  createdAt?: string;
-}
-
-export interface TechnicalAdminHealth {
-  environment: string;
-  frontendUrl: string;
-  backendUrl: string;
-  uptimeSeconds: number;
-  database: { connected: boolean; readyState: number; host: string; name: string };
-  smtp: TechnicalEmailStatus;
-  liveScoreService: { healthy: boolean; message: string };
-  deployment: Record<string, string>;
-  appVersion: string;
-  checkedAt: string;
-}
-
-export interface TechnicalEmailStatus {
-  configured: boolean;
-  healthy: boolean;
-  provider: string;
-  from: string;
-  sent: number;
-  failed: number;
-  lastEmailSentAt?: string | null;
-  lastEmailError?: string;
-  lastCheckedAt?: string | null;
-  coordinatorCredentialEmails?: number;
-  volunteerCredentialEmails?: number;
-  message?: string;
-}
-
-export interface TechnicalRouteUsage {
-  route: string;
-  count: number;
-  avgResponseTimeMs: number;
-}
-
-export interface TechnicalAdminStats {
-  api: {
-    requestsToday: number;
-    failedToday: number;
-    notFoundToday: number;
-    serverErrorsToday: number;
-    averageResponseTimeMs: number;
-    lastError?: TechnicalErrorLog | null;
-    mostUsedRoutes: TechnicalRouteUsage[];
-  };
-  registrations: Record<string, number>;
-  fixtures: Record<string, number>;
-  users: TechnicalAdminUser[];
-  checkedAt: string;
-}
-
-export interface TechnicalCollectionStatus {
-  key: string;
-  collection: string;
-  count: number;
-}
-
-export interface TechnicalDatabaseStatus {
-  database: { connected: boolean; readyState: number; host: string; name: string };
-  collections: TechnicalCollectionStatus[];
-  checkedAt: string;
-}
-
-export interface TechnicalApiLog {
-  _id: string;
-  method: string;
-  route: string;
-  statusCode: number;
-  responseTimeMs: number;
-  userRole?: string;
-  userEmail?: string;
-  createdAt: string;
-}
-
-export interface TechnicalErrorLog extends TechnicalApiLog {
-  errorType?: string;
-  message?: string;
-}
-
-export interface TechnicalAuditLog {
-  _id: string;
-  action: string;
-  performedBy?: string;
-  role?: string;
-  status?: string;
-  route?: string;
-  details?: string;
-  createdAt: string;
-}
-
-export interface TechnicalLiveMatch {
-  id: string;
-  matchTitle: string;
-  sport?: string;
-  category?: string;
-  status: string;
-  teamAName?: string;
-  teamBName?: string;
-  scoreA: number;
-  scoreB: number;
-  lastScoreUpdate?: string | null;
-  warnings: string[];
-}
-
-export function getTechnicalAdminHealth() {
-  return apiFetch<TechnicalAdminHealth>("/admin/health");
-}
-
-export function getTechnicalAdminStats() {
-  return apiFetch<TechnicalAdminStats>("/admin/stats");
-}
-
-export function getTechnicalAdminDatabaseStatus() {
-  return apiFetch<TechnicalDatabaseStatus>("/admin/database-status");
-}
-
-export function getTechnicalAdminApiLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalApiLog[] }>(withQuery("/admin/api-logs", params));
-}
-
-export function getTechnicalAdminErrorLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalErrorLog[] }>(withQuery("/admin/error-logs", params));
-}
-
-export function getTechnicalAdminAuditLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalAuditLog[] }>(withQuery("/admin/audit-logs", params));
-}
-
-export function getTechnicalAdminLiveMonitoring() {
-  return apiFetch<{ matches: TechnicalLiveMatch[]; checkedAt: string }>("/admin/live-monitoring");
-}
-
-export function getTechnicalAdminEmailStatus() {
-  return apiFetch<TechnicalEmailStatus>("/admin/email-status");
-}
-
-export function testTechnicalAdminSmtp() {
-  return apiFetch<{ sent: boolean; skipped: boolean; message: string }>("/admin/test-smtp", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-export function testTechnicalAdminMongoDb() {
-  return apiFetch<{ ok: boolean; responseTimeMs: number }>("/admin/test-mongodb", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-export function updateTechnicalAdminUserStatus(role: string, id: string, status: "active" | "inactive") {
-  return apiFetch<{ user: TechnicalAdminUser }>(`/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-}
-
-export function resetTechnicalAdminUserPassword(role: string, id: string) {
-  return apiFetch<{ message: string; temporaryPassword: string; user: TechnicalAdminUser }>(
-    `/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/reset-password`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
 }

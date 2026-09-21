@@ -1,25 +1,16 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, Download, GitFork, ImageUp, Loader2, MapPin, Plus, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
+import { CalendarDays, Clock, Download, GitFork, Loader2, MapPin, Radio, Trash2, Trophy, Wand2 } from "lucide-react";
 import {
   AdminFixturePayload,
   generateAdminFixtures,
   getAdminSports,
   getAdminTournaments,
   getAdminVenues,
-  createAdminFixture,
-  analyzeAdminFixtureImage,
-  validateAdminFixtureImage,
-  confirmAdminFixtureImage,
-  FixtureImageCandidate,
-  getAdminTeams,
-  getAdminRoleAccounts,
   MongoSport,
-  TeamSyncPayload,
   TournamentPayload,
   VenuePayload,
-  RoleAccountPayload,
 } from "@/lib/api";
 
 interface AutomaticFixtureGeneratorProps {
@@ -62,15 +53,15 @@ function getSportNameFromFixture(fixture: AdminFixturePayload) {
 }
 
 function getFixtureCategory(fixture: AdminFixturePayload) {
-  return fixture.category === "Female" || fixture.category === "Mixed" ? fixture.category : "Male";
+  return fixture.category === "Female" ? "Female" : "Male";
 }
 
 function getFixtureGroupName(fixture: AdminFixturePayload) {
   return `${getSportNameFromFixture(fixture)} ${getFixtureCategory(fixture)}`;
 }
 
-function getFixtureCategories(sport: MongoSport): ("Male" | "Female" | "Mixed")[] {
-  const categories = (sport.categories || []).filter((item): item is "Male" | "Female" | "Mixed" => item === "Male" || item === "Female" || item === "Mixed");
+function getFixtureCategories(sport: MongoSport): ("Male" | "Female")[] {
+  const categories = (sport.categories || []).filter((item): item is "Male" | "Female" => item === "Male" || item === "Female");
   return categories.length ? categories : ["Male", "Female"];
 }
 
@@ -86,11 +77,6 @@ function getDownloadFileName(sportName: string) {
 function getBracketFileName(sportName: string) {
   const slug = sportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "sport";
   return `invicta-${slug}-tournament-bracket.doc`;
-}
-
-function getExcelFileName(sportName: string) {
-  const slug = sportName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "sport";
-  return `invicta-${slug}-fixtures.xls`;
 }
 
 function getFixtureTeamNames(fixtures: AdminFixturePayload[]) {
@@ -381,47 +367,10 @@ function downloadBracket(sportName: string, fixtures: AdminFixturePayload[]) {
   window.URL.revokeObjectURL(url);
 }
 
-function downloadExcelFixtures(sportName: string, fixtures: AdminFixturePayload[]) {
-  const sortedFixtures = [...fixtures].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  const rows = sortedFixtures.map((fixture, index) => `
-    <tr>
-      <td>${index + 1}</td>
-      <td>${escapeHtml(fixture.tournamentName || "INVICTA")}</td>
-      <td>${escapeHtml(fixture.sportName || fixture.sport || sportName)}</td>
-      <td>${escapeHtml(fixture.category || "")}</td>
-      <td>${escapeHtml(fixture.round || "")}</td>
-      <td>${escapeHtml(fixture.teamAName || fixture.teamA || "Team A")}</td>
-      <td>${escapeHtml(fixture.teamBName || fixture.teamB || "Team B")}</td>
-      <td>${escapeHtml(fixture.date || "")}</td>
-      <td>${escapeHtml(fixture.time || "")}</td>
-      <td>${escapeHtml(fixture.venue || "")}</td>
-      <td>${escapeHtml(fixture.status || "upcoming")}</td>
-    </tr>
-  `).join("");
-  const html = `<html><head><meta charset="utf-8" /></head><body>
-    <table border="1">
-      <thead><tr><th>#</th><th>Tournament</th><th>Sport</th><th>Category</th><th>Round</th><th>Team A</th><th>Team B</th><th>Date</th><th>Time</th><th>Venue</th><th>Status</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </body></html>`;
-  const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = getExcelFileName(sportName);
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-}
-
 export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtureGroup }: AutomaticFixtureGeneratorProps) {
   const [sports, setSports] = useState<MongoSport[]>([]);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
   const [venues, setVenues] = useState<VenuePayload[]>([]);
-  const [teams, setTeams] = useState<TeamSyncPayload[]>([]);
-  const [volunteers, setVolunteers] = useState<RoleAccountPayload[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState("");
@@ -430,34 +379,13 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
 
   const [tournamentId, setTournamentId] = useState("");
   const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
-  const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female" | "Mixed")[]>>({});
+  const [categoriesBySport, setCategoriesBySport] = useState<Record<string, ("Male" | "Female")[]>>({});
   const [venueBySport, setVenueBySport] = useState<Record<string, string>>({});
   const [startDate, setStartDate] = useState(getTodayInputValue());
-  const [endDate, setEndDate] = useState("");
-  const [matchesPerDay, setMatchesPerDay] = useState(5);
   const [dayStartTime, setDayStartTime] = useState("09:00");
   const [dayEndTime, setDayEndTime] = useState("17:00");
   const [matchDurationMinutes, setMatchDurationMinutes] = useState(45);
   const [gapMinutes, setGapMinutes] = useState(15);
-  const [playDays, setPlayDays] = useState<number[]>([0, 6]);
-  const [manualSportId, setManualSportId] = useState("");
-  const [manualTournamentId, setManualTournamentId] = useState("");
-  const [manualCategory, setManualCategory] = useState<"Male" | "Female" | "Mixed">("Male");
-  const [manualTeamA, setManualTeamA] = useState("");
-  const [manualTeamB, setManualTeamB] = useState("");
-  const [manualDate, setManualDate] = useState(getTodayInputValue());
-  const [manualTime, setManualTime] = useState("09:00");
-  const [manualVenue, setManualVenue] = useState("");
-  const [manualVolunteer, setManualVolunteer] = useState("");
-  const [manualRound, setManualRound] = useState("");
-  const [manualDuration, setManualDuration] = useState(45);
-  const [manualSaving, setManualSaving] = useState(false);
-  const [fixtureMode, setFixtureMode] = useState<"automatic" | "manual" | "ai">("manual");
-  const [imageCandidate, setImageCandidate] = useState<FixtureImageCandidate | null>(null);
-  const [imageReviewToken, setImageReviewToken] = useState("");
-  const [imageErrors, setImageErrors] = useState<string[]>([]);
-  const [imageBusy, setImageBusy] = useState(false);
-  const [imagePreview, setImagePreview] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -465,12 +393,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     async function loadOptions() {
       setLoadingOptions(true);
       try {
-        const [nextSports, nextTournaments, nextVenues, nextTeams, nextAccounts] = await Promise.all([
+        const [nextSports, nextTournaments, nextVenues] = await Promise.all([
           getAdminSports(),
           getAdminTournaments(),
           getAdminVenues(),
-          getAdminTeams(),
-          getAdminRoleAccounts(),
         ]);
 
         if (!isMounted) return;
@@ -478,18 +404,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         setSports(nextSports);
         setTournaments(nextTournaments);
         setVenues(nextVenues);
-        setTeams(nextTeams.filter((team) =>
-          team.status === "draft" ||
-          team.status === "approved" ||
-          team.status === "ready" ||
-          team.status === "registered"
-        ));
-        setVolunteers(nextAccounts.filter((account) => account.role === "volunteer" && account.status !== "inactive"));
         setSelectedSportIds(nextSports[0]?._id ? [nextSports[0]._id] : []);
-        setManualSportId(nextSports[0]?._id || "");
         setCategoriesBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getFixtureCategories(sport)])));
         setTournamentId(getTournamentId(nextTournaments[0] || {}));
-        setManualTournamentId(getTournamentId(nextTournaments[0] || {}));
         setVenueBySport(Object.fromEntries(nextSports.map((sport) => [sport._id, getVenueId(nextVenues[0] || {})])));
       } catch (err) {
         if (isMounted) setError(err instanceof Error ? err.message : "Could not load fixture setup data.");
@@ -506,20 +423,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
   }, []);
 
   const selectedSports = useMemo(() => sports.filter((sport) => selectedSportIds.includes(sport._id)), [sports, selectedSportIds]);
-  const manualSport = sports.find((sport) => sport._id === manualSportId);
-  const manualTournament = tournaments.find((tournament) => getTournamentId(tournament) === manualTournamentId);
-  const manualTeams = teams.filter((team) => {
-    const teamTournamentId = String(team.tournamentId || "");
-    const teamTournamentName = String(team.tournamentName || "").trim().toLowerCase();
-    const selectedTournamentName = String(manualTournament?.name || "").trim().toLowerCase();
-    const tournamentMatches = !manualTournamentId ||
-      teamTournamentId === manualTournamentId ||
-      Boolean(selectedTournamentName && teamTournamentName === selectedTournamentName);
-    if (!tournamentMatches) return false;
-    const teamSport = String(team.sportId || team.sportName || team.sport || "").toLowerCase();
-    const sportName = String(manualSport?.sportName || manualSport?.name || "").toLowerCase();
-    return teamSport === manualSportId.toLowerCase() || teamSport === sportName || String(team.sport || "").toLowerCase() === sportName.replace(/\s+/g, "-");
-  }).filter((team) => !manualCategory || team.category === manualCategory);
   const selectedIncludesFootball = useMemo(() => selectedSports.some(isFootballSport), [selectedSports]);
   const fixturesBySport = useMemo(() => {
     const groups = new Map<string, { sportName: string; fixtures: AdminFixturePayload[] }>();
@@ -547,11 +450,9 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     );
 
     const missingVenueSport = selectedSports.find((sport) => !venueBySport[sport._id]);
-    if (!tournamentId || generationTargets.length === 0 || missingVenueSport || playDays.length === 0) {
+    if (!tournamentId || generationTargets.length === 0 || missingVenueSport) {
       setError(missingVenueSport
         ? `Please select a venue for ${getSportLabel(missingVenueSport)}.`
-        : playDays.length === 0
-          ? "Select at least one day of the week for fixture generation."
         : "Please select tournament and at least one sport/category before generating fixtures.");
       return;
     }
@@ -568,13 +469,10 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           venueId: target.venueId,
           venue: selectedVenue?.name || "",
           startDate,
-          endDate: endDate || undefined,
-          matchesPerDay,
           dayStartTime,
           dayEndTime,
           matchDurationMinutes,
           gapMinutes,
-          playDays,
         });
         results.push(result);
       }
@@ -607,104 +505,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
     }
   }
 
-  async function handleFixtureImage(event: React.ChangeEvent<HTMLInputElement>) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
-        setImageErrors(["Please upload a JPG, PNG, or WEBP image smaller than 5MB."]);
-        event.target.value = "";
-        return;
-      }
-      if (imagePreview) URL.revokeObjectURL(imagePreview);
-      setImagePreview(URL.createObjectURL(file));
-      setImageBusy(true);
-      setImageErrors([]);
-      setMessage("");
-      try {
-        const result = await analyzeAdminFixtureImage(file);
-        setImageReviewToken(result.reviewToken);
-        setImageCandidate({ ...result.candidate, category: result.candidate.category || "Male" });
-        setImageErrors(result.validation.errors);
-        setMessage("Image analyzed. Review every field before validating and creating the fixture.");
-      } catch (err) {
-        setImageErrors([err instanceof Error ? err.message : "Could not analyze the fixture image."]);
-      } finally {
-        setImageBusy(false);
-        event.target.value = "";
-      }
-    }
-
-  async function validateImageCandidate() {
-      if (!imageCandidate || !imageReviewToken) return;
-      setImageBusy(true);
-      try {
-        const result = await validateAdminFixtureImage(imageReviewToken, imageCandidate);
-        setImageCandidate(result.candidate);
-        setImageErrors(result.errors);
-        if (result.valid) setMessage("Fixture details validated. Confirm creation only after reviewing the values.");
-      } catch (err) { setImageErrors([err instanceof Error ? err.message : "Could not validate fixture details."]); }
-      finally { setImageBusy(false); }
-    }
-
-  async function confirmImageCandidate() {
-      if (!imageCandidate || !imageReviewToken || imageErrors.length) return;
-      setImageBusy(true);
-      try {
-        const created = await confirmAdminFixtureImage(imageReviewToken, imageCandidate);
-        onGenerated([created]);
-        setImageCandidate(null);
-        setImageReviewToken("");
-        if (imagePreview) URL.revokeObjectURL(imagePreview);
-        setImagePreview("");
-        setMessage("AI fixture created after human review.");
-      } catch (err) { setImageErrors([err instanceof Error ? err.message : "Could not create the fixture."]); }
-      finally { setImageBusy(false); }
-    }
-
-  async function handleManualCreate(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    setError("");
-    if (!manualTournamentId || !manualSportId || !manualTeamA || !manualTeamB || manualTeamA === manualTeamB || !manualVenue) {
-      setError("Select a tournament, sport, two different teams, and a venue for the manual fixture.");
-      return;
-    }
-    if (!manualDate || !manualTime || !Number.isFinite(manualDuration) || manualDuration < 1) {
-      setError("Enter a valid fixture date, time, and match duration.");
-      return;
-    }
-    setManualSaving(true);
-    try {
-      setMessage("Saving manual fixture...");
-      const created = await createAdminFixture({
-        sportId: manualSportId,
-        tournamentId: manualTournamentId || undefined,
-        category: manualCategory,
-        teamA: manualTeamA,
-        teamB: manualTeamB,
-        date: manualDate,
-        time: manualTime,
-        venue: manualVenue,
-        assignedVolunteer: manualVolunteer || undefined,
-        round: manualRound || undefined,
-        matchDurationMinutes: manualDuration,
-        gapMinutes,
-      });
-      if (!created?.id) {
-        throw new Error("The server did not return a saved fixture. Please try again.");
-      }
-      onGenerated([created]);
-      setMessage("Manual fixture created successfully and added to the schedule.");
-      setManualTeamA("");
-      setManualTeamB("");
-      setManualVolunteer("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the manual fixture.");
-    } finally {
-      setManualSaving(false);
-    }
-  }
-
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col gap-2">
@@ -713,68 +513,14 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
           Fixture Scheduler
         </span>
         <div>
-          <h2 className="sport-heading text-2xl font-black text-foreground">Create Fixtures</h2>
+          <h2 className="sport-heading text-2xl font-black text-foreground">Generate Fixtures</h2>
           <p className="max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Choose one method below. Use automatic generation for a full schedule or manual creation for fixtures prepared on paper.
+            Generate approved-team fixtures for multiple sports and categories. Football and volleyball use a shuffled single round-robin schedule where each team plays every other team once, while the backend validates weekends, one match per team per day, venue clashes, and volunteer assignment clashes before saving.
           </p>
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-3 sm:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => setFixtureMode("automatic")}
-          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "automatic" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
-        >
-          <span className="block text-xs font-black uppercase tracking-widest">Automatic Generation</span>
-          <span className="mt-1 block text-xs font-medium opacity-80">Create a complete schedule from registered teams.</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFixtureMode("manual")}
-          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "manual" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
-        >
-          <span className="block text-xs font-black uppercase tracking-widest">Manual Creation</span>
-          <span className="mt-1 block text-xs font-medium opacity-80">Add one fixture from a paper schedule.</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFixtureMode("ai")}
-          className={`rounded-xl px-4 py-3 text-left transition-colors ${fixtureMode === "ai" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:border-accent"}`}
-        >
-          <span className="block text-xs font-black uppercase tracking-widest"><ImageUp className="mr-1 inline" size={14} /> AI Fixture From Image</span>
-          <span className="mt-1 block text-xs font-medium opacity-80">Extract one paper fixture, review it, then confirm.</span>
-        </button>
-      </div>
-
-      {fixtureMode === "ai" && <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-black text-foreground">AI Fixture From Image</h3>
-            <p className="text-sm text-muted-foreground">The image is analyzed on the server. Nothing is created until you validate and confirm every field.</p>
-          </div>
-          <label className="flex w-fit cursor-pointer items-center gap-2 rounded-xl bg-accent px-4 py-3 text-xs font-black uppercase tracking-widest text-accent-foreground">
-            <ImageUp size={16} /> {imageBusy ? "Analyzing..." : "Upload fixture image"}
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => void handleFixtureImage(event)} disabled={imageBusy} />
-          </label>
-          {imagePreview && <div className="rounded-xl border border-border bg-background p-4"><img src={imagePreview} alt="Uploaded fixture schedule preview" className="max-h-72 w-full rounded-lg object-contain" /></div>}
-          {imageCandidate && <div className="grid gap-4 rounded-xl border border-border bg-background p-4 sm:grid-cols-2">
-            <label className="space-y-1 text-xs font-bold">Team A<input value={imageCandidate.teamAName || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, teamAName: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
-            <label className="space-y-1 text-xs font-bold">Team B<input value={imageCandidate.teamBName || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, teamBName: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
-            <label className="space-y-1 text-xs font-bold">Sport<select value={imageCandidate.sportId || ""} onChange={(event) => { const sport = sports.find((item) => item._id === event.target.value); setImageCandidate({ ...imageCandidate, sportId: event.target.value, sportName: sport ? getSportLabel(sport) : imageCandidate.sportName }); }} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option value="">Select sport...</option>{sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}</select></label>
-            <label className="space-y-1 text-xs font-bold">Tournament<select value={imageCandidate.tournamentId || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, tournamentId: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option value="">Select tournament...</option>{tournaments.map((item) => <option key={getTournamentId(item)} value={getTournamentId(item)}>{item.name}</option>)}</select></label>
-            <label className="space-y-1 text-xs font-bold">Category<select value={imageCandidate.category || "Male"} onChange={(event) => setImageCandidate({ ...imageCandidate, category: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm"><option>Male</option><option>Female</option><option>Mixed</option></select></label>
-            <label className="space-y-1 text-xs font-bold">Date<input type="date" value={imageCandidate.date || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, date: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
-            <label className="space-y-1 text-xs font-bold">Time<input type="time" value={imageCandidate.time || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, time: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
-            <label className="space-y-1 text-xs font-bold">Venue<input value={imageCandidate.venue || ""} onChange={(event) => setImageCandidate({ ...imageCandidate, venue: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm" /></label>
-            <div className="flex items-end gap-2"><button type="button" onClick={() => void validateImageCandidate()} disabled={imageBusy} className="rounded-lg border border-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent">Validate</button><button type="button" onClick={() => void confirmImageCandidate()} disabled={imageBusy || imageErrors.length > 0} className="rounded-lg bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-accent-foreground disabled:opacity-50">Confirm & Create</button></div>
-            {imageErrors.length > 0 && <div className="sm:col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">{imageErrors.map((item) => <p key={item}>{item}</p>)}</div>}
-            <p className="sm:col-span-2 text-xs text-muted-foreground">Source: {imageCandidate.source || "image"}{imageCandidate.confidence ? ` · OCR confidence ${imageCandidate.confidence}%` : ""}. Review is required.</p>
-          </div>}
-        </div>
-      </div>}
-
-      {fixtureMode === "automatic" && <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         {loadingOptions ? (
           <div className="flex items-center justify-center gap-3 py-16 text-sm font-bold text-muted-foreground">
             <Loader2 className="animate-spin text-accent" size={20} />
@@ -914,47 +660,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                 />
               </label>
 
-              <div className="space-y-2 md:col-span-2 lg:col-span-4">
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                  <CalendarDays size={13} /> Days this sport will be played
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    ["Sunday", 0],
-                    ["Monday", 1],
-                    ["Tuesday", 2],
-                    ["Wednesday", 3],
-                    ["Thursday", 4],
-                    ["Friday", 5],
-                    ["Saturday", 6],
-                  ].map(([label, day]) => (
-                    <label key={day} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground">
-                      <input
-                        type="checkbox"
-                        checked={playDays.includes(Number(day))}
-                        onChange={(event) => setPlayDays((current) => event.target.checked
-                          ? [...new Set([...current, Number(day)])]
-                          : current.filter((item) => item !== Number(day)))}
-                        className="accent-accent"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                  <CalendarDays size={13} /> End Date (optional)
-                </span>
-                <input type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent" />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Matches per day</span>
-                <input type="number" min={1} value={matchesPerDay} onChange={(event) => setMatchesPerDay(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground outline-none transition-colors focus:border-accent" />
-              </label>
-
               <label className="space-y-2">
                 <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                   <Clock size={13} /> Day Start
@@ -1011,7 +716,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                     const venue = venues.find((item) => getVenueId(item) === venueBySport[sport._id]);
                     return `${getSportLabel(sport)} (${(categoriesBySport[sport._id] || []).join(", ") || "no category"}${venue ? `, ${venue.name}` : ", no venue"})`;
                   }).join(" / ")
-                  : "Select sports and categories"}. The schedule will use {playDays.map((day) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]).join(", ") || "the selected days"}, allows as many matches per day as the time window permits, and keeps each team to one match per day. Each sport uses its selected venue. Full-time controls apply only to football.
+                : "Select sports and categories"}. The backend saves fixtures only on Saturdays and Sundays, allows as many matches per day as the time window permits, and keeps each team to one match per day. Each sport uses its selected venue. Full-time controls apply only to football.
             </div>
 
             {(message || error) && (
@@ -1036,88 +741,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
             </div>
           </div>
         )}
-      </form>}
-
-      {fixtureMode === "manual" && <form onSubmit={handleManualCreate} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex items-start gap-3">
-          <div className="rounded-xl bg-accent/10 p-2 text-accent"><Plus size={18} /></div>
-          <div>
-            <h3 className="sport-heading text-xl font-black text-foreground">Add Manual Fixture</h3>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">Enter a fixture that was prepared on paper or outside the automatic generator.</p>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Tournament
-            <select aria-label="Tournament" value={manualTournamentId} onChange={(event) => { setManualTournamentId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
-            <option value="">Select tournament...</option>
-            {tournaments.map((tournament) => <option key={getTournamentId(tournament)} value={getTournamentId(tournament)}>{tournament.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Sport
-            <select aria-label="Sport" value={manualSportId} onChange={(event) => { setManualSportId(event.target.value); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
-            <option value="">Select sport...</option>
-            {sports.map((sport) => <option key={sport._id} value={sport._id}>{getSportLabel(sport)}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Category
-            <select aria-label="Category" value={manualCategory} onChange={(event) => { setManualCategory(event.target.value as "Male" | "Female" | "Mixed"); setManualTeamA(""); setManualTeamB(""); }} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
-            {(manualSport ? getFixtureCategories(manualSport) : ["Male", "Female"]).map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Team A
-            <select aria-label="Team A" value={manualTeamA} onChange={(event) => setManualTeamA(event.target.value)} disabled={loadingOptions || manualTeams.length === 0} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground disabled:opacity-50">
-            <option value="">Team A...</option>
-            {manualTeams.map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Team B
-            <select aria-label="Team B" value={manualTeamB} onChange={(event) => setManualTeamB(event.target.value)} disabled={loadingOptions || manualTeams.length < 2} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground disabled:opacity-50">
-            <option value="">Team B...</option>
-            {manualTeams.filter((team) => team.id !== manualTeamA).map((team) => <option key={team.id} value={team.id}>{team.teamName || team.name}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">Date<input aria-label="Fixture date" type="date" value={manualDate} onChange={(event) => setManualDate(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" /></label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">Time<input aria-label="Fixture time" type="time" value={manualTime} onChange={(event) => setManualTime(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" /></label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">Venue<select aria-label="Venue" value={manualVenue} onChange={(event) => setManualVenue(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
-            <option value="">Venue...</option>
-            {venues.map((venue) => <option key={getVenueId(venue)} value={venue.name}>{venue.name}</option>)}
-          </select></label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">Volunteer (optional)<select aria-label="Volunteer" value={manualVolunteer} onChange={(event) => setManualVolunteer(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground">
-            <option value="">No volunteer assigned</option>
-            {volunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.fullName || volunteer.email}</option>)}
-          </select></label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">Round<input type="text" aria-label="Round" value={manualRound} onChange={(event) => setManualRound(event.target.value)} placeholder="Optional" className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground placeholder:text-muted-foreground" /></label>
-          <label className="space-y-1 text-xs font-bold text-muted-foreground">
-            Match duration (minutes)
-            <input type="number" min={1} value={manualDuration} onChange={(event) => setManualDuration(Number(event.target.value))} className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground" />
-          </label>
-        </div>
-        {!loadingOptions && manualTeams.length < 2 && (
-          <div className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-500">
-            At least two eligible teams are required for this tournament, sport, and category.
-          </div>
-        )}
-        {(message || error) && (
-          <div className={`mt-4 rounded-xl border px-4 py-3 text-sm font-bold ${
-            error
-              ? "border-red-400/40 bg-red-500/10 text-red-500"
-              : "border-emerald-400/40 bg-emerald-500/10 text-emerald-500"
-          }`}>
-            {error || message}
-          </div>
-        )}
-        <div className="mt-5 flex justify-end">
-          <button type="submit" disabled={manualSaving || loadingOptions || manualTeams.length < 2} className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-xs font-black uppercase tracking-[0.2em] text-accent-foreground disabled:opacity-50">
-            {manualSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            {manualSaving ? "Saving..." : "Create Manual Fixture"}
-          </button>
-        </div>
-      </form>}
+      </form>
 
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1152,15 +776,6 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
                     </span>
                   </span>
                   <Download size={18} className="shrink-0 text-accent" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadExcelFixtures(group.sportName, group.fixtures)}
-                  aria-label={`Download ${group.sportName} fixtures as Excel`}
-                  title={`Download ${group.sportName} fixtures as Excel`}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 transition-colors hover:bg-emerald-500/20"
-                >
-                  <span className="text-[10px] font-black">XLS</span>
                 </button>
                 <button
                   type="button"

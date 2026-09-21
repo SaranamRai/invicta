@@ -36,7 +36,7 @@ export default function AnnouncementsPage() {
     }
 
     void loadAnnouncements();
-    const interval = window.setInterval(loadAnnouncements, 1000);
+    const interval = window.setInterval(loadAnnouncements, 15000);
 
     return () => {
       isMounted = false;

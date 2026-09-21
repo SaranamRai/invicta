@@ -5,11 +5,11 @@ import Issue from "../models/Issue.js";
 import Announcement from "../models/Announcement.js";
 import Rule from "../models/Rule.js";
 import Sport from "../models/Sport.js";
+import PointsTable from "../models/PointsTable.js";
 import Volunteer from "../models/Volunteer.js";
 import { createRoleAccount } from "./authController.js";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
-import { buildLeagueTable } from "../utils/leagueTable.js";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -115,10 +115,7 @@ export async function updatePlayer(req, res) {
 }
 
 export async function coordinatorFixtures(req, res) {
-  const query = {
-    ...(await buildAssignedSportQuery(req)),
-    status: { $ne: "cancelled" },
-  };
+  const query = await buildAssignedSportQuery(req);
   if (req.query.tournamentId) query.tournamentId = req.query.tournamentId;
   if (req.query.category) query.category = String(req.query.category);
   const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
@@ -203,27 +200,23 @@ export async function coordinatorPointsTable(req, res) {
   const sportIds = await getAssignedSportIds(assignedSport);
   if (assignedSport && sportIds.length === 0) return res.json([]);
 
-  const filters = {};
-  if (req.query.tournamentId) filters.tournamentId = String(req.query.tournamentId);
-  if (req.query.category) filters.category = String(req.query.category);
-  if (sportIds.length) filters.sportId = { $in: sportIds };
+  const rows = await PointsTable.find(assignedSport ? { sportId: { $in: sportIds } } : {})
+    .populate("sportId", "sportName name")
+    .sort({ points: -1, wins: -1, updatedAt: -1 })
+    .lean();
 
-  const rows = await buildLeagueTable(filters);
-  return res.json(rows.map((row) => ({
-    id: row.teamId,
-    rank: row.position,
+  return res.json(rows.map((row, index) => ({
+    id: row._id.toString(),
+    rank: index + 1,
     department: row.department,
-    team: row.team,
-    sportId: row.sportId,
-    sportName: row.sport,
-    matchesPlayed: row.played,
-    wins: row.wins,
-    losses: row.losses,
-    draws: row.draws,
-    points: row.points,
-    goalsFor: row.goalsFor,
-    goalsAgainst: row.goalsAgainst,
-    updatedAt: new Date(),
+    sportId: row.sportId?._id?.toString?.() || row.sportId?.toString?.() || "",
+    sportName: row.sportId?.sportName || row.sportId?.name || "",
+    matchesPlayed: row.matchesPlayed || 0,
+    wins: row.wins || 0,
+    losses: row.losses || 0,
+    draws: row.draws || 0,
+    points: row.points || 0,
+    updatedAt: row.updatedAt,
   })));
 }
 
