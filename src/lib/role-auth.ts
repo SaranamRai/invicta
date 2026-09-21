@@ -51,5 +51,5 @@ export async function logoutPortalSession() {
 }
 
 export function canAccessRole(accountRole: PortalRole, requiredRole: PortalRole) {
-  return accountRole === "admin" || accountRole === "supercoordinator" || accountRole === requiredRole;
+  return accountRole === requiredRole;
 }

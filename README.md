@@ -1,4 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# INVICTA Sports Management System
+
+This repository keeps one Express/MongoDB backend and supports two separate Next.js frontend deployments from the same source tree.
+
+## Frontend Deployments
+
+Public website:
+
+```env
+NEXT_PUBLIC_APP_TYPE=public
+NEXT_PUBLIC_API_URL=https://your-backend-url.onrender.com/api
+```
+
+Portal dashboard:
+
+```env
+NEXT_PUBLIC_APP_TYPE=portal
+NEXT_PUBLIC_API_URL=https://your-backend-url.onrender.com/api
+```
+
+The public deployment blocks login and dashboard routes. The portal deployment redirects `/` to `/login` and blocks public website pages. Both deployments call the same backend API and use the same MongoDB database through that backend.
+
+## Backend Environment
+
+```env
+MONGO_URI=your_existing_mongodb_atlas_uri
+JWT_SECRET=your_jwt_secret
+CLIENT_PUBLIC_URL=https://invicta-public.vercel.app
+CLIENT_PORTAL_URL=https://invicta-portal.vercel.app
+LOCAL_PUBLIC_URL=http://localhost:5173
+LOCAL_PORTAL_URL=http://localhost:5174
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=your_email
+SMTP_PASS=your_app_password
+NODE_ENV=production
+```
+
+Do not put MongoDB, SMTP, or JWT secrets in frontend environment variables.
 
 ## Getting Started
 
@@ -6,19 +44,16 @@ First, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev:api
+npm run dev:public
+npm run dev:portal
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+For two local frontend ports, open `http://localhost:5173` for public and `http://localhost:5174` for portal.
 
 ## Learn More
 

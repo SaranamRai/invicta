@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { fileURLToPath } from "node:url";
 
 import { connectDB, getDBStatus } from "./config/db.js";
+import ApiLog from "./models/ApiLog.js";
+import ErrorLog from "./models/ErrorLog.js";
 import Admin from "./models/Admin.js";
 import SuperCoordinator from "./models/SuperCoordinator.js";
 import Coordinator from "./models/Coordinator.js";
@@ -15,6 +17,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import coordinatorRoutes from "./routes/coordinatorRoutes.js";
 import registrationRoutes from "./routes/registrationRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import Sport from "./models/Sport.js";
 import { getRecommendedPlayerCount } from "./utils/sportPlayerCounts.js";
 
@@ -124,6 +127,10 @@ console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 
 const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
 const allowedOrigins = [
+  process.env.CLIENT_PUBLIC_URL,
+  process.env.CLIENT_PORTAL_URL,
+  process.env.LOCAL_PUBLIC_URL,
+  process.env.LOCAL_PORTAL_URL,
   process.env.CLIENT_URL,
   process.env.FRONTEND_URL,
   process.env.FRONTEND_ORIGIN,
@@ -131,8 +138,10 @@ const allowedOrigins = [
   process.env.ALLOWED_ORIGINS,
   "http://localhost:3000",
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
 ]
   .filter(Boolean)
   .flatMap((origin) => String(origin).split(","))
@@ -166,12 +175,38 @@ app.use(
 app.options("*", cors());
 app.use(express.json({ limit: "10mb" }));
 
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    if (!req.path.startsWith("/api")) return;
+
+    const durationMs = Date.now() - startedAt;
+    void ApiLog.create({
+      method: req.method,
+      path: req.originalUrl.split("?")[0],
+      statusCode: res.statusCode,
+      durationMs,
+      userRole: req.user?.role || "",
+      userEmail: req.user?.email || "",
+      isSlow: durationMs >= Number(process.env.SLOW_API_THRESHOLD_MS || 1500),
+    }).catch((error) => {
+      console.error("API log write failed:", error.message);
+    });
+  });
+  next();
+});
+
 app.get("/api/health", async (_req, res, next) => {
   try {
+    const database = await getDBStatus();
     res.json({
       status: "ok",
-      service: "sports-management-api",
-      database: await getDBStatus(),
+      backend: "online",
+      mongodb: database.connected ? "connected" : "disconnected",
+      smtp: process.env.SMTP_HOST ? "configured" : "not_configured",
+      uptimeSeconds: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || "development",
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     next(error);
@@ -185,10 +220,23 @@ app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/coordinator", coordinatorRoutes);
 app.use("/api/registrations", registrationRoutes);
 app.use("/api/registration", registrationRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use((error, _req, res, next) => {
   void next;
   console.error(error);
+  void ErrorLog.create({
+    type: error.name || "Error",
+    route: _req.originalUrl,
+    method: _req.method,
+    statusCode: error.status || 500,
+    message: error.message || "Server error",
+    userRole: _req.user?.role || "",
+    userEmail: _req.user?.email || "",
+    userAgent: _req.headers["user-agent"] || "",
+  }).catch((logError) => {
+    console.error("Error log write failed:", logError.message);
+  });
   res.status(error.status || 500).json({ message: error.message || "Server error" });
 });
 
