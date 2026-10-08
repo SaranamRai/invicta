@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Mail, Phone, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
+import { MedhaviLogo } from "@/components/medhavi-logo";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
@@ -42,12 +43,13 @@ const teamMembers = [
       "Responsible for designing and developing the user-facing components of INVICTA. Focused on creating an intuitive, responsive, and engaging user experience while ensuring seamless interaction between users and the platform.",
   },
   {
-    name: "Sachin Kumar Sharma",
-    role: "Mentor",
-    image: "/sachin%20sir%20stamp.jpeg",
-    skills: ["Mentorship", "Project Guidance", "Product Direction"],
+    name: "Muskan Chettri",
+    role: "Data Entry Operator",
+    image: "/data-entry-operator.jpg",
+    imageClassName: "object-[center_38%]",
+    skills: ["Data Entry", "Data Management", "Record Maintenance", "Administrative Support"],
     details:
-      "Mentored and guided us throughout the development of the INVICTA project, helping us transform our ideas into a practical sports management platform.",
+      "Responsible for accurately entering, updating, and maintaining data within the INVICTA platform. Supports the team by keeping records organized, ensuring information is up to date, and assisting with the management of platform data and administrative records.",
   },
 ];
 
@@ -113,33 +115,32 @@ export default function AboutPage() {
 
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
-      {/* Header */}
-      <header className="absolute inset-x-0 top-0 z-40">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-4 px-5 py-5 sm:justify-between sm:px-8 lg:px-10">
-          <Link href="/" aria-label="Invicta home">
-            <InvictaLogo className="h-12 w-44 sm:h-14 sm:w-56" />
+      <header className="fixed inset-x-0 top-0 z-40 px-2 pt-2 sm:px-5 sm:pt-5">
+        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-2 py-2 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:flex-nowrap">
+          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 flex-1 items-center justify-start gap-1 sm:flex-none sm:gap-3">
+            <MedhaviLogo className="h-9 w-[min(7rem,28vw)] sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
+            <InvictaLogo className="h-8 w-[min(7rem,28vw)] sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
           </Link>
 
-          <nav className="flex items-center gap-4 sm:gap-8">
+          <nav className="order-3 flex w-full items-center justify-center gap-1 overflow-x-auto rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto lg:overflow-visible">
             {navLinks.map((link, index) => (
-              <a
+              <Link
                 key={link.label}
                 href={link.href}
-                className={`relative whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] transition-colors hover:text-[#f4c35a] sm:text-xs sm:tracking-[0.24em] ${index === 1 ? "text-[#f4c35a]" : "text-foreground/80"}`}
+                className={`whitespace-nowrap rounded-full px-2 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:bg-[#f4d27b]/20 hover:text-[#d99d2b] sm:px-3 sm:text-[10px] lg:px-4 lg:text-[11px] ${index === 1 ? "bg-[#f2c66b] text-[#141414] shadow-sm" : "text-[#1b1b1b]/75"}`}
               >
                 {link.label}
-                {index === 1 && <span className="absolute -bottom-2 left-1/2 h-px w-6 -translate-x-1/2 bg-[#f4c35a]" />}
-              </a>
+              </Link>
             ))}
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex shrink-0 items-center justify-center gap-2 sm:gap-3 lg:justify-end">
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className="pt-28 pb-16">
+      <main className="pt-36 pb-16 sm:pt-32 lg:pt-36">
         <section id="about" className="px-5 py-16 sm:px-8">
           <div className="mx-auto max-w-7xl">
             {/* Title Block */}

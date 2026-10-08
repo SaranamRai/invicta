@@ -20,7 +20,7 @@ import RegistrationField from "../models/RegistrationField.js";
 import { audit } from "../utils/audit.js";
 import { createRoleAccount } from "./authController.js";
 import { applyRecommendedPlayerCounts } from "../utils/sportPlayerCounts.js";
-import { sendTeamApprovedEmail, sendTeamRejectedEmail, getEmailErrorMessage } from "../utils/emailService.js";
+import { sendTeamApprovedEmail, sendTeamRejectedEmail, sendAccountCreatedEmail, getEmailErrorMessage } from "../utils/emailService.js";
 import bcrypt from "bcryptjs";
 
 function getRegistrationApprovalBlockMessage(registration) {
@@ -185,17 +185,8 @@ export async function updateVenue(req, res) {
 export async function deleteVenue(req, res) {
   const venue = await Venue.findById(req.params.id).lean();
   if (!venue) return res.status(404).json({ message: "Venue not found" });
-
-  const venueNames = [venue.name, venue.venueName].filter(Boolean);
-  const fixtures = venueNames.length
-    ? await Fixture.find({
-        $or: venueNames.map((name) => ({ venue: new RegExp(`^${escapeRegExp(name)}$`, "i") })),
-      }).lean()
-    : [];
-  const deletedFixtures = await deleteFixtureRecords(fixtures);
   await Venue.deleteOne({ _id: venue._id });
-
-  return res.json({ message: "Venue deleted successfully", deletedFixtures });
+  return res.json({ message: "Venue deleted successfully" });
 }
 
 export async function listSports(_req, res) {
@@ -490,6 +481,7 @@ export async function listRoleAccounts(_req, res) {
     id: account._id.toString(),
     fullName: account.name || account.email,
     email: account.email,
+    phone: account.phone || "",
     deptName: account.department || account.assignedSport || "Not assigned",
     assignedSport: account.assignedSport || "",
     assignedSportId: account.assignedSportId?.toString?.() || "",
@@ -506,6 +498,63 @@ export async function listRoleAccounts(_req, res) {
     ...volunteers.map((account) => mapAccount(account, "volunteer")),
     ...coordinators.map((account) => mapAccount(account, "coordinator")),
   ]);
+}
+
+export async function createCoordinatorVolunteer(req, res) {
+  const { name, email, password, assignedSport, assignedSportId, assignedSportName, registrationNo, phone } = req.body;
+  if (!name?.trim() || !email?.trim() || !password) {
+    return res.status(400).json({ message: "Name, email, and password are required" });
+  }
+  if (!assignedSport?.trim()) return res.status(400).json({ message: "Assigned sport is required" });
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const existing = await Promise.all([
+    Admin.findOne({ email: normalizedEmail }).lean(),
+    SuperCoordinator.findOne({ email: normalizedEmail }).lean(),
+    Coordinator.findOne({ email: normalizedEmail }).lean(),
+    Volunteer.findOne({ email: normalizedEmail }).lean(),
+  ]);
+  if (existing.some(Boolean)) return res.status(409).json({ message: "An account with this email already exists" });
+
+  const sharedAccountFields = {
+    name: String(name).trim(),
+    email: normalizedEmail,
+    password: await bcrypt.hash(password, 12),
+    assignedSport: String(assignedSport).trim().toLowerCase().replace(/\s+/g, "-"),
+    assignedSportId: assignedSportId || undefined,
+    assignedSportName: assignedSportName || "",
+    phone: phone || "",
+    createdBy: req.user?.id,
+    createdByRole: req.user?.role,
+  };
+
+  let coordinator;
+  try {
+    coordinator = await Coordinator.create({ ...sharedAccountFields, registrationNo, role: "coordinator" });
+    await Volunteer.create({ ...sharedAccountFields, registrationNumber: registrationNo, role: "volunteer" });
+  } catch (error) {
+    if (coordinator) await Coordinator.deleteOne({ _id: coordinator._id });
+    if (error?.code === 11000) return res.status(409).json({ message: "An account with this email already exists" });
+    throw error;
+  }
+
+  const emails = await Promise.allSettled(["coordinator", "volunteer"].map((role) => sendAccountCreatedEmail({
+    name: sharedAccountFields.name,
+    email: normalizedEmail,
+    role,
+    assignedSport: sharedAccountFields.assignedSportName || sharedAccountFields.assignedSport,
+    password,
+  })));
+  const emailSent = emails.some((result) => result.status === "fulfilled" && result.value?.sent);
+  return res.status(201).json({
+    id: coordinator._id.toString(),
+    name: coordinator.name,
+    email: coordinator.email,
+    phone: coordinator.phone || "",
+    roles: ["coordinator", "volunteer"],
+    emailSent,
+    message: "Account created successfully",
+  });
 }
 
 export async function listTournaments(_req, res) {
@@ -612,6 +661,7 @@ export async function updateRoleAccount(req, res) {
 
   const account = await model.findById(id);
   if (!account) return res.status(404).json({ message: "Account not found" });
+  const accountEmailBeforeUpdate = account.email;
 
   if (name !== undefined) account.name = String(name).trim();
   if (email !== undefined) {
@@ -632,6 +682,20 @@ export async function updateRoleAccount(req, res) {
   if (phone !== undefined) account.phone = String(phone).trim();
 
   await account.save();
+
+  if (role === "coordinator" || role === "volunteer") {
+    const pairedModel = role === "coordinator" ? Volunteer : Coordinator;
+    const pairedUpdates = {};
+    if (name !== undefined) pairedUpdates.name = account.name;
+    if (email !== undefined) pairedUpdates.email = account.email;
+    if (password) pairedUpdates.password = account.password;
+    if (assignedSport !== undefined) pairedUpdates.assignedSport = account.assignedSport;
+    if (assignedSportId !== undefined) pairedUpdates.assignedSportId = account.assignedSportId;
+    if (assignedSportName !== undefined) pairedUpdates.assignedSportName = account.assignedSportName;
+    if (status !== undefined) pairedUpdates.status = account.status;
+    if (phone !== undefined) pairedUpdates.phone = account.phone;
+    await pairedModel.updateOne({ email: accountEmailBeforeUpdate }, { $set: pairedUpdates });
+  }
 
   return res.json({
     id: account._id.toString(),
@@ -749,6 +813,7 @@ export const adminHandlers = {
   createSuperCoordinator: (req, res) => createRoleAccount(SuperCoordinator, "supercoordinator", req, res),
   createVolunteer: (req, res) => createRoleAccount(Volunteer, "volunteer", req, res),
   createCoordinator: (req, res) => createRoleAccount(Coordinator, "coordinator", req, res),
+  createCoordinatorVolunteer,
   listVenues,
   createVenue,
   updateVenue,

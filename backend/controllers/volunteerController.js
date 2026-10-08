@@ -6,6 +6,7 @@ import LiveFeed from "../models/LiveFeed.js";
 import Gallery from "../models/Gallery.js";
 import Issue from "../models/Issue.js";
 import Result from "../models/Result.js";
+import Volunteer from "../models/Volunteer.js";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -49,11 +50,19 @@ async function requireVolunteerFixture(req, fixtureId) {
     throw sportAccessDenied();
   }
 
-  const assignedMatches = Array.isArray(req.user.assignedMatches) ? req.user.assignedMatches.map(String) : [];
+  const volunteer = await Volunteer.findById(req.user.id).select("assignedFixture assignedMatches status").lean();
+  if (!volunteer || volunteer.status === "inactive") {
+    const error = new Error("Active volunteer account required");
+    error.status = 403;
+    throw error;
+  }
+  const assignedMatches = [volunteer.assignedFixture, ...(volunteer.assignedMatches || [])].filter(Boolean).map(String);
   const fixtureVolunteerId = fixture.assignedVolunteer?.toString?.() || "";
-  const isAssignedToThisVolunteer = fixtureVolunteerId === req.user.id || assignedMatches.includes(fixture._id.toString());
+  const isAssignedToThisVolunteer = fixtureVolunteerId
+    ? fixtureVolunteerId === String(volunteer._id)
+    : assignedMatches.includes(fixture._id.toString());
 
-  if (fixtureVolunteerId && !isAssignedToThisVolunteer) {
+  if (!isAssignedToThisVolunteer) {
     const error = new Error("This match is not assigned to this volunteer");
     error.status = 403;
     throw error;
@@ -63,21 +72,23 @@ async function requireVolunteerFixture(req, fixtureId) {
 }
 
 export async function assignedMatches(req, res) {
-  const assignedSport = normalizeSport(req.user.assignedSport);
-  const sportQuery = req.user.assignedSportId && assignedSport
-    ? { $or: [{ sportId: req.user.assignedSportId }, { sport: assignedSport }] }
-    : req.user.assignedSportId
-      ? { sportId: req.user.assignedSportId }
+  const volunteer = await Volunteer.findById(req.user.id).select("assignedFixture assignedMatches status assignedSport assignedSportId").lean();
+  if (!volunteer || volunteer.status === "inactive") return res.status(403).json({ message: "Active volunteer account required" });
+  const ids = [volunteer.assignedFixture, ...(volunteer.assignedMatches || [])].filter(Boolean);
+  const assignedSport = normalizeSport(volunteer.assignedSport);
+  const sportQuery = volunteer.assignedSportId && assignedSport
+    ? { $or: [{ sportId: volunteer.assignedSportId }, { sport: assignedSport }] }
+    : volunteer.assignedSportId
+      ? { sportId: volunteer.assignedSportId }
       : assignedSport
         ? { sport: assignedSport }
         : {};
-  const assignmentQuery = {
-    $or: [
-      { assignedVolunteer: req.user.id },
-      { assignedVolunteer: { $exists: false } },
-      { assignedVolunteer: null },
-    ],
-  };
+  const assignmentQuery = ids.length
+    ? { $or: [
+        { assignedVolunteer: volunteer._id },
+        { _id: { $in: ids }, $or: [{ assignedVolunteer: { $exists: false } }, { assignedVolunteer: null }] },
+      ] }
+    : { assignedVolunteer: volunteer._id };
   const query = Object.keys(sportQuery).length
     ? { $and: [sportQuery, assignmentQuery], status: { $ne: "cancelled" } }
     : { ...assignmentQuery, status: { $ne: "cancelled" } };
@@ -223,6 +234,7 @@ export async function updateLiveScore(req, res) {
     "clockRunning",
     "announcements",
     "scoreEvents",
+    "disciplinaryEvents",
     "volleyballSets",
     "winner",
     "winnerName",
@@ -278,9 +290,8 @@ export async function updateLiveScore(req, res) {
 }
 
 export async function createLiveFeed(req, res) {
-  if (req.body.fixtureId) {
-    await requireVolunteerFixture(req, req.body.fixtureId);
-  }
+  if (!req.body.fixtureId) return res.status(400).json({ message: "A match is required for a volunteer update" });
+  await requireVolunteerFixture(req, req.body.fixtureId);
   const feed = await LiveFeed.create({ ...req.body, addedBy: req.user.id });
   return res.status(201).json(feed);
 }
@@ -296,9 +307,8 @@ export async function createIssue(req, res) {
 }
 
 export async function submitResult(req, res) {
-  if (req.body.fixtureId) {
-    await requireVolunteerFixture(req, req.body.fixtureId);
-  }
+  if (!req.body.fixtureId) return res.status(400).json({ message: "A match is required to submit a result" });
+  await requireVolunteerFixture(req, req.body.fixtureId);
   const result = await Result.create({ ...req.body, submittedBy: req.user.id, verifiedByAdmin: false });
   return res.status(201).json(result);
 }

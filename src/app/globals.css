@@ -144,6 +144,253 @@ html {
   -webkit-overflow-scrolling: touch;
 }
 
+.dashboard-surface {
+  min-width: 0;
+}
+
+.dashboard-surface :is(main, header, section, article) {
+  min-width: 0;
+}
+
+.dashboard-surface svg.lucide {
+  max-width: 1.25rem;
+  max-height: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Compact the dashboard content panels while leaving interactive controls alone. */
+.dashboard-surface [class~="p-5"] { padding: 1rem !important; }
+.dashboard-surface [class~="p-6"] { padding: 1.125rem !important; }
+.dashboard-surface [class~="p-8"] { padding: 1.375rem !important; }
+.dashboard-surface [class~="p-10"],
+.dashboard-surface [class~="p-12"] { padding: 1.5rem !important; }
+.dashboard-surface [class~="p-16"],
+.dashboard-surface [class~="p-20"] { padding: 1.75rem !important; }
+
+.dashboard-surface [class~="gap-6"] { gap: 1rem !important; }
+.dashboard-surface [class~="gap-8"] { gap: 1.25rem !important; }
+.dashboard-surface [class~="gap-10"],
+.dashboard-surface [class~="gap-12"] { gap: 1.5rem !important; }
+
+.dashboard-surface [class~="space-y-6"] > :not([hidden]),
+.dashboard-surface [class~="space-y-8"] > :not([hidden]),
+.dashboard-surface [class~="space-y-10"] > :not([hidden]) { margin-block-end: 0 !important; }
+.dashboard-surface [class~="space-y-6"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1rem !important; }
+.dashboard-surface [class~="space-y-8"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1.25rem !important; }
+.dashboard-surface [class~="space-y-10"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1.5rem !important; }
+
+@media (min-width: 640px) {
+  .dashboard-surface [class~="sm:p-5"] { padding: 1rem !important; }
+  .dashboard-surface [class~="sm:p-6"] { padding: 1.125rem !important; }
+  .dashboard-surface [class~="sm:p-8"] { padding: 1.375rem !important; }
+  .dashboard-surface [class~="sm:p-10"],
+  .dashboard-surface [class~="sm:p-12"] { padding: 1.5rem !important; }
+  .dashboard-surface [class~="sm:gap-6"] { gap: 1rem !important; }
+  .dashboard-surface [class~="sm:gap-8"] { gap: 1.25rem !important; }
+  .dashboard-surface [class~="sm:gap-10"] { gap: 1.5rem !important; }
+  .dashboard-surface [class~="sm:space-y-6"] > :not([hidden]) { margin-block-end: 0 !important; }
+  .dashboard-surface [class~="sm:space-y-6"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1rem !important; }
+  .dashboard-surface [class~="sm:space-y-8"] > :not([hidden]) { margin-block-end: 0 !important; }
+  .dashboard-surface [class~="sm:space-y-8"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1.25rem !important; }
+  .dashboard-surface [class~="sm:space-y-10"] > :not([hidden]) { margin-block-end: 0 !important; }
+  .dashboard-surface [class~="sm:space-y-10"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 1.5rem !important; }
+}
+
+@media (min-width: 768px) {
+  .dashboard-surface [class~="md:p-6"] { padding: 1.125rem !important; }
+  .dashboard-surface [class~="md:p-8"] { padding: 1.375rem !important; }
+  .dashboard-surface [class~="md:gap-6"] { gap: 1rem !important; }
+  .dashboard-surface [class~="md:gap-8"] { gap: 1.25rem !important; }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-surface [class~="lg:p-6"] { padding: 1.125rem !important; }
+  .dashboard-surface [class~="lg:p-8"] { padding: 1.375rem !important; }
+  .dashboard-surface [class~="lg:gap-6"] { gap: 1rem !important; }
+  .dashboard-surface [class~="lg:gap-8"] { gap: 1.25rem !important; }
+}
+
+/* Use a denser layout for the staff dashboards while keeping controls easy to tap. */
+.ops-dashboard-surface [class~="p-3"],
+.ops-dashboard-surface [class~="sm:p-3"],
+.ops-dashboard-surface [class~="md:p-3"],
+.ops-dashboard-surface [class~="lg:p-3"],
+.ops-dashboard-surface [class~="xl:p-3"] { padding: 0.625rem !important; }
+
+.ops-dashboard-surface [class~="p-4"],
+.ops-dashboard-surface [class~="p-5"],
+.ops-dashboard-surface [class~="p-6"],
+.ops-dashboard-surface [class~="sm:p-4"],
+.ops-dashboard-surface [class~="sm:p-5"],
+.ops-dashboard-surface [class~="sm:p-6"],
+.ops-dashboard-surface [class~="md:p-4"],
+.ops-dashboard-surface [class~="md:p-5"],
+.ops-dashboard-surface [class~="md:p-6"],
+.ops-dashboard-surface [class~="lg:p-4"],
+.ops-dashboard-surface [class~="lg:p-5"],
+.ops-dashboard-surface [class~="lg:p-6"],
+.ops-dashboard-surface [class~="xl:p-4"],
+.ops-dashboard-surface [class~="xl:p-5"],
+.ops-dashboard-surface [class~="xl:p-6"] { padding: 0.875rem !important; }
+
+.ops-dashboard-surface [class~="p-8"],
+.ops-dashboard-surface [class~="p-10"],
+.ops-dashboard-surface [class~="p-12"],
+.ops-dashboard-surface [class~="sm:p-8"],
+.ops-dashboard-surface [class~="sm:p-10"],
+.ops-dashboard-surface [class~="sm:p-12"],
+.ops-dashboard-surface [class~="md:p-8"],
+.ops-dashboard-surface [class~="md:p-10"],
+.ops-dashboard-surface [class~="md:p-12"],
+.ops-dashboard-surface [class~="lg:p-8"],
+.ops-dashboard-surface [class~="lg:p-10"],
+.ops-dashboard-surface [class~="lg:p-12"],
+.ops-dashboard-surface [class~="xl:p-8"],
+.ops-dashboard-surface [class~="xl:p-10"],
+.ops-dashboard-surface [class~="xl:p-12"] { padding: 1.125rem !important; }
+
+.ops-dashboard-surface [class~="p-16"],
+.ops-dashboard-surface [class~="p-20"],
+.ops-dashboard-surface [class~="sm:p-16"],
+.ops-dashboard-surface [class~="sm:p-20"],
+.ops-dashboard-surface [class~="md:p-16"],
+.ops-dashboard-surface [class~="md:p-20"],
+.ops-dashboard-surface [class~="lg:p-16"],
+.ops-dashboard-surface [class~="lg:p-20"],
+.ops-dashboard-surface [class~="xl:p-16"],
+.ops-dashboard-surface [class~="xl:p-20"] { padding: 1.375rem !important; }
+
+.ops-dashboard-surface [class~="gap-3"],
+.ops-dashboard-surface [class~="gap-4"],
+.ops-dashboard-surface [class~="sm:gap-3"],
+.ops-dashboard-surface [class~="sm:gap-4"],
+.ops-dashboard-surface [class~="md:gap-3"],
+.ops-dashboard-surface [class~="md:gap-4"],
+.ops-dashboard-surface [class~="lg:gap-3"],
+.ops-dashboard-surface [class~="lg:gap-4"],
+.ops-dashboard-surface [class~="xl:gap-3"],
+.ops-dashboard-surface [class~="xl:gap-4"] { gap: 0.75rem !important; }
+
+.ops-dashboard-surface [class~="gap-5"],
+.ops-dashboard-surface [class~="gap-6"],
+.ops-dashboard-surface [class~="sm:gap-5"],
+.ops-dashboard-surface [class~="sm:gap-6"],
+.ops-dashboard-surface [class~="md:gap-5"],
+.ops-dashboard-surface [class~="md:gap-6"],
+.ops-dashboard-surface [class~="lg:gap-5"],
+.ops-dashboard-surface [class~="lg:gap-6"],
+.ops-dashboard-surface [class~="xl:gap-5"],
+.ops-dashboard-surface [class~="xl:gap-6"] { gap: 0.875rem !important; }
+
+.ops-dashboard-surface [class~="space-y-4"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="sm:space-y-4"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="md:space-y-4"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="lg:space-y-4"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="xl:space-y-4"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 0.75rem !important; }
+
+.ops-dashboard-surface [class~="space-y-5"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="sm:space-y-5"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="md:space-y-5"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="lg:space-y-5"] > :not([hidden]) ~ :not([hidden]),
+.ops-dashboard-surface [class~="xl:space-y-5"] > :not([hidden]) ~ :not([hidden]) { margin-block-start: 0.875rem !important; }
+
+.ops-dashboard-surface :is(button, a[role="button"])[class~="h-12"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="sm:h-12"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="md:h-12"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="lg:h-12"] {
+  height: 2.625rem !important;
+  min-height: 2.625rem !important;
+}
+
+.ops-dashboard-surface :is(button, a[role="button"])[class~="py-3"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="sm:py-3"] { padding-block: 0.625rem !important; }
+
+.ops-dashboard-surface :is(button, a[role="button"])[class~="px-5"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="px-6"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="sm:px-5"],
+.ops-dashboard-surface :is(button, a[role="button"])[class~="sm:px-6"] { padding-inline: 1rem !important; }
+
+.dashboard-scroll-box {
+  max-height: min(68svh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matches-scroll-box {
+  max-height: min(72svh, 820px);
+}
+
+.coordinator-table-scroll {
+  max-height: min(58svh, 620px);
+}
+
+.coordinator-announcements-scroll,
+.coordinator-teams-scroll {
+  max-height: min(56svh, 560px);
+}
+
+@media (max-width: 767px) {
+  .dashboard-scroll-box {
+    max-height: min(62svh, 620px);
+  }
+
+  .matches-scroll-box {
+    max-height: min(66svh, 680px);
+  }
+
+  .coordinator-table-scroll,
+  .coordinator-announcements-scroll,
+  .coordinator-teams-scroll {
+    max-height: min(54svh, 520px);
+  }
+}
+
+@media (max-width: 374px) {
+  .dashboard-scroll-box {
+    max-height: min(56svh, 460px);
+  }
+
+  .coordinator-table-scroll,
+  .coordinator-announcements-scroll,
+  .coordinator-teams-scroll {
+    max-height: min(50svh, 400px);
+  }
+}
+
+@media (min-width: 1440px) and (min-height: 900px) {
+  .matches-scroll-box {
+    max-height: min(74svh, 900px);
+  }
+}
+
+@media (max-height: 700px) {
+  .dashboard-scroll-box,
+  .matches-scroll-box {
+    max-height: min(52svh, 420px);
+  }
+
+  .coordinator-table-scroll,
+  .coordinator-announcements-scroll,
+  .coordinator-teams-scroll {
+    max-height: min(42svh, 340px);
+  }
+}
+
+@media (max-height: 568px) {
+  .dashboard-scroll-box,
+  .matches-scroll-box {
+    max-height: min(44svh, 260px);
+  }
+
+  .coordinator-table-scroll,
+  .coordinator-announcements-scroll,
+  .coordinator-teams-scroll {
+    max-height: min(38svh, 220px);
+  }
+}
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;

@@ -5,6 +5,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MatchTrackerProvider } from "@/components/layout/match-tracker";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
@@ -42,16 +43,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
-        <div className="fixed right-6 top-6 z-50 hidden lg:block">
-          <ThemeToggle />
+    <MatchTrackerProvider>
+      <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col lg:ml-52 2xl:ml-60">
+          <div className="fixed right-4 top-4 z-50 hidden lg:block">
+            <ThemeToggle />
+          </div>
+          <main className="mx-auto w-full max-w-[1440px] px-3 py-3 transition-all duration-300 sm:p-4 lg:p-5 xl:p-6">
+            {children}
+          </main>
         </div>
-        <main className="mx-auto w-full max-w-[1440px] px-2 py-2 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
-          {children}
-        </main>
       </div>
-    </div>
+    </MatchTrackerProvider>
   );
 }

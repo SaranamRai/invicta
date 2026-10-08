@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { MatchData, MatchPeriod, ScoreEvent, VolleyballSet } from "@/lib/types";
+import { DisciplinaryEvent, MatchData, MatchPeriod, ScoreEvent, VolleyballSet } from "@/lib/types";
 import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, Flag, Loader2, Pause, Play, Plus, Save, Square } from "lucide-react";
@@ -44,6 +44,9 @@ export default function LiveMatchEditPanel() {
   const [currentSetScoreB, setCurrentSetScoreB] = useState(0);
   const [volleyballSets, setVolleyballSets] = useState<VolleyballSet[]>([]);
   const [winner, setWinner] = useState<"A" | "B" | "">("");
+  const [cardType, setCardType] = useState<DisciplinaryEvent["cardType"]>("Yellow Card");
+  const [cardTeam, setCardTeam] = useState<"A" | "B">("A");
+  const [cardPlayerName, setCardPlayerName] = useState("");
   const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
   const pauseReasons = ["Fault", "Player exchange", "Injury", "Timeout", "Referee issue", "Technical delay"];
   const sportKey = (match?.sportName || match?.sport || assignedSport || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -625,6 +628,42 @@ export default function LiveMatchEditPanel() {
     }
   };
 
+  const handleRecordCard = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const playerName = cardPlayerName.trim();
+    if (!match || !playerName || (match.status !== "Live" && match.status !== "Paused")) return;
+
+    setSaving(true);
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      const timestamp = Date.now();
+      const matchTime = isFootball ? getMatchClockText(match, now || timestamp) : (match.timer || "In progress");
+      const teamName = cardTeam === "A" ? match.teamA : match.teamB;
+      const cardEvent: DisciplinaryEvent = {
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${timestamp}-card`,
+        cardType,
+        team: cardTeam,
+        teamName,
+        playerName,
+        matchTime,
+        period: getMatchPeriod(match),
+        timestamp,
+        volunteerEmail: email,
+      };
+      const disciplinaryEvents = [cardEvent, ...(match.disciplinaryEvents || [])].slice(0, 100);
+      await updateMatchDetails(matchId, { disciplinaryEvents });
+      await logActivity(matchId, `${cardType} to ${playerName} (${teamName}) at ${matchTime}`, email);
+      setMatch((current) => current ? { ...current, disciplinaryEvents } : current);
+      setCardPlayerName("");
+      showMessage(`${cardType} recorded for ${playerName}.`, "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Failed to record player card.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading || !match) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -662,12 +701,12 @@ export default function LiveMatchEditPanel() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Main Controls */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="space-y-5 lg:col-span-2">
           {isFootball && (
-          <Card className="bg-white/5 border-white/10 p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <Card className="bg-white/5 border-white/10 p-4 sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Clock Seen by Visitors</p>
                 <div className="mt-2 flex flex-wrap items-end gap-4">
@@ -745,14 +784,14 @@ export default function LiveMatchEditPanel() {
           </Card>
           )}
 
-          <Card className="bg-white/5 border-white/10 p-8">
+          <Card className="bg-white/5 border-white/10 p-4 sm:p-5">
             <h2 className="text-xl font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-6">
               Score and Match Status
             </h2>
             
             <form onSubmit={handleSave} className="space-y-8">
               {/* Status & Timer */}
-              <div className={`grid grid-cols-1 gap-6 ${isFootball ? "md:grid-cols-3" : !isVolleyball ? "md:grid-cols-2" : ""}`}>
+              <div className={`grid grid-cols-1 gap-4 ${isFootball ? "md:grid-cols-3" : !isVolleyball ? "md:grid-cols-2" : ""}`}>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match Status</label>
                   <select 
@@ -956,9 +995,9 @@ export default function LiveMatchEditPanel() {
         </div>
 
         {/* Sidebar Controls */}
-        <div className="space-y-8">
+        <div className="space-y-5">
           {isVolleyball && (
-          <Card className="bg-white/5 border-white/10 p-6">
+          <Card className="bg-white/5 border-white/10 p-4">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
               Set History
             </h2>
@@ -985,7 +1024,56 @@ export default function LiveMatchEditPanel() {
           </Card>
           )}
 
-          <Card className="bg-white/5 border-white/10 p-6">
+          <Card className="border-white/10 bg-white/5 p-5">
+            <h2 className="mb-2 border-b border-white/10 pb-4 text-lg font-black uppercase tracking-wider text-white">
+              Player Cards
+            </h2>
+            <p className="mb-4 text-xs font-medium leading-relaxed text-slate-400">
+              Record a yellow or red card with the player and team while the match is live or paused.
+            </p>
+            <form onSubmit={handleRecordCard} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1.5">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Card</span>
+                  <select value={cardType} onChange={(event) => setCardType(event.target.value as DisciplinaryEvent["cardType"])} className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-xs font-bold text-white outline-none focus:border-accent">
+                    <option value="Yellow Card">Yellow Card</option>
+                    <option value="Red Card">Red Card</option>
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Team</span>
+                  <select value={cardTeam} onChange={(event) => setCardTeam(event.target.value as "A" | "B")} className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-xs font-bold text-white outline-none focus:border-accent">
+                    <option value="A">{match.teamA}</option>
+                    <option value="B">{match.teamB}</option>
+                  </select>
+                </label>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Player name</span>
+                <input value={cardPlayerName} onChange={(event) => setCardPlayerName(event.target.value)} maxLength={100} required placeholder="Enter player name" className="h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 text-sm font-semibold text-white outline-none placeholder:text-slate-500 focus:border-accent" />
+              </label>
+              <button type="submit" disabled={saving || !cardPlayerName.trim() || (match.status !== "Live" && match.status !== "Paused")} className={cn("h-11 w-full rounded-xl px-4 text-xs font-black uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50", cardType === "Yellow Card" ? "bg-yellow-400 text-slate-950 hover:bg-yellow-300" : "bg-red-500 text-white hover:bg-red-400")}>
+                Record {cardType}
+              </button>
+              {match.status !== "Live" && match.status !== "Paused" && <p className="text-center text-[10px] font-semibold text-slate-500">Start the match to enable card recording.</p>}
+            </form>
+            <div className="mt-5 max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {match.disciplinaryEvents?.length ? match.disciplinaryEvents.map((card) => (
+                <div key={card.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span aria-label={card.cardType} className={cn("mt-0.5 h-4 w-3 shrink-0 rounded-sm", card.cardType === "Yellow Card" ? "bg-yellow-400" : "bg-red-500")} />
+                    <div className="min-w-0">
+                      <p className="break-words text-xs font-black uppercase text-white">{card.playerName}</p>
+                      <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">{card.teamName} · {card.cardType}</p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 text-[9px] font-black text-slate-500">{card.matchTime}</span>
+                </div>
+              )) : <p className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">No player cards recorded</p>}
+            </div>
+          </Card>
+
+          <Card className="bg-white/5 border-white/10 p-4">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
               Scoring Timeline
             </h2>
@@ -1006,7 +1094,7 @@ export default function LiveMatchEditPanel() {
             </div>
           </Card>
 
-          <Card className="bg-white/5 border-white/10 p-6">
+          <Card className="bg-white/5 border-white/10 p-4">
             <h2 className="text-lg font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-4">
               Match Announcements
             </h2>

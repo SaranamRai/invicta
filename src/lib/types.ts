@@ -27,6 +27,18 @@ export interface ScoreEvent {
   volunteerEmail: string;
 }
 
+export interface DisciplinaryEvent {
+  id: string;
+  cardType: "Yellow Card" | "Red Card";
+  team: "A" | "B";
+  teamName: string;
+  playerName: string;
+  matchTime: string;
+  period: string;
+  timestamp: number;
+  volunteerEmail: string;
+}
+
 export interface MatchData {
   id: string;
   tournamentId?: string;
@@ -62,6 +74,7 @@ export interface MatchData {
   foulsB?: number;
   announcements?: string[];
   scoreEvents?: ScoreEvent[];
+  disciplinaryEvents?: DisciplinaryEvent[];
   volleyballSets?: VolleyballSet[];
   winner?: "A" | "B" | "";
   winnerName?: string;

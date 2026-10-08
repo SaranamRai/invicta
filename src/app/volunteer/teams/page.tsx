@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Calendar, ChevronDown, Search, Shield, ShieldOff, Trophy, User, UsersRound } from "lucide-react";
+import { Calendar, ChevronDown, Search, Shield, ShieldOff, Trophy, UsersRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { GenderMark } from "@/components/gender-mark";
 import { Team } from "@/lib/fixture-generator";
@@ -62,7 +62,7 @@ function CategorySection({ label, icon: Icon, children }: { label: string; icon:
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
+        <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${gender === "Female" ? "bg-pink-500/15" : gender === "Male" ? "bg-blue-500/15" : "bg-accent/15 text-accent"}`}>
           {gender ? <GenderMark gender={gender} className="h-4 w-4" /> : <Icon size={14} />}
         </div>
         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
@@ -171,7 +171,7 @@ export default function VolunteerTeamsPage() {
     <div className="space-y-8">
       <header className="flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-4xl font-black uppercase tracking-tighter text-foreground sport-heading">
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-foreground sport-heading">
             Teams & Members
           </h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
@@ -224,7 +224,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
-              <Shield size={18} />
+              <GenderMark gender="Male" className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Male Teams</p>
@@ -235,7 +235,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400">
-              <ShieldOff size={18} />
+              <GenderMark gender="Female" className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Female Teams</p>
@@ -246,7 +246,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
-              <User size={18} />
+              <GenderMark gender="Male" className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Male Members</p>
@@ -257,7 +257,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400">
-              <User size={18} />
+              <GenderMark gender="Female" className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Female Members</p>
@@ -493,7 +493,7 @@ function MemberCard({ item }: { item: { member: unknown; teamName: string; depar
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border bg-card/40 p-10 text-center">
+    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-card/40 p-6 text-center">
       <UsersRound size={42} className="text-muted-foreground" />
       <h2 className="mt-5 text-2xl font-black uppercase tracking-wide text-foreground">{label}</h2>
       <p className="mt-2 max-w-md text-xs font-bold uppercase tracking-widest text-muted-foreground">

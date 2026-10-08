@@ -28,7 +28,7 @@ export function Sidebar() {
       <aside className="sticky top-0 z-40 border-b border-border bg-background/92 px-2 py-2 text-foreground shadow-sm shadow-slate-950/5 backdrop-blur-xl lg:hidden">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <Link href="/public-dashboard" className="flex min-w-0 shrink items-center gap-2">
-            <MedhaviLogo className="h-11 w-44 max-w-[58vw] sm:h-14 sm:w-56" />
+            <MedhaviLogo className="h-10 w-40 max-w-[54vw] sm:h-12 sm:w-48" />
           </Link>
           <div className="flex shrink-0 items-center gap-1.5">
             <ThemeToggle />
@@ -64,16 +64,16 @@ export function Sidebar() {
         </nav>
       </aside>
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 overflow-hidden border-r border-border bg-[#020617] text-white lg:block">
-        <div className="no-scrollbar flex h-full flex-col overflow-y-auto overscroll-contain px-5 py-6">
-          <Link href="/public-dashboard" className="mb-7 block">
-            <MedhaviLogo className="mx-auto mb-4 h-20 w-full" />
-            <div className="border-t border-white/10 pt-4">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-52 overflow-hidden border-r border-border bg-[#020617] text-white lg:block 2xl:w-60">
+        <div className="no-scrollbar flex h-full flex-col overflow-y-auto overscroll-contain px-4 py-5">
+          <Link href="/public-dashboard" className="mb-5 block">
+            <MedhaviLogo className="mx-auto mb-3 h-16 w-full" />
+            <div className="border-t border-white/10 pt-3">
               <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">Sports Hub</p>
             </div>
           </Link>
 
-          <nav className="flex flex-1 flex-col gap-2">
+          <nav className="flex flex-1 flex-col gap-1.5">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -81,13 +81,13 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "group flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 text-sm font-black uppercase tracking-wide transition-all",
+                    "group flex min-h-10 items-center gap-2.5 rounded-lg border px-3 py-2 text-xs font-black uppercase tracking-wide transition-all",
                     isActive
                       ? "border-accent bg-accent text-accent-foreground"
                       : "border-white/10 text-slate-300 hover:border-white/30 hover:bg-white/5 hover:text-white"
                   )}
                 >
-                  <item.icon size={19} className={cn(isActive ? "text-accent-foreground" : "text-slate-500 group-hover:text-accent")} />
+                  <item.icon size={16} className={cn(isActive ? "text-accent-foreground" : "text-slate-500 group-hover:text-accent")} />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -96,9 +96,9 @@ export function Sidebar() {
 
           <Link
             href="/login"
-            className="mt-6 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-widest text-slate-950 transition-all hover:bg-accent"
+            className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-lg bg-white px-3 text-[11px] font-black uppercase tracking-widest text-slate-950 transition-all hover:bg-accent"
           >
-            <LogIn size={16} />
+            <LogIn size={14} />
             Staff Login
           </Link>
         </div>

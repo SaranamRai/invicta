@@ -305,10 +305,10 @@ async function publicApiFetch<T>(path: string): Promise<T[]> {
   }
 }
 
-export async function loginRoleAccount(email: string, password: string) {
+export async function loginRoleAccount(email: string, password: string, role?: AuthSession["role"]) {
   return apiFetch<AuthSession>("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, role }),
   });
 }
 
@@ -641,6 +641,7 @@ export interface MongoLiveScore {
   clockRunning?: boolean;
   announcements?: string[];
   scoreEvents?: unknown[];
+  disciplinaryEvents?: unknown[];
   volleyballSets?: unknown[];
   winner?: "A" | "B" | "";
   winnerName?: string;
@@ -873,6 +874,7 @@ export function mapMongoFixture(fixture: MongoFixture, liveScore?: MongoLiveScor
     timer: liveScore?.timer,
     announcements: liveScore?.announcements || [],
     scoreEvents: liveScore?.scoreEvents as never[] || [],
+    disciplinaryEvents: liveScore?.disciplinaryEvents as never[] || [],
     volleyballSets: liveScore?.volleyballSets as never[] || [],
     winner: liveScore?.winner || "",
     winnerName: liveScore?.winnerName || "",
@@ -1125,6 +1127,13 @@ export function createAdminVolunteer(payload: {
   assignedSport: string;
 }) {
   return apiFetch<RoleAccountPayload>("/admin/create-volunteer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createAdminDualRoleAccount(payload: CreateCoordinatorPayload) {
+  return apiFetch<RoleAccountPayload>("/admin/create-coordinator-volunteer", {
     method: "POST",
     body: JSON.stringify(payload),
   });

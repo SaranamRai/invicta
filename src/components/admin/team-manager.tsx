@@ -547,7 +547,7 @@ export function TeamManager({
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredTeams.map((team: ExtendedTeam) => {
               const sportName = sportOptions.find(
                 (s) => s._id === team.sportId || (s.sportName || s.name || "").toLowerCase().replace(/\s+/g, "-") === team.sport
@@ -556,14 +556,14 @@ export function TeamManager({
                 <Card key={team.id}
                   className="bg-slate-900/60 border border-white/10 hover:border-white/20 transition-all duration-300 relative flex flex-col justify-between overflow-hidden shadow-xl">
                   <div className="absolute top-0 left-0 w-full h-[3px] bg-accent" />
-                  <CardContent className="p-6 space-y-4 flex-1">
+                  <CardContent className="flex-1 space-y-3 p-4">
                     <div className="flex items-start gap-4">
                       {team.logo ? (
-                        <div className="h-14 w-14 rounded-xl overflow-hidden bg-slate-950 border border-white/10 shrink-0 flex items-center justify-center">
+                        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-slate-950 flex items-center justify-center">
                           <img src={team.logo} alt={team.name} className="h-full w-full object-contain" />
                         </div>
                       ) : (
-                        <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-accent/20 to-amber-500/20 border border-accent/30 text-accent font-black text-xl shrink-0 flex items-center justify-center uppercase tracking-tighter">
+                        <div className="h-11 w-11 shrink-0 rounded-lg border border-accent/30 bg-gradient-to-br from-accent/20 to-amber-500/20 text-lg font-black text-accent flex items-center justify-center uppercase tracking-tighter">
                           {team.name.slice(0, 2)}
                         </div>
                       )}

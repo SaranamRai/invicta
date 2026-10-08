@@ -677,7 +677,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         </button>
       </div>
 
-      {fixtureMode === "automatic" && <form onSubmit={handleSubmit} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      {fixtureMode === "automatic" && <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
         {loadingOptions ? (
           <div className="flex items-center justify-center gap-3 py-16 text-sm font-bold text-muted-foreground">
             <Loader2 className="animate-spin text-accent" size={20} />
@@ -941,7 +941,7 @@ export function AutomaticFixtureGenerator({ fixtures, onGenerated, onDeleteFixtu
         )}
       </form>}
 
-      {fixtureMode === "manual" && <form onSubmit={handleManualCreate} className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      {fixtureMode === "manual" && <form onSubmit={handleManualCreate} className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="mb-5 flex items-start gap-3">
           <div className="rounded-xl bg-accent/10 p-2 text-accent"><Plus size={18} /></div>
           <div>

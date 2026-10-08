@@ -235,9 +235,9 @@ export function AdminOverview({
   });
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-5 animate-fadeIn">
       {/* Quick Action Overlay banner */}
-      <div className="admin-hero-panel rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="admin-hero-panel rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div>
           <div className="admin-hero-accent flex items-center gap-2">
             <Sparkles size={18} />
@@ -265,7 +265,7 @@ export function AdminOverview({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {[
           { label: "Total Teams", val: totalTeams, icon: Users, color: "text-amber-600 border-amber-200 bg-amber-50" },
           { label: "Total Players", val: totalPlayers, icon: Trophy, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
@@ -277,13 +277,13 @@ export function AdminOverview({
           const Icon = stat.icon;
           return (
             <Card key={idx} className="bg-card border-border shadow-sm hover:border-slate-300 transition-all">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
-                <div className={`p-2.5 rounded-xl border w-fit ${stat.color}`}>
-                  <Icon size={20} />
+              <CardContent className="flex h-full flex-col justify-between p-3">
+                <div className={`w-fit rounded-lg border p-2 ${stat.color}`}>
+                  <Icon size={16} />
                 </div>
                 <div className="mt-4">
                   <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">{stat.label}</span>
-                  <span className="text-3xl font-black text-foreground block mt-1 scoreboard-number">{stat.val}</span>
+                  <span className="mt-1 block text-2xl font-black text-foreground scoreboard-number">{stat.val}</span>
                 </div>
               </CardContent>
             </Card>
@@ -291,7 +291,7 @@ export function AdminOverview({
         })}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <Card className="bg-slate-900/60 border-white/5 text-white">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -480,7 +480,7 @@ export function AdminOverview({
       </div>
 
       {/* Analytics & Progress Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Match Breakdown & Analytics Bar Chart */}
         <Card className="bg-slate-900/60 border-white/5 lg:col-span-2">
           <CardHeader>
@@ -635,7 +635,7 @@ export function AdminOverview({
       </Card>
 
       {/* Match Calendar section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Calendar Card */}
         <Card className="bg-slate-900/60 border-white/5 lg:col-span-1">
           <CardHeader>

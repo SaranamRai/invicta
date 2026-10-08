@@ -99,6 +99,7 @@ router.post("/create-admin", superOnly, adminHandlers.createAdmin);
 router.post("/create-supercoordinator", superOnly, adminHandlers.createSuperCoordinator);
 router.post("/create-volunteer", superOnly, adminHandlers.createVolunteer);
 router.post("/create-coordinator", superOnly, adminHandlers.createCoordinator);
+router.post("/create-coordinator-volunteer", superOnly, adminHandlers.createCoordinatorVolunteer);
 router.get("/role-accounts", adminOrSuper, listRoleAccounts);
 router.put("/role-accounts/:id", superOnly, updateRoleAccount);
 router.delete("/role-accounts/:id", superOnly, deleteRoleAccount);

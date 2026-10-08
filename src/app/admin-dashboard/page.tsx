@@ -90,7 +90,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-border bg-card p-4 shadow-sm ${className}`}>{children}</div>;
+  return <div className={`min-w-0 rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4 ${className}`}>{children}</div>;
 }
 
 function MetricCard({ label, value, sub, icon: Icon }: { label: string; value: string | number; sub?: string; icon: typeof Activity }) {
@@ -101,8 +101,8 @@ function MetricCard({ label, value, sub, icon: Icon }: { label: string; value: s
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
           <p className="mt-2 text-2xl font-black text-foreground">{value}</p>
         </div>
-        <span className="rounded-xl bg-accent/10 p-2 text-accent">
-          <Icon className="h-5 w-5" />
+        <span className="rounded-lg bg-accent/10 p-1.5 text-accent">
+          <Icon className="h-4 w-4" />
         </span>
       </div>
       {sub ? <p className="mt-2 text-xs font-semibold text-muted-foreground">{sub}</p> : null}
@@ -189,14 +189,14 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="dashboard-surface min-h-screen bg-background pb-12 text-foreground">
+    <div className="dashboard-surface ops-dashboard-surface min-h-screen bg-background pb-12 text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-3 py-2.5 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
-            <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
-            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
+            <MedhaviLogo className="h-9 w-36 shrink-0 sm:h-11 sm:w-44" />
+            <InvictaLogo className="h-10 w-36 shrink-0 sm:h-12 sm:w-44" />
             <div className="space-y-0.5 sm:space-y-1">
-              <h1 className="sport-heading text-lg font-black sm:text-3xl">INVICTA ADMIN DASHBOARD</h1>
+              <h1 className="sport-heading text-base font-black sm:text-2xl">INVICTA ADMIN DASHBOARD</h1>
               <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
                 Technical monitoring for deployment health, API activity, database status, user access, email delivery, and live score warnings.
               </p>
@@ -231,7 +231,7 @@ function AdminDashboard() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all sm:px-6 sm:py-4 sm:text-sm ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] transition-all sm:px-4 sm:py-3 sm:text-xs ${
                   activeTab === tab.id ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -242,9 +242,9 @@ function AdminDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         {activeTab === "overview" ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <MetricCard label="Environment" value={health?.environment || "-"} sub={`Version ${health?.appVersion || "-"}`} icon={Server} />
               <MetricCard label="Uptime" value={formatUptime(health?.uptimeSeconds || 0)} sub={formatDate(health?.checkedAt)} icon={Activity} />

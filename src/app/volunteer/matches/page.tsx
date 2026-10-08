@@ -8,11 +8,14 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAssignedMatches } from "@/lib/services/mongo-service";
 import { getRoleAccount } from "@/lib/role-auth";
+import { GenderMark } from "@/components/gender-mark";
 
 export default function MatchesSelectionPage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"All" | "Live" | "Paused" | "Upcoming" | "Finished">("All");
+  const [category, setCategory] = useState("All");
+  const [date, setDate] = useState("");
   const assignedSport = getRoleAccount()?.assignedSport?.trim().toLowerCase() || "";
 
   useEffect(() => {
@@ -37,14 +40,16 @@ export default function MatchesSelectionPage() {
     const matchesSearch = match.teamA.toLowerCase().includes(search.toLowerCase()) || 
                           match.teamB.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === "All" || match.status === filter;
-    return matchesSearch && matchesFilter;
+    const matchesCategory = category === "All" || match.category === category;
+    const matchesDate = !date || String(match.date || "").slice(0, 10) === date;
+    return matchesSearch && matchesFilter && matchesCategory && matchesDate;
   });
 
   return (
-    <div className="space-y-8 sm:space-y-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="space-y-6">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-white uppercase sport-heading sm:text-4xl">All Matches</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white uppercase sport-heading sm:text-3xl">All Matches</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-slate-400">
             Find the match you are responsible for, then open it to update the clock, score, announcements, and match events.
           </p>
@@ -78,10 +83,21 @@ export default function MatchesSelectionPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="flex flex-wrap items-center gap-2">
+        {(["All", "Male", "Female"] as const).map(value => (
+          <button key={value} onClick={() => setCategory(value)} className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold", category === value ? "bg-accent text-accent-foreground" : "bg-white/5 text-slate-300")}>
+            {value !== "All" && <GenderMark gender={value} className="h-4 w-4" />}{value}
+          </button>
+        ))}
+        <label htmlFor="assigned-match-date" className="sr-only">Filter assigned matches by date</label>
+        <input id="assigned-match-date" type="date" value={date} onChange={event => setDate(event.target.value)} className="min-h-10 max-w-full rounded-xl border border-white/10 bg-slate-900 px-3 text-sm text-white" />
+        {date && <button onClick={() => setDate("")} className="min-h-10 rounded-xl px-3 text-xs font-bold text-slate-300">Clear date</button>}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {filteredMatches.map(match => (
           <Link key={match.id} href={`/volunteer/matches/${match.id}`}>
-            <Card className="bg-white/5 border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden group sm:p-6">
+            <Card className="bg-white/5 border-white/10 p-3 transition-colors hover:bg-white/10 sm:p-4">
               {match.status === "Live" && (
                 <div className="absolute left-0 top-0 h-full w-1 bg-accent" />
               )}
@@ -97,7 +113,7 @@ export default function MatchesSelectionPage() {
                   {match.status === "Live" && <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />}
                   {match.status}
                 </span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{match.sport}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{match.category && <GenderMark gender={match.category} className="h-4 w-4" />}{match.sport}</span>
               </div>
 
               <div className="space-y-4">
@@ -119,6 +135,7 @@ export default function MatchesSelectionPage() {
             </Card>
           </Link>
         ))}
+        {!filteredMatches.length && <div className="col-span-full rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm font-semibold text-slate-400">{matches.length ? "No assigned matches match these filters." : "No matches are currently assigned to you."}</div>}
       </div>
     </div>
   );

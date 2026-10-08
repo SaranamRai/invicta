@@ -61,13 +61,13 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 hidden w-full border-b border-border bg-background/88 px-6 py-3 shadow-sm shadow-slate-950/5 backdrop-blur-xl lg:block lg:px-8">
-      <div className="flex min-h-16 items-center justify-between gap-5">
+    <header className="sticky top-0 z-30 hidden w-full border-b border-border bg-background/88 px-4 py-2 shadow-sm shadow-slate-950/5 backdrop-blur-xl lg:block lg:px-6">
+      <div className="flex min-h-14 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/public-dashboard"
             className={cn(
-              "group inline-flex h-11 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-[0.18em] transition-all",
+              "group inline-flex h-9 items-center rounded-full border px-3 text-[10px] font-black uppercase tracking-[0.14em] transition-all",
               pathname === "/public-dashboard"
                 ? "border-accent bg-accent text-accent-foreground shadow-lg shadow-accent/20"
                 : "border-border bg-card text-foreground hover:border-accent hover:text-accent"
@@ -83,13 +83,13 @@ export function Header() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "group inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-[10px] font-black uppercase tracking-[0.12em] transition-all xl:px-4",
+                    "group inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[9px] font-black uppercase tracking-[0.1em] transition-all xl:px-3",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   )}
                 >
-                  <item.icon size={14} className={cn(isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent")} />
+              <item.icon size={12} className={cn(isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent")} />
                   {item.label}
                 </Link>
               );

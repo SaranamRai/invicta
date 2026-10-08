@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Download, MapPin, Plus, Trophy, Calendar, AlignLeft, Activity, Trash2 } from "lucide-react";
+import { Download, MapPin, Plus, Trophy, Calendar, AlignLeft, Activity, Trash2, Pencil, X } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
 import {
   createAdminSport,
   createAdminTournament,
   createAdminVenue,
+  deleteAdminVenue,
   deleteAdminSport,
   deleteAdminTournament,
   getAdminSports,
@@ -17,6 +18,7 @@ import {
   getAdminVenues,
   toggleAdminTournamentRegistration,
   getStoredSession,
+  updateAdminVenue,
   MongoSport,
   VenuePayload,
 } from "@/lib/api";
@@ -61,6 +63,9 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
   const [venueSportType, setVenueSportType] = useState("both");
   const [venueCapacity, setVenueCapacity] = useState("");
   const [venueStatus, setVenueStatus] = useState("active");
+  const [editingVenueId, setEditingVenueId] = useState<string | null>(null);
+  const [deletingVenueId, setDeletingVenueId] = useState<string | null>(null);
+  const [venueBusy, setVenueBusy] = useState(false);
 
   const sportOptions = [{ id: "all", name: "All Sports" }, ...sports];
   const getSportName = (sportId: string) => {
@@ -163,21 +168,76 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
       return;
     }
 
-    const savedVenue = await createAdminVenue({
+    const payload = {
       venueName: venueName.trim(),
       name: venueName.trim(),
       location: venueLocation.trim(),
       sportType: venueSportType,
       capacity: venueCapacity ? Number(venueCapacity) : undefined,
       status: venueStatus,
-    });
+    };
 
-    setVenues((current) => [savedVenue, ...current]);
+    setVenueBusy(true);
+    try {
+      if (editingVenueId) {
+        const updatedVenue = await updateAdminVenue(editingVenueId, payload);
+        setVenues((current) => current.map((venue) => (String(venue._id || venue.id) === editingVenueId ? updatedVenue : venue)));
+        setSuccessMessage("Venue updated successfully.");
+      } else {
+        const savedVenue = await createAdminVenue(payload);
+        setVenues((current) => [savedVenue, ...current]);
+        setSuccessMessage("Venue created successfully.");
+      }
+      resetVenueForm();
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not save venue.");
+      setTimeout(() => setErrorMessage(null), 4000);
+    } finally {
+      setVenueBusy(false);
+    }
+  };
+
+  const resetVenueForm = () => {
+    setEditingVenueId(null);
     setVenueName("");
     setVenueLocation("");
+    setVenueSportType("both");
     setVenueCapacity("");
-    setSuccessMessage("Venue created successfully.");
-    setTimeout(() => setSuccessMessage(null), 4000);
+    setVenueStatus("active");
+  };
+
+  const startVenueEdit = (venue: VenuePayload) => {
+    const id = String(venue._id || venue.id || "");
+    if (!id) {
+      setErrorMessage("Venue identifier missing — cannot edit this venue.");
+      return;
+    }
+    setEditingVenueId(id);
+    setVenueName(venue.venueName || venue.name || "");
+    setVenueLocation(venue.location || "");
+    setVenueSportType(venue.sportType || "both");
+    setVenueCapacity(venue.capacity == null ? "" : String(venue.capacity));
+    setVenueStatus(venue.status || "active");
+  };
+
+  const confirmVenueDelete = async (venue: VenuePayload) => {
+    const id = String(venue._id || venue.id || "");
+    if (!id) return;
+    setVenueBusy(true);
+    try {
+      await deleteAdminVenue(id);
+      setVenues((current) => current.filter((item) => String(item._id || item.id) !== id));
+      if (editingVenueId === id) resetVenueForm();
+      setDeletingVenueId(null);
+      setSuccessMessage("Venue deleted. Existing fixtures and results were kept.");
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not delete venue.");
+      setTimeout(() => setErrorMessage(null), 4000);
+    } finally {
+      setVenueBusy(false);
+    }
   };
 
   const handleCreateSport = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -544,23 +604,28 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-            <button className="h-12 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground">
-              Save Venue
+            <button disabled={venueBusy} className="h-12 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground disabled:opacity-60">
+              {venueBusy ? "Saving..." : editingVenueId ? "Update Venue" : "Save Venue"}
             </button>
+            {editingVenueId && <button type="button" onClick={resetVenueForm} className="h-12 rounded-xl border border-white/10 px-4 text-xs font-black uppercase tracking-widest text-slate-300"><X size={14} className="mr-1 inline" /> Cancel</button>}
           </form>
 
           <div className="mt-4 flex flex-wrap gap-2">
             {venues.map((venue) => (
-              <span key={venue._id || venue.id || venue.venueName} className="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
-                {venue.venueName || venue.name} / {venue.sportType}
-              </span>
+              <div key={venue._id || venue.id || venue.venueName} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{venue.venueName || venue.name} / {venue.sportType}</span>
+                <button type="button" onClick={() => startVenueEdit(venue)} className="rounded-md border border-white/10 p-1.5 text-slate-300 hover:text-white" aria-label={`Edit ${venue.venueName || venue.name}`}><Pencil size={13} /></button>
+                {deletingVenueId === String(venue._id || venue.id) ? (
+                  <><span className="text-[10px] font-bold text-red-300">Delete venue?</span><button type="button" disabled={venueBusy} onClick={() => void confirmVenueDelete(venue)} className="rounded-md bg-red-500/20 px-2 py-1 text-[10px] font-black uppercase text-red-300 disabled:opacity-60">Confirm</button><button type="button" onClick={() => setDeletingVenueId(null)} className="rounded-md border border-white/10 px-2 py-1 text-[10px] font-black uppercase text-slate-300">Cancel</button></>
+                ) : <button type="button" onClick={() => setDeletingVenueId(String(venue._id || venue.id))} className="rounded-md border border-red-500/20 p-1.5 text-red-300 hover:bg-red-500/10" aria-label={`Delete ${venue.venueName || venue.name}`}><Trash2 size={13} /></button>}
+              </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
       {/* Tournaments Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {tournaments.map((tour) => {
           const sName = getSportName(tour.sport);
           return (
@@ -569,7 +634,7 @@ export function TournamentManager({ teamsCountBySport }: TournamentManagerProps)
                 tour.status === "ongoing" ? "bg-green-500" :
                 tour.status === "completed" ? "bg-blue-500" : "bg-amber-500"
               }`} />
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <h3 className="font-black text-white text-lg uppercase tracking-wide">{tour.name}</h3>

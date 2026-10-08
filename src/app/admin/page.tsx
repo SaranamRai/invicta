@@ -244,9 +244,9 @@ function ApprovalsPanel() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
       ) : filteredRegistrations.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
-          <p className="mt-4 text-sm font-bold text-muted-foreground">No pending registrations match these filters</p>
+        <div className="rounded-xl border border-dashed border-border p-6 text-center">
+          <CheckCircle size={24} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-3 text-sm font-bold text-muted-foreground">No pending registrations match these filters</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -602,14 +602,14 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
       ) : !selectedTournament ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
-          <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
+        <div className="rounded-xl border border-dashed border-border p-6 text-center">
+          <CheckCircle size={24} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-3 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
         </div>
       ) : visibleRegistrations.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
-          <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for these filters</p>
+        <div className="rounded-xl border border-dashed border-border p-6 text-center">
+          <CheckCircle size={24} className="mx-auto text-muted-foreground/40" />
+          <p className="mt-3 text-sm font-bold text-muted-foreground">No approved teams found for these filters</p>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -834,15 +834,15 @@ export default function AdminDashboard() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="dashboard-surface min-h-screen overflow-x-hidden bg-background pb-12 text-foreground">
+    <div className="dashboard-surface ops-dashboard-surface min-h-screen overflow-x-hidden bg-background pb-12 text-foreground">
       {/* Header */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-3 py-2.5 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
-            <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
-            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
+            <MedhaviLogo className="h-9 w-36 shrink-0 sm:h-11 sm:w-44" />
+            <InvictaLogo className="h-10 w-36 shrink-0 sm:h-12 sm:w-44" />
             <div className="space-y-0.5 sm:space-y-1">
-              <h1 className="sport-heading text-lg font-black sm:text-3xl">
+              <h1 className="sport-heading text-base font-black sm:text-2xl">
                 {canManageSetup ? "INVICTA SUPERCOORDINATOR" : "INVICTA ADMIN"}
               </h1>
               <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
@@ -892,7 +892,7 @@ export default function AdminDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:px-6 sm:py-4 sm:text-sm sm:tracking-[0.1em] ${
+                className={`shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[9px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:px-4 sm:py-3 sm:text-xs sm:tracking-[0.1em] ${
                   activeTab === tab.id
                     ? "border-accent text-accent"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -906,7 +906,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-5">
         {activeTab === "dashboard" && (
           <>
             {canManageSetup && (

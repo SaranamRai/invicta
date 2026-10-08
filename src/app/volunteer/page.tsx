@@ -11,6 +11,7 @@ import { getPublicLiveFeeds } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/lib/match-clock";
 import { getRoleAccount } from "@/lib/role-auth";
+import { GenderMark } from "@/components/gender-mark";
 
 function normalizeSportValue(value?: string) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -27,6 +28,8 @@ export default function VolunteerDashboard() {
   const [updatesToday, setUpdatesToday] = useState(0);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [selectedSport, setSelectedSport] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedDate, setSelectedDate] = useState("");
   const [startingId, setStartingId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const account = getRoleAccount();
@@ -45,7 +48,11 @@ export default function VolunteerDashboard() {
         if (!isMounted) return;
 
         setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
-        const logs = feeds.map((feed) => ({
+        const assignedMatchIds = new Set(matchesData.map(match => match.id));
+        const logs = feeds.filter(feed => {
+          const id = typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "";
+          return assignedMatchIds.has(id);
+        }).map((feed) => ({
         id: feed._id,
         matchId: typeof feed.fixtureId === "string" ? feed.fixtureId : feed.fixtureId?._id || feed.fixtureId?.id || "",
         action: feed.message,
@@ -77,7 +84,11 @@ export default function VolunteerDashboard() {
   }, []);
 
   const sports = assignedSport ? [assignedSport] : ["All", ...Array.from(new Set(matches.map(match => match.sport)))];
-  const filteredMatches = matches.filter(match => Boolean(assignedSport) || selectedSport === "All" || match.sport === selectedSport);
+  const filteredMatches = matches.filter(match =>
+    (Boolean(assignedSport) || selectedSport === "All" || match.sport === selectedSport) &&
+    (selectedCategory === "All" || match.category === selectedCategory) &&
+    (!selectedDate || String(match.date || "").slice(0, 10) === selectedDate)
+  );
   const activeMatches = matches.filter(match => match.status === "Live");
   const nextMatch = matches.find(match => match.status === "Upcoming");
 
@@ -129,19 +140,19 @@ export default function VolunteerDashboard() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase sport-heading">Match Dashboard</h1>
+        <h1 className="text-2xl font-black tracking-tighter text-foreground uppercase sport-heading sm:text-4xl">Match Dashboard</h1>
         <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
           Use this page during match duty. Start a match clock, update quick scores, or open the full control panel for detailed events and announcements.
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
-            <Activity size={24} />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card className="flex items-center gap-3 p-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20 text-accent">
+            <Activity size={19} />
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Live Matches</p>
@@ -149,9 +160,9 @@ export default function VolunteerDashboard() {
           </div>
         </Card>
         
-        <Card className="p-6 flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
-            <Trophy size={24} />
+        <Card className="flex items-center gap-3 p-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 text-blue-500">
+            <Trophy size={19} />
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Updates Today</p>
@@ -159,9 +170,9 @@ export default function VolunteerDashboard() {
           </div>
         </Card>
 
-        <Card className="p-6 flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
-            <Clock size={24} />
+        <Card className="flex items-center gap-3 p-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20 text-purple-500">
+            <Clock size={19} />
           </div>
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Next Event</p>
@@ -170,14 +181,14 @@ export default function VolunteerDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-        <div className="xl:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
           <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-black uppercase tracking-wider text-foreground">Matches Assigned for Updates</h2>
               <p className="mt-1 text-sm font-semibold leading-relaxed text-muted-foreground">Filter by sport, start the match clock, adjust scores, or open the full control panel.</p>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-border bg-secondary/50 p-1">
+            <div className="flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-border bg-secondary/50 p-1">
               {sports.map(sport => {
                 const sportName = sport === assignedSport
                   ? assignedSportName
@@ -198,18 +209,27 @@ export default function VolunteerDashboard() {
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            {(["All", "Male", "Female"] as const).map(category => <button key={category} onClick={() => setSelectedCategory(category)} className={cn("inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold", selectedCategory === category ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground")}>
+              {category !== "All" && <GenderMark gender={category} className="h-4 w-4" />}{category}
+            </button>)}
+            <label className="sr-only" htmlFor="volunteer-match-date">Filter matches by date</label>
+            <input id="volunteer-match-date" type="date" value={selectedDate} onChange={event => setSelectedDate(event.target.value)} className="min-h-10 rounded-xl border border-border bg-card px-3 text-sm text-foreground" />
+            {selectedDate && <button onClick={() => setSelectedDate("")} className="rounded-xl px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-secondary">Clear date</button>}
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {filteredMatches.length > 0 ? filteredMatches.map(match => {
               const isRunning = match.status === "Live" && match.clockRunning;
               const isFinished = match.status === "Finished" || match.period === "Full Time";
 
               return (
-                <Card key={match.id} className="p-6 relative overflow-hidden">
+                <Card key={match.id} className="relative overflow-hidden p-4">
                   {isRunning && <div className="absolute left-0 top-0 h-full w-1 bg-accent" />}
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                        {getSportDisplayName(match.sport, match.sportName)} / {match.type}
+                      <span className="flex flex-wrap items-center gap-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        {match.category && <GenderMark gender={match.category} className="h-4 w-4" />}{getSportDisplayName(match.sport, match.sportName)} / {match.type}
                       </span>
                       <h3 className="mt-2 text-lg font-black uppercase tracking-wide text-foreground">{match.teamA} vs {match.teamB}</h3>
                     </div>
@@ -293,9 +313,9 @@ export default function VolunteerDashboard() {
                 </Card>
               );
             }) : (
-              <div className="col-span-full text-center p-10 border border-dashed border-border rounded-2xl">
+              <div className="col-span-full text-center p-6 sm:p-10 border border-dashed border-border rounded-2xl">
                 <AlertCircle size={32} className="mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No matches for this sport</p>
+                <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">{matches.length ? "No assigned matches for these filters" : "No matches are currently assigned to you."}</p>
               </div>
             )}
           </div>

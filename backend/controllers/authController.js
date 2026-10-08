@@ -61,15 +61,19 @@ function toSession(account, role, token) {
 }
 
 export async function login(req, res) {
-  const { email, password } = req.body;
+  const { email, password, role: selectedRole } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: "Email and password are required" });
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
+  if (selectedRole && !roleModels.some((item) => item.role === selectedRole)) {
+    return res.status(400).json({ message: "Select a valid account role" });
+  }
+  const rolesToCheck = selectedRole ? roleModels.filter((item) => item.role === selectedRole) : roleModels;
 
-  for (const { role, model } of roleModels) {
+  for (const { role, model } of rolesToCheck) {
     const account = await model.findOne({ email: normalizedEmail });
     if (!account) continue;
 

@@ -11,11 +11,11 @@ export function Card({ children, className, glass = false, variant = "default", 
   return (
     <div
       className={cn(
-        "rounded-xl border transition-all duration-300",
-        variant === "default" && "bg-card text-card-foreground shadow-sm border-border p-4 sm:p-5",
-        variant === "scoreboard" && "bg-slate-900 text-white border-white/10 p-4 shadow-xl sm:p-5",
-        variant === "accent" && "bg-accent text-accent-foreground border-accent p-4 shadow-lg sm:p-5",
-        glass && "bg-white/10 backdrop-blur-md border-white/20 dark:bg-slate-900/40 dark:border-slate-700/50 p-4 sm:p-5",
+        "min-w-0 rounded-xl border transition-all duration-300",
+        variant === "default" && "bg-card text-card-foreground shadow-sm border-border p-3 sm:p-4",
+        variant === "scoreboard" && "bg-slate-900 text-white border-white/10 p-3 shadow-xl sm:p-4",
+        variant === "accent" && "bg-accent text-accent-foreground border-accent p-3 shadow-lg sm:p-4",
+        glass && "bg-white/10 backdrop-blur-md border-white/20 dark:bg-slate-900/40 dark:border-slate-700/50 p-3 sm:p-4",
         className
       )}
       {...props}
@@ -26,11 +26,11 @@ export function Card({ children, className, glass = false, variant = "default", 
 }
 
 export function CardHeader({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("mb-6 space-y-1", className)}>{children}</div>;
+  return <div className={cn("mb-4 space-y-1", className)}>{children}</div>;
 }
 
 export function CardTitle({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <h3 className={cn("text-xl font-bold leading-none tracking-tight sport-heading", className)}>{children}</h3>;
+  return <h3 className={cn("text-lg font-bold leading-tight tracking-tight sport-heading", className)}>{children}</h3>;
 }
 
 

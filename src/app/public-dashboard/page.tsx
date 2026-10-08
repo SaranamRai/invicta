@@ -132,7 +132,8 @@ export default function PublicDashboard() {
   }, []);
 
   const activeTeams = teamsData.length || new Set(matchesData.flatMap((match) => [match.teamA, match.teamB])).size;
-  const liveMatches = matchesData.filter((match) => match.status === "Live").length;
+  const currentLiveMatches = matchesData.filter((match) => match.status === "Live");
+  const liveMatches = currentLiveMatches.length;
   const upcomingMatches = matchesData.filter((match) => match.status === "Upcoming").length;
   const sports = getAvailableSports(teamsData, matchesData);
   const latestSportIds = new Set(
@@ -193,7 +194,7 @@ export default function PublicDashboard() {
         <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.36)_100%)]" />
         <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(2,6,23,0.98)]" />
         <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#020617] to-transparent" />
-        <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
+        <div className="relative flex flex-col items-start gap-4 p-4 sm:gap-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
           <div className="max-w-2xl space-y-4">
             <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
@@ -290,8 +291,8 @@ export default function PublicDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
+      <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-10">
+        <div className="flex min-h-0 min-w-0 flex-col space-y-5 lg:col-span-2 lg:space-y-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-primary" />
@@ -300,9 +301,9 @@ export default function PublicDashboard() {
             <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
 
-          <Card className="border-2 p-4 sm:p-5">
+          <Card className="min-h-0 border-2 p-4 sm:p-5 lg:flex lg:h-[36rem] lg:flex-col lg:overflow-hidden">
             {standingsBySport.length > 0 ? (
-              <div className="grid gap-4">
+              <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
                 {standingsBySport.map((sport) => (
                   <div key={sport.id} className="overflow-hidden rounded-xl border border-border bg-background/40">
                     <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary px-3 py-3 sm:px-4">
@@ -343,7 +344,7 @@ export default function PublicDashboard() {
           </Card>
         </div>
 
-        <div className="min-w-0 space-y-5 lg:space-y-6">
+        <div className="flex min-h-0 min-w-0 flex-col space-y-5 lg:space-y-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-accent" />
@@ -354,8 +355,8 @@ export default function PublicDashboard() {
             </Link>
           </div>
 
-          <div className="max-h-[36rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner">
-            {matchesData.length > 0 ? matchesData.map((match, i) => (
+          <div className="min-h-0 space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner lg:h-[36rem] lg:max-h-none lg:flex-none">
+            {currentLiveMatches.length > 0 ? currentLiveMatches.map((match, i) => (
               <motion.div
                 key={match.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -413,10 +414,10 @@ export default function PublicDashboard() {
             )) : (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center">
                 <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
-                  <Activity size={32} className="text-slate-600" />
+                  <Activity size={22} className="text-slate-600" />
                 </div>
-                <h3 className="sport-heading text-xl font-black text-white">No Matches Published Yet</h3>
-                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">When the organizing team publishes fixtures, match cards and live scores will appear here.</p>
+                <h3 className="sport-heading text-xl font-black text-white">No Live Matches</h3>
+                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">Live matches will appear here while they are in progress.</p>
               </div>
             )}
           </div>
