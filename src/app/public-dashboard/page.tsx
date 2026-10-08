@@ -1,28 +1,18 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import {
-  Activity,
-  ArrowUpRight,
-  Calendar,
-  ClipboardList,
-  Home,
-  LogIn,
-  Radio,
-  Trophy,
-  Users,
-} from "lucide-react";
+import { Activity, ArrowRight, CalendarDays, MapPin, Megaphone, Radio, Trophy, Users } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { SportMark } from "@/components/sport-mark";
 import { Team } from "@/lib/fixture-generator";
 import {
+  getPublicAnnouncements,
   getPublicFixtures,
   getPublicLiveScores,
   getPublicTeams,
   getPublicTournaments,
+  mapMongoAnnouncement,
   mapMongoFixture,
   mapMongoTeam,
   TournamentPayload,
@@ -30,75 +20,50 @@ import {
 import { InvictaLogo } from "@/components/invicta-logo";
 import { buildStandings, getAvailableSports } from "@/lib/live-data";
 import { getMatchClockText, getMatchPeriod } from "@/lib/match-clock";
-import { MatchData } from "@/lib/types";
+import { MatchData, NotificationData } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const toDateKey = (value?: string) => value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || "";
 
 export default function PublicDashboard() {
   const [matchesData, setMatchesData] = useState<MatchData[]>([]);
   const [teamsData, setTeamsData] = useState<Team[]>([]);
+  const [announcements, setAnnouncements] = useState<NotificationData[]>([]);
   const [now, setNow] = useState(0);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
-
-  const { registrationOpen, openTournament, nextTournament } = useMemo(() => {
-    const normalized = tournaments
-      .map((tournament) => ({
-        ...tournament,
-        startTime: new Date(tournament.startDate).setHours(0, 0, 0, 0),
-        endTime: new Date(tournament.endDate).setHours(23, 59, 59, 999),
-      }))
-      .filter((tournament) =>
-        tournament.registrationOpen &&
-        !Number.isNaN(tournament.startTime) &&
-        !Number.isNaN(tournament.endTime)
-      );
-
-    const validOpenTournaments = normalized.filter((tournament) => now <= tournament.endTime);
-    const activeTournament = validOpenTournaments
-      .sort((a, b) => a.startTime - b.startTime)[0] || null;
-
-    const upcomingTournament = validOpenTournaments
-      .filter((tournament) => tournament.startTime > now)
-      .sort((a, b) => a.startTime - b.startTime)[0] || null;
-
-    return {
-      registrationOpen: Boolean(activeTournament),
-      openTournament: activeTournament,
-      nextTournament: upcomingTournament,
-    };
-  }, [now, tournaments]);
-
-  const formatDate = (value: string) => {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-      ? value
-      : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  };
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadPublicData() {
-      const [fixtures, liveScores, teams, tournaments] = await Promise.all([
-        getPublicFixtures(),
-        getPublicLiveScores(),
-        getPublicTeams(),
-        getPublicTournaments(),
-      ]);
+      try {
+        const [fixtures, liveScores, teams, publicTournaments, publicAnnouncements] = await Promise.all([
+          getPublicFixtures(),
+          getPublicLiveScores(),
+          getPublicTeams(),
+          getPublicTournaments(),
+          getPublicAnnouncements(),
+        ]);
+        if (!isMounted) return;
 
-      if (!isMounted) return;
-
-      const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
-      setMatchesData(
-        fixtures
-          .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
-          .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
-      );
-      setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
-      setTournaments(tournaments);
-    };
+        const scoreLookup = new Map(liveScores.map((score) => [score.fixtureId, score]));
+        setMatchesData(
+          fixtures
+            .map((fixture) => mapMongoFixture(fixture, scoreLookup.get(fixture._id)) as MatchData)
+            .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
+        );
+        setTeamsData(teams.map((team) => mapMongoTeam(team) as Team));
+        setTournaments(publicTournaments);
+        setAnnouncements(publicAnnouncements.map(mapMongoAnnouncement));
+      } catch {
+        // Keep the latest successfully loaded public data visible during brief API interruptions.
+      }
+    }
 
     void loadPublicData();
-    const interval = window.setInterval(loadPublicData, 15000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void loadPublicData();
+    }, 15000);
 
     return () => {
       isMounted = false;
@@ -111,373 +76,283 @@ export default function PublicDashboard() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const activeTeams = teamsData.length || new Set(matchesData.flatMap((match) => [match.teamA, match.teamB])).size;
-  const liveMatches = matchesData.filter((match) => match.status === "Live").length;
-  const upcomingMatches = matchesData.filter((match) => match.status === "Upcoming").length;
+  const registrationOpen = tournaments.some((tournament) => {
+    const endTime = new Date(tournament.endDate).setHours(23, 59, 59, 999);
+    return Boolean(tournament.registrationOpen) && !Number.isNaN(endTime) && Date.now() <= endTime;
+  });
+
+  const currentTournament = useMemo(() => {
+    const timestamp = now || Date.now();
+    const active = tournaments.find((tournament) => {
+      const start = new Date(tournament.startDate).setHours(0, 0, 0, 0);
+      const end = new Date(tournament.endDate).setHours(23, 59, 59, 999);
+      return !Number.isNaN(start) && !Number.isNaN(end) && start <= timestamp && timestamp <= end;
+    });
+    return active || [...tournaments].sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate))[0] || null;
+  }, [now, tournaments]);
+
+  const liveMatches = matchesData.filter((match) => match.status === "Live");
+  const upcomingMatches = matchesData
+    .filter((match) => match.status === "Upcoming")
+    .sort((a, b) => {
+      const dateA = toDateKey(a.date);
+      const dateB = toDateKey(b.date);
+      return `${dateA}T${a.time || "23:59"}`.localeCompare(`${dateB}T${b.time || "23:59"}`);
+    });
+  const completedMatches = matchesData.filter((match) => match.status === "Finished");
   const sports = getAvailableSports(teamsData, matchesData);
-  const latestSportIds = new Set(
-    sports
-      .map((sport) => {
-        const latestMatchTime = matchesData
-          .filter((match) => match.sport === sport.id)
-          .reduce((latest, match) => {
-            const scheduledTime = match.date
-              ? new Date(`${match.date}T${match.time || "00:00"}`).getTime()
-              : 0;
-            return Math.max(latest, match.lastUpdated || 0, Number.isNaN(scheduledTime) ? 0 : scheduledTime);
-          }, 0);
+  const activeTeams = teamsData.length || new Set(matchesData.flatMap((match) => [match.teamA, match.teamB])).size;
+  const standingsSport = sports[0];
+  const standings = buildStandings(matchesData, teamsData, standingsSport?.id).slice(0, 5);
+  const latestAnnouncements = [...announcements].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3);
+  const featuredTeams = teamsData.slice(0, 8);
 
-        return { id: sport.id, latestMatchTime };
-      })
-      .sort((a, b) => b.latestMatchTime - a.latestMatchTime)
-      .slice(0, 1)
-      .map((sport) => sport.id)
-  );
-  const standingsBySport = sports
-    .filter((sport) => latestSportIds.has(sport.id))
-    .map((sport) => ({
-      ...sport,
-      rows: buildStandings(matchesData, teamsData, sport.id).slice(0, 5),
-    }))
-    .filter((sport) => sport.rows.length > 0);
-
-  const stats = [
-    { label: "Registered Teams", value: activeTeams.toString(), icon: Users, color: "text-accent", bg: "bg-white/5" },
-    { label: "Live Matches", value: liveMatches.toString(), icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Matches Scheduled", value: upcomingMatches.toString(), icon: Calendar, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Sports Available", value: sports.length.toString(), icon: Trophy, color: "text-blue-500", bg: "bg-blue-500/10" },
-  ];
-
-  const visitorActions = [
-    { label: "View Sports", href: "/sports", icon: ClipboardList },
-    { label: "Follow Matches", href: "/matches", icon: Radio },
-    { label: "Check League Tables", href: "/standings", icon: Trophy },
-  ];
-
-  const easyPaths = [
-    { label: "Visitors", href: "/matches", icon: Radio },
-    { label: "Teams", href: registrationOpen ? "/public-register" : "/", icon: ClipboardList },
-    { label: "Staff", href: "/login", icon: LogIn },
-  ];
-
-  const heroBackdropStyle: React.CSSProperties = {
-    backgroundImage: 'radial-gradient(circle at 78% 40%,rgba(255,255,255,0.26) 0%,rgba(255,255,255,0.18) 28%,transparent 50%),radial-gradient(circle at 82% 38%,rgba(252,211,77,0.22),transparent 34%),linear-gradient(110deg,rgba(2,6,23,0.98) 0%,rgba(15,23,42,0.9) 42%,rgba(15,23,42,0.54) 100%),url("/medhavi-skills-university.png")',
-    backgroundPosition: "right 2rem center, center, center, right 3rem center",
-    backgroundSize: "min(42rem, 64%) auto, cover, cover, min(40rem, 58%) auto",
+  const formatMatchDate = (match: MatchData) => {
+    const dateKey = toDateKey(match.date);
+    if (!dateKey) return match.date || "Date to be announced";
+    const date = new Date(`${dateKey}T${match.time || "12:00"}`);
+    return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
   };
 
+  const tournamentStatus = currentTournament
+    ? currentTournament.status === "ongoing" ? "In progress" : registrationOpen ? "Registration open" : "Upcoming"
+    : "Tournament details soon";
+
   return (
-    <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
-      <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
-        <div className="absolute inset-0 bg-no-repeat opacity-100" style={heroBackdropStyle} />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.36)_100%)]" />
-        <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(2,6,23,0.98)]" />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#020617] to-transparent" />
-        <div className="relative flex flex-col items-start gap-5 p-4 sm:gap-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between lg:p-12">
-          <div className="max-w-2xl space-y-4">
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent/30 bg-accent/20 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-accent sm:text-[10px] sm:tracking-widest">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-              Official MSU Sports Event Hub
+    <div className="space-y-10 sm:space-y-12">
+      <section className="relative isolate overflow-hidden rounded-3xl bg-[#0b1220] text-white shadow-xl">
+        <div className="absolute inset-0 -z-20 bg-[url('/landingpage.jpeg')] bg-cover bg-center opacity-40" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b1220] via-[#0b1220]/90 to-[#0b1220]/45" />
+        <div className="absolute -right-20 -top-24 -z-10 h-80 w-80 rounded-full bg-blue-500/20 blur-3xl" />
+
+        <div className="grid gap-8 p-6 sm:p-9 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:p-12">
+          <div className="max-w-3xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Official MSU Sports Tournament
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-5">
-              <span className="sport-heading text-4xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)] sm:text-6xl lg:text-7xl">
-                MSU
-              </span>
-              <InvictaLogo className="h-12 w-44 sm:h-20 sm:w-80 lg:h-24 lg:w-96" />
+            <div className="mb-4 flex items-center gap-4">
+              <span className="text-3xl font-black tracking-tight sm:text-4xl">MSU</span>
+              <InvictaLogo className="h-10 w-36 sm:h-14 sm:w-52" />
             </div>
-            <p className="max-w-2xl text-sm font-bold leading-relaxed text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)] sm:text-lg">
-              A simple place for departments to register teams, for visitors to follow match scores, and for everyone to see which teams are leading.
+            <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+              Where competition <span className="text-blue-300">comes alive.</span>
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
+              Follow matches, live scores, teams and tournament standings — all in one place.
             </p>
           </div>
-
-          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-80 lg:grid-cols-1">
-            <Link href="/sports" className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-accent px-3 text-white shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-95 sm:h-14">
-              <span className="sport-heading relative z-10 text-[10px] font-black uppercase tracking-wide sm:text-xs sm:tracking-[0.2em]">View Sports</span>
-              <div className="absolute inset-0 hidden translate-x-[-100%] bg-white/20 transition-transform group-hover:translate-x-0 sm:block" />
+          <div className="flex flex-col gap-3 sm:flex-row lg:min-w-48 lg:flex-col">
+            <Link href="/matches" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-950/30 transition-colors hover:bg-blue-500">
+              View Matches <ArrowRight size={16} />
             </Link>
-            <Link href="/matches" className="flex h-11 w-full items-center justify-center rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wide text-white transition-all hover:border-accent hover:bg-white/15 hover:text-accent active:scale-95 sm:h-14 sm:text-xs sm:tracking-[0.2em]">
-              View Live Matches
+            <Link href="/live-score" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 text-sm font-bold text-white transition-colors hover:bg-white/15">
+              <Radio size={16} /> Live Scores
             </Link>
-            <Link href="/" className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[9px] font-black uppercase tracking-wide text-slate-300 transition-all hover:border-white/30 hover:bg-white/10 hover:text-white active:scale-95 sm:h-14 sm:text-[10px] sm:tracking-[0.18em]">
-              <Home size={14} className="text-accent" />
-              Landing Page
-            </Link>
-          </div>
-        </div>
-
-        <div className="hidden border-t border-white/10 bg-black/40 py-4 backdrop-blur-md sm:block">
-          <div className="flex animate-marquee whitespace-nowrap gap-20">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="flex gap-20">
-                <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                  View MSU Invicta sports and department teams
-                </span>
-                <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Track live scores as volunteers update them
-                </span>
-                <span className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  League tables are calculated from completed matches
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <Card className="group relative flex min-h-[7.5rem] overflow-hidden border-2 transition-all hover:border-accent">
-              <div className="absolute right-0 top-0 p-2 opacity-5 transition-opacity group-hover:opacity-10">
-                <stat.icon size={80} />
-              </div>
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
-                  <h3 className="sport-heading mt-1 text-4xl font-black">{stat.value}</h3>
-                </div>
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", stat.bg)}>
-                  <stat.icon className={stat.color} size={24} />
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        {visitorActions.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-accent hover:shadow-md"
-          >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
-              <item.icon size={20} />
+      <section aria-label="Tournament status" className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(4,minmax(0,1fr))] lg:items-center">
+          <div className="flex items-center gap-3 border-b border-border pb-4 sm:col-span-2 lg:col-span-1 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"><Trophy size={21} /></div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Tournament</p>
+              <h2 className="truncate text-base font-bold text-foreground">{currentTournament?.name || "INVICTA"}</h2>
             </div>
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-wide text-foreground">{item.label}</h2>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
-        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 rounded-full bg-primary" />
-              <h2 className="sport-heading text-2xl font-black">League Tables</h2>
-            </div>
-            <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
+          <StatusMetric label="Status" value={tournamentStatus} status={currentTournament?.status === "ongoing" ? "live" : "normal"} />
+          <StatusMetric label="Matches" value={matchesData.length.toString()} />
+          <StatusMetric label="Teams" value={activeTeams.toString()} />
+          <StatusMetric label="Completed" value={completedMatches.length.toString()} />
+        </div>
+      </section>
 
-          <Card className="border-2 p-4 sm:p-5">
-            {standingsBySport.length > 0 ? (
-              <div className="grid gap-4">
-                {standingsBySport.map((sport) => (
-                  <div key={sport.id} className="overflow-hidden rounded-xl border border-border bg-background/40">
-                    <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary px-3 py-3 sm:px-4">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-secondary-foreground">{sport.name}</h3>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Top {sport.rows.length}</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[640px] text-left text-sm">
-                        <thead className="text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-wide sm:px-4">Rank</th>
-                            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-wide sm:px-4">Department</th>
-                            <th className="px-3 py-3 text-center text-[9px] font-black uppercase tracking-wide sm:px-4">Played</th>
-                            <th className="px-3 py-3 text-right text-[9px] font-black uppercase tracking-wide sm:px-4">Points</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {sport.rows.map((team) => (
-                            <tr key={`${team.sport}:${team.team}`} className="group transition-all hover:bg-secondary/50">
-                              <td className="sport-heading px-3 py-3 text-base font-black sm:px-4">{team.rank}</td>
-                              <td className="px-3 py-3 text-sm font-bold tracking-wide transition-colors group-hover:text-primary sm:px-4">{team.team}</td>
-                              <td className="px-3 py-3 text-center font-bold text-muted-foreground sm:px-4">{team.played}</td>
-                              <td className="sport-heading px-3 py-3 text-right text-base font-black text-primary sm:px-4">{team.pts}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+      <section className="space-y-5">
+        <SectionHeading title="Live Now" subtitle="Follow the action as it happens." actionLabel="All live scores" actionHref="/live-score" />
+        {liveMatches.length ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {liveMatches.slice(0, 4).map((match) => (
+              <Card key={match.id} className="relative overflow-hidden border border-emerald-500/20 bg-card p-4 shadow-sm sm:p-5">
+                <div className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> LIVE
+                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">{match.sportName || match.sport} · {match.type}</span>
+                </div>
+                <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+                  <span className="truncate text-sm font-bold text-foreground sm:text-base">{match.teamA}</span>
+                  <span className="scoreboard-number text-3xl font-extrabold tabular-nums text-foreground sm:text-4xl">
+                    {match.scoreA ?? 0}<span className="px-2 text-muted-foreground">–</span>{match.scoreB ?? 0}
+                  </span>
+                  <span className="truncate text-right text-sm font-bold text-foreground sm:text-base">{match.teamB}</span>
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <span className="text-xs font-medium text-muted-foreground">{getMatchPeriod(match)} · {getMatchClockText(match, now)}</span>
+                  <Link href="/matches" className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-600 dark:text-blue-300">
+                    View Match <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel icon={Radio} title="No matches are live right now" text="Check the upcoming fixtures to see what’s next." actionLabel="View upcoming matches" actionHref="/matches" />
+        )}
+      </section>
+
+      <section className="space-y-5">
+        <SectionHeading title="Upcoming Matches" subtitle="See what’s next on the tournament schedule." actionLabel="Full schedule" actionHref="/matches" />
+        {upcomingMatches.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {upcomingMatches.slice(0, 3).map((match) => (
+              <Card key={match.id} className="flex h-full flex-col border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">{match.type || "Scheduled match"}</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{match.sportName || match.sport}</p>
                   </div>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">Upcoming</span>
+                </div>
+                <div className="my-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 text-center">
+                  <span className="break-words text-sm font-bold text-foreground">{match.teamA}</span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">vs</span>
+                  <span className="break-words text-sm font-bold text-foreground">{match.teamB}</span>
+                </div>
+                <div className="mt-auto space-y-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                  <p className="flex items-center gap-2"><CalendarDays size={14} className="text-blue-600 dark:text-blue-300" /> {formatMatchDate(match)}{match.time ? ` · ${match.time}` : ""}</p>
+                  <p className="flex items-center gap-2"><MapPin size={14} className="text-blue-600 dark:text-blue-300" /> <span className="truncate">{match.venue || "Venue to be announced"}</span></p>
+                </div>
+                <Link href="/matches" className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-600 dark:text-blue-300">
+                  Match details <ArrowRight size={14} />
+                </Link>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel icon={CalendarDays} title="No upcoming fixtures yet" text="Published matches will appear here when the schedule is ready." actionLabel="Browse matches" actionHref="/matches" />
+        )}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <div className="min-w-0 space-y-4">
+          <SectionHeading title="Tournament Standings" subtitle={standingsSport ? `${standingsSport.name} · Top teams` : "League leaders across the tournament."} actionLabel="Full standings" actionHref="/standings" />
+          <Card className="overflow-hidden border border-border bg-card p-0 shadow-sm">
+            {standings.length ? (
+              <ol className="divide-y divide-border">
+                {standings.map((row) => (
+                  <li key={`${row.sport}:${row.team}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 sm:px-5">
+                    <span className={cn("flex h-8 w-8 items-center justify-center rounded-full text-xs font-extrabold", row.rank === 1 ? "bg-blue-600 text-white" : "bg-secondary text-muted-foreground")}>{row.rank}</span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-foreground">{row.team}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{row.played} matches · {row.won} wins</p>
+                    </div>
+                    <p className="text-right text-sm font-extrabold text-foreground">{row.pts}<span className="ml-1 text-[10px] font-medium text-muted-foreground">pts</span></p>
+                  </li>
                 ))}
-              </div>
+              </ol>
             ) : (
-              <div className="p-10 text-center">
-                <Trophy size={48} className="mx-auto mb-4 text-slate-700 opacity-20" />
-                <p className="text-sm font-semibold text-slate-500">League tables will appear after teams are registered and matches are completed.</p>
-              </div>
+              <p className="p-6 text-sm text-muted-foreground">Standings will appear after matches are completed.</p>
             )}
           </Card>
         </div>
 
-        <div className="min-w-0 space-y-5 lg:space-y-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-1.5 rounded-full bg-accent" />
-              <h2 className="sport-heading text-xl font-black sm:text-2xl lg:text-xl">Live Scores</h2>
-            </div>
-            <Link href="/matches" className="flex items-center text-xs font-black uppercase tracking-widest text-primary transition-colors hover:text-accent">
-              All Matches <ArrowUpRight size={16} className="ml-1" />
-            </Link>
-          </div>
-
-          <div className="max-h-[36rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner">
-            {matchesData.length > 0 ? matchesData.map((match, i) => (
-              <motion.div
-                key={match.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + i * 0.1 }}
-              >
-                <Card variant={match.status === "Live" ? "scoreboard" : "default"} className="group relative overflow-hidden border-2 p-4">
-                  {match.status === "Live" && (
-                    <div className="absolute left-0 top-0 h-full w-1.5 bg-accent shadow-[0_0_15px_rgba(252,191,77,0.5)]" />
-                  )}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex min-w-0 items-center gap-4">
-                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white p-2 shadow-inner transition-transform group-hover:scale-105">
-                        <SportMark name={match.sportName || match.sport} className="h-full w-full text-slate-950" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="sport-heading text-[9px] font-black uppercase tracking-[0.18em] text-accent">{match.type}</span>
-                          {match.status === "Live" && (
-                            <span className="flex animate-pulse items-center gap-1.5 rounded-full border border-accent/30 bg-accent/20 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-accent">
-                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                              On Air {getMatchClockText(match, now)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="sport-heading truncate text-base font-black tracking-wide">
-                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamA}</span>
-                          <span className="mx-2 text-accent italic">VS</span>
-                          <span className="opacity-80 transition-opacity group-hover:opacity-100">{match.teamB}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-3 rounded-xl border border-white/5 bg-black/40 p-3 shadow-xl">
-                      <span className="scoreboard-number text-3xl font-black leading-none tracking-tighter">{(match.scoreA ?? 0).toString().padStart(2, "0")}</span>
-                      <div className="h-8 w-0.5 bg-white/20" />
-                      <span className="scoreboard-number text-3xl font-black leading-none tracking-tighter">{(match.scoreB ?? 0).toString().padStart(2, "0")}</span>
+        <div className="min-w-0 space-y-4">
+          <SectionHeading title="Latest Updates" subtitle="News from the tournament desk." actionLabel="All updates" actionHref="/announcements" />
+          {latestAnnouncements.length ? (
+            <div className="space-y-3">
+              {latestAnnouncements.map((announcement) => (
+                <Link key={announcement.id} href={announcement.href || "/announcements"} className="group block rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-blue-300">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"><Megaphone size={17} /></span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300">Tournament update</p>
+                      <h3 className="mt-1 line-clamp-2 text-sm font-bold text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300">{announcement.title}</h3>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{announcement.message}</p>
+                      <p className="mt-2 text-[10px] font-medium text-muted-foreground">{new Date(announcement.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
                     </div>
                   </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-                    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-slate-300">
-                      {getMatchPeriod(match)}
-                    </span>
-                    <span className="rounded-full bg-white/10 px-2.5 py-1 font-mono text-[11px] font-black text-accent">
-                      {getMatchClockText(match, now)}
-                    </span>
-                    {match.scoreEvents?.[0] && (
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                        Last point: {match.scoreEvents[0].teamName} at {match.scoreEvents[0].matchTime}
-                      </span>
-                    )}
-                  </div>
-                </Card>
-              </motion.div>
-            )) : (
-              <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-card/30 p-8 text-center">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
-                  <Activity size={32} className="text-slate-600" />
-                </div>
-                <h3 className="sport-heading text-xl font-black text-white">No Matches Published Yet</h3>
-                <p className="mt-2 max-w-md text-sm font-semibold leading-relaxed text-slate-500">When the organizing team publishes fixtures, match cards and live scores will appear here.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <section className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5">
-        <div className="mb-5">
-          <h2 className="sport-heading text-xl font-black tracking-tight text-foreground">Start Here</h2>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">Pick the path that matches what you need to do.</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {easyPaths.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn(
-                "flex min-h-20 items-center gap-4 rounded-xl border border-border bg-secondary/50 p-4 transition-all hover:border-accent hover:bg-accent/10",
-                item.label === "Teams" && !registrationOpen ? "pointer-events-none opacity-60" : ""
-              )}
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background text-accent">
-                <item.icon size={19} />
-              </div>
-              <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-foreground">{item.label}</h3>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm md:p-8">
-        <div className="mb-8 flex flex-col gap-3 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent/20 text-accent">
-              <Users size={24} />
-            </div>
-            <h2 className="sport-heading text-2xl font-black tracking-tight text-foreground">Public Team Registration</h2>
-            <p className="mt-2 max-w-2xl text-sm font-medium text-muted-foreground">
-              Registration opens only when the admin enables the registration portal and the current date falls within an active tournament window.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {registrationOpen && openTournament ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Registration is open from {formatDate(openTournament.startDate)} to {formatDate(openTournament.endDate)}.
-              </p>
-              <Link
-                href="/public-register"
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-accent px-4 text-xs font-black uppercase tracking-wide text-accent-foreground transition-all hover:bg-accent/90 sm:h-14 sm:text-sm sm:tracking-[0.2em]"
-              >
-                Open Registration
-              </Link>
+                </Link>
+              ))}
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-red-200 bg-red-500/10 p-4 text-sm font-medium text-red-700">
-                Registration is currently closed. You can only register while the admin portal is enabled and the date is within the tournament window.
-              </div>
-              {nextTournament ? (
-                <p className="text-sm text-muted-foreground">
-                  Next registration window: {formatDate(nextTournament.startDate)} to {formatDate(nextTournament.endDate)}.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">No upcoming registration window is configured yet.</p>
-              )}
-              <button
-                type="button"
-                disabled
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-slate-400 px-4 text-xs font-black uppercase tracking-wide text-white opacity-70 sm:h-14 sm:text-sm sm:tracking-[0.2em]"
-              >
-                Registration Closed
-              </button>
-            </div>
+            <EmptyPanel icon={Megaphone} title="No new updates yet" text="Tournament notices will appear here when published." actionLabel="View news" actionHref="/announcements" compact />
           )}
         </div>
       </section>
+
+      <section className="space-y-5">
+        <SectionHeading title="Meet the Teams" subtitle="The departments bringing the tournament to life." actionLabel="Browse teams" actionHref="/teams" />
+        {featuredTeams.length ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+            {featuredTeams.map((team) => (
+              <Link key={team.id} href="/teams" className="group rounded-2xl border border-border bg-card p-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md sm:p-5">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-lg font-extrabold uppercase text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{team.name.slice(0, 1)}</span>
+                <h3 className="mt-3 truncate text-sm font-bold text-foreground">{team.name}</h3>
+                <p className="mt-1 truncate text-[11px] text-muted-foreground">{team.sportName || team.sport} · {team.members.length} players</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 dark:text-blue-300">View team <ArrowRight size={13} /></span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel icon={Users} title="Teams will appear here" text="Teams will show once they are registered for the tournament." actionLabel="Browse sports" actionHref="/sports" />
+        )}
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900 dark:bg-blue-950/30 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm dark:bg-blue-900 dark:text-blue-200"><Users size={19} /></span>
+          <div>
+            <h2 className="text-base font-bold text-foreground">{registrationOpen ? "Ready to compete?" : "Explore the tournament"}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{registrationOpen ? "Team registration is open for an active tournament." : "Follow fixtures, standings and tournament news in one place."}</p>
+          </div>
+        </div>
+        <Link href={registrationOpen ? "/public-register" : "/sports"} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white transition-colors hover:bg-blue-500">
+          {registrationOpen ? "Register a team" : "Explore sports"} <ArrowRight size={15} />
+        </Link>
+      </section>
+
+      <div className="sr-only" aria-live="polite">{liveMatches.length} matches currently live</div>
+    </div>
+  );
+}
+
+function StatusMetric({ label, value, status }: { label: string; value: string; status?: "live" | "normal" }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 flex items-center gap-2 truncate text-sm font-bold text-foreground">
+        {status === "live" && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500" />}
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionHeading({ title, subtitle, actionLabel, actionHref }: { title: string; subtitle: string; actionLabel: string; actionHref: string }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">{title}</h2>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{subtitle}</p>
+      </div>
+      <Link href={actionHref} className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-600 dark:text-blue-300">
+        {actionLabel} <ArrowRight size={14} />
+      </Link>
+    </div>
+  );
+}
+
+function EmptyPanel({ icon: Icon, title, text, actionLabel, actionHref, compact = false }: { icon: typeof Activity; title: string; text: string; actionLabel: string; actionHref: string; compact?: boolean }) {
+  return (
+    <div className={cn("rounded-2xl border border-dashed border-border bg-card text-center", compact ? "p-5" : "p-7 sm:p-9")}>
+      <Icon size={compact ? 22 : 28} className="mx-auto text-muted-foreground" />
+      <h3 className="mt-3 text-sm font-bold text-foreground">{title}</h3>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">{text}</p>
+      <Link href={actionHref} className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-600 dark:text-blue-300">
+        {actionLabel} <ArrowRight size={14} />
+      </Link>
     </div>
   );
 }
