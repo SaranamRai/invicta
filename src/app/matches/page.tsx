@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar as CalendarIcon, MapPin, Clock, ChevronLeft, ChevronRight, Radio } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, ChevronLeft, ChevronRight, Radio, Download, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { MatchData, LiveFeedPost } from "@/lib/types";
@@ -41,6 +41,9 @@ export default function MatchesPage() {
   const [isDateFilterActive, setIsDateFilterActive] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const [downloadSport, setDownloadSport] = useState("All Sports");
+  const [downloadCategory, setDownloadCategory] = useState("All");
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
 
@@ -134,6 +137,29 @@ export default function MatchesPage() {
     ? liveFeeds.filter((feed) => feed.matchId === selectedMatchId)
     : [];
 
+  const downloadMatches = () => {
+    const exportMatches = tournamentFilteredMatches.filter((match) => (
+      (downloadSport === "All Sports" || match.sport === downloadSport) &&
+      (downloadCategory === "All" || match.category === downloadCategory)
+    ));
+    const csvCell = (value: string | number | undefined) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const headers = ["Date", "Time", "Sport", "Category", "Team A", "Team B", "Venue", "Status", "Score"];
+    const rows = exportMatches.map((match) => [
+      match.date, match.time, match.sportName || match.sport, match.category,
+      match.teamA, match.teamB, match.venue, match.status, `${match.scoreA} - ${match.scoreB}`,
+    ].map(csvCell).join(","));
+    const blob = new Blob([[headers.map(csvCell).join(","), ...rows].join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `invicta-fixtures-${downloadSport.toLowerCase().replace(/\s+/g, "-")}-${downloadCategory.toLowerCase()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setIsDownloadOpen(false);
+  };
+
   const formatMonth = (date: Date) =>
     date.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase();
 
@@ -157,34 +183,34 @@ export default function MatchesPage() {
   ];
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="matches-page space-y-4 sm:space-y-6">
       {/* Header */}
-      <header className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:pb-6">
+      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:pb-5">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter sport-heading text-primary sm:text-4xl">Matches & Live Scores</h1>
-          <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
+          <h1 className="text-2xl font-black tracking-tighter sport-heading text-primary sm:text-3xl">Matches & Live Scores</h1>
+          <p className="mt-1 max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
             See every published fixture, follow live scores during a match, and read updates posted by volunteers. Selected date: {formatFullDate(selectedDate)}.
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-4 relative">
-          <div className="flex items-center gap-3">
+        <div className="relative flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); setIsDateFilterActive(true); }}
-              className="px-4 py-2 rounded-xl bg-secondary hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-all border border-border"
+              className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-white/10 text-[9px] font-black uppercase tracking-widest text-muted-foreground transition-all border border-border"
             >
               Today
             </button>
-            <div className="flex items-center gap-3 rounded-2xl bg-card border-2 border-border p-2">
+            <div             className="flex items-center gap-1.5 rounded-2xl bg-card border-2 border-border p-1.5">
               <button
                 onClick={() => { const d = new Date(currentDate); d.setMonth(d.getMonth() - 1); setCurrentDate(d); }}
-                className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-secondary transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-xl hover:bg-secondary transition-colors"
               >
                 <ChevronLeft size={20} />
               </button>
 
               <div
-                className="flex items-center gap-3 px-4 py-1 cursor-pointer group"
+                className="flex items-center gap-2 px-3 py-1 cursor-pointer group"
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
               >
                 <CalendarIcon size={18} className="text-accent group-hover:scale-110 transition-transform" />
@@ -195,7 +221,7 @@ export default function MatchesPage() {
 
               <button
                 onClick={() => { const d = new Date(currentDate); d.setMonth(d.getMonth() + 1); setCurrentDate(d); }}
-                className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-secondary transition-colors"
+                className="h-8 w-8 flex items-center justify-center rounded-xl hover:bg-secondary transition-colors"
               >
                 <ChevronRight size={20} />
               </button>
@@ -280,10 +306,10 @@ export default function MatchesPage() {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-border bg-card/70 p-3 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-4">
+      <section className="rounded-2xl border border-border bg-card/70 p-3 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-3.5">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
-          <h2 className="mt-1 text-xl font-black sport-heading text-foreground">Select Tournament</h2>
+          <h2 className="mt-1 text-lg font-black sport-heading text-foreground">Select Tournament</h2>
         </div>
         <select
           value={selectedTournamentId}
@@ -292,7 +318,7 @@ export default function MatchesPage() {
             setSelectedSport("All Sports");
             setSelectedMatchId(null);
           }}
-          className="mt-4 h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
+          className="mt-3 h-10 w-full rounded-2xl border border-border bg-background px-3 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
         >
           {tournaments.length === 0 ? (
             <option value="">No tournaments available</option>
@@ -305,14 +331,14 @@ export default function MatchesPage() {
       </section>
 
       {/* Navigation Tabs */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex w-fit flex-wrap gap-4 rounded-2xl bg-secondary/50 p-1">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex w-fit flex-wrap gap-1 rounded-2xl bg-secondary/50 p-1">
           {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all",
+                "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all",
                 activeTab === tab
                   ? "bg-primary text-primary-foreground shadow-lg"
                   : "text-muted-foreground hover:text-primary hover:bg-white/50"
@@ -330,7 +356,7 @@ export default function MatchesPage() {
               setSelectedSport(event.target.value);
               setSelectedMatchId(null);
             }}
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
+            className="h-10 w-full rounded-2xl border border-border bg-background px-3 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
           >
             {sportOptions.map((sport) => (
               <option key={sport} value={sport}>{sport}</option>
@@ -342,7 +368,7 @@ export default function MatchesPage() {
           <select
             value={selectedCategory}
             onChange={(event) => { setSelectedCategory(event.target.value); setSelectedMatchId(null); }}
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
+            className="h-10 w-full rounded-2xl border border-border bg-background px-3 text-sm font-black text-foreground outline-none transition-colors focus:border-accent"
           >
             <option value="All">All</option>
             <option value="Male">Male</option>
@@ -350,7 +376,73 @@ export default function MatchesPage() {
             <option value="Mixed">Mixed</option>
           </select>
         </label>
+        <button
+          type="button"
+          onClick={() => {
+            setDownloadSport(selectedSport);
+            setDownloadCategory(selectedCategory);
+            setIsDownloadOpen(true);
+          }}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground shadow-sm transition-transform hover:scale-[1.02]"
+        >
+          <Download size={15} /> Download
+        </button>
       </div>
+
+      <AnimatePresence>
+        {isDownloadOpen && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDownloadOpen(false); }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="download-fixtures-title"
+              className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            >
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="download-fixtures-title" className="text-lg font-black sport-heading text-foreground">Download Fixtures</h2>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">Choose the sport and category to export as CSV.</p>
+                </div>
+                <button type="button" onClick={() => setIsDownloadOpen(false)} aria-label="Close download dialog" className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-accent">Sport</span>
+                  <select value={downloadSport} onChange={(event) => setDownloadSport(event.target.value)} className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground outline-none focus:border-accent">
+                    {sportOptions.map((sport) => <option key={sport} value={sport}>{sport}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-accent">Category</span>
+                  <select value={downloadCategory} onChange={(event) => setDownloadCategory(event.target.value)} className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground outline-none focus:border-accent">
+                    <option value="All">All</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Mixed">Mixed</option>
+                  </select>
+                </label>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsDownloadOpen(false)} className="h-10 rounded-xl border border-border px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-secondary">Cancel</button>
+                <button type="button" onClick={downloadMatches} className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground">
+                  <Download size={14} /> Download CSV
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Two-column layout: Matches (left) + Live Feed (right) */}
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-7">
