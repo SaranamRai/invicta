@@ -187,7 +187,7 @@ export default function PublicDashboard() {
   };
 
   return (
-    <div className="dashboard-surface min-h-screen space-y-10 bg-background text-foreground">
+    <div className="dashboard-surface min-h-screen space-y-6 bg-background text-foreground sm:space-y-8">
       <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
         <div className="absolute inset-0 bg-no-repeat opacity-100" style={heroBackdropStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.36)_100%)]" />
@@ -290,7 +290,7 @@ export default function PublicDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
+      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
         <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">

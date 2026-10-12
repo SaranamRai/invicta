@@ -64,7 +64,7 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="relative min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
-        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-4 backdrop-blur-xl sm:px-8 md:px-12 md:py-5">
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/90 px-3 py-3 backdrop-blur-xl sm:px-6 sm:py-4 md:px-8">
           <div className="flex min-w-0 items-center gap-4">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volunteer Area</p>
@@ -73,12 +73,12 @@ export function VolunteerShell({ children }: { children: React.ReactNode }) {
           </div>
           <ThemeToggle />
         </header>
-        <main className="p-3 sm:p-8 md:p-12">
+        <main className="p-3 sm:p-5 md:p-6 lg:p-8">
           <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 opacity-[0.02] blur-[20px] pointer-events-none select-none sm:h-96 sm:w-96">
             <img src="/msu-logo.png" alt="" className="w-full h-full object-contain" />
           </div>
 
-          <div className="relative z-10 max-w-7xl mx-auto">
+          <div className="relative z-10 mx-auto w-full max-w-7xl">
             {children}
           </div>
         </main>

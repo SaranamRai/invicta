@@ -26,11 +26,11 @@ export function Card({ children, className, glass = false, variant = "default", 
 }
 
 export function CardHeader({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("mb-6 space-y-1", className)}>{children}</div>;
+  return <div className={cn("mb-4 space-y-1", className)}>{children}</div>;
 }
 
 export function CardTitle({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <h3 className={cn("text-xl font-bold leading-none tracking-tight sport-heading", className)}>{children}</h3>;
+  return <h3 className={cn("text-lg font-bold leading-tight tracking-tight sport-heading sm:text-xl", className)}>{children}</h3>;
 }
 
 

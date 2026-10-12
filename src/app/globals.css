@@ -385,6 +385,24 @@ a {
   overflow-wrap: anywhere;
 }
 
+/* Keep dense dashboard layouts usable on narrow screens without changing page content. */
+.dashboard-surface {
+  min-width: 0;
+}
+
+.dashboard-surface main,
+.dashboard-surface section {
+  min-width: 0;
+}
+
+.dashboard-surface table {
+  max-width: 100%;
+}
+
+.dashboard-surface [class*="grid-cols-"] > * {
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .dashboard-surface button,
   .dashboard-surface a {
@@ -445,6 +463,20 @@ a {
   .dashboard-surface [class*="rounded-[2.5rem]"],
   .dashboard-surface [class*="rounded-[3rem]"] {
     border-radius: 1.25rem !important;
+  }
+
+  .dashboard-surface [class*="p-8"],
+  .dashboard-surface [class*="p-10"],
+  .dashboard-surface [class*="p-12"],
+  .dashboard-surface [class*="p-16"],
+  .dashboard-surface [class*="p-20"] {
+    padding: 1rem !important;
+  }
+
+  .dashboard-surface [class*="gap-8"],
+  .dashboard-surface [class*="gap-10"],
+  .dashboard-surface [class*="gap-12"] {
+    gap: 1.25rem !important;
   }
 }
 

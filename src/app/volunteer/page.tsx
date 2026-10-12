@@ -129,7 +129,7 @@ export default function VolunteerDashboard() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-4xl font-black tracking-tighter text-foreground uppercase sport-heading">Match Dashboard</h1>
         <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
@@ -138,8 +138,8 @@ export default function VolunteerDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 flex items-center gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3 sm:gap-4">
+        <Card className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
           <div className="h-12 w-12 rounded-xl bg-accent/20 flex items-center justify-center text-accent">
             <Activity size={24} />
           </div>
@@ -149,7 +149,7 @@ export default function VolunteerDashboard() {
           </div>
         </Card>
         
-        <Card className="p-6 flex items-center gap-4">
+        <Card className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
           <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
             <Trophy size={24} />
           </div>
@@ -159,7 +159,7 @@ export default function VolunteerDashboard() {
           </div>
         </Card>
 
-        <Card className="p-6 flex items-center gap-4">
+        <Card className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
           <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
             <Clock size={24} />
           </div>
@@ -170,8 +170,8 @@ export default function VolunteerDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-        <div className="xl:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 xl:gap-8">
+        <div className="space-y-5 xl:col-span-2">
           <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-black uppercase tracking-wider text-foreground">Matches Assigned for Updates</h2>

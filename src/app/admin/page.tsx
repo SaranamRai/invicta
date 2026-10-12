@@ -906,7 +906,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-6">
         {activeTab === "dashboard" && (
           <>
             {canManageSetup && (
@@ -928,7 +928,7 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === "teams" && canManageSetup && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <TeamManager
               teams={teams}
               tournaments={tournaments}
