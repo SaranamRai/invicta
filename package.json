@@ -5,9 +5,13 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "next dev -H 127.0.0.1",
+    "dev:public": "set NEXT_PUBLIC_APP_TYPE=public&& next dev -H 127.0.0.1 -p 5173",
+    "dev:portal": "set NEXT_PUBLIC_APP_TYPE=portal&& next dev -H 127.0.0.1 -p 5174",
     "dev:api": "npm --prefix backend run dev",
     "start:api": "npm --prefix backend run start",
     "build": "next build",
+    "build:public": "set NEXT_PUBLIC_APP_TYPE=public&& next build",
+    "build:portal": "set NEXT_PUBLIC_APP_TYPE=portal&& next build",
     "start": "next start",
     "lint": "eslint",
     "test:toggle": "node scripts/test-toggle.js"

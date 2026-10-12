@@ -5,14 +5,33 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { MatchTrackerProvider } from "@/components/layout/match-tracker";
+import { PublicDashboardShell } from "@/components/layout/public-dashboard-shell";
+import { InvictaAssistant } from "@/components/invicta-assistant";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
   const pathname = usePathname();
 
   const isLandingPage = pathname === "/";
-  const isAboutPage = pathname === "/about";
+  const isPublicPage = [
+    "/about",
+    "/sports",
+    "/fixtures",
+    "/live",
+    "/live-score",
+    "/results",
+    "/standings",
+    "/announcements",
+    "/rules",
+    "/gallery",
+    "/public-register",
+    "/departments",
+    "/contact",
+    "/teams",
+    "/matches",
+    "/points-table",
+    "/public-dashboard",
+  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
   const isAuthPage = pathname === "/login";
   const isTeamRegistrationPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
@@ -21,8 +40,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminPage = pathname.startsWith("/admin") || pathname.startsWith("/admin-dashboard");
   const isCoordinatorPage = pathname.startsWith("/coordinator-dashboard");
 
-  if (isLandingPage || isAboutPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
+  if (isLandingPage) {
+    return <>{children}<InvictaAssistant /></>;
+  }
+
+  if (isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
     return <>{children}</>;
+  }
+
+  if (isPublicPage) {
+    return <><PublicDashboardShell>{children}</PublicDashboardShell><InvictaAssistant /></>;
   }
 
   if (loading && isAuthPage) {
@@ -43,18 +70,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <MatchTrackerProvider>
-      <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col lg:ml-52 2xl:ml-60">
-          <div className="fixed right-4 top-4 z-50 hidden lg:block">
-            <ThemeToggle />
-          </div>
-          <main className="mx-auto w-full max-w-[1440px] px-3 py-3 transition-all duration-300 sm:p-4 lg:p-5 xl:p-6">
-            {children}
-          </main>
+    <div className="dashboard-surface flex min-h-screen w-full flex-col overflow-x-hidden bg-background text-foreground lg:flex-row">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-64">
+        <div className="fixed right-6 top-6 z-50 hidden lg:block">
+          <ThemeToggle />
         </div>
+        <main className="mx-auto w-full max-w-[1440px] px-2 py-2 transition-all duration-300 sm:p-5 lg:p-6 xl:p-8">
+          {children}
+        </main>
       </div>
-    </MatchTrackerProvider>
+    </div>
   );
 }

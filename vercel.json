@@ -20,15 +20,7 @@
   "services": {
     "frontend": {
       "root": ".",
-      "framework": "nextjs",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "backend",
-          "format": "url",
-          "env": "BACKEND_URL"
-        }
-      ]
+      "framework": "nextjs"
     },
     "backend": {
       "root": "backend",
@@ -37,7 +29,6 @@
         {
           "source": "/_/backend/:path(.*)?",
           "destination": "/:path"
-       
         }
       ]
     }

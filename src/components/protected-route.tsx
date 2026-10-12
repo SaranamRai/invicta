@@ -77,7 +77,7 @@ export function ProtectedRoute({ allowedRole, children }: ProtectedRouteProps) {
           </div>
           <h1 className="sport-heading text-2xl font-black">Access Denied</h1>
           <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">
-            This account is not allowed to open this dashboard.
+            Access denied. You are not allowed to access this page.
           </p>
           <button
             type="button"

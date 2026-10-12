@@ -2,20 +2,17 @@ import mongoose from "mongoose";
 
 const apiLogSchema = new mongoose.Schema(
   {
-    method: { type: String, trim: true },
-    route: { type: String, trim: true },
-    statusCode: { type: Number, default: 0 },
-    responseTimeMs: { type: Number, default: 0 },
-    userRole: { type: String, trim: true },
-    userEmail: { type: String, trim: true },
-    userAgent: { type: String, trim: true },
-    ip: { type: String, trim: true },
+    method: { type: String, required: true },
+    path: { type: String, required: true, index: true },
+    statusCode: { type: Number, required: true, index: true },
+    durationMs: { type: Number, required: true },
+    isSlow: { type: Boolean, default: false, index: true },
+    userRole: { type: String, default: "" },
+    userEmail: { type: String, default: "" },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: true }
 );
 
 apiLogSchema.index({ createdAt: -1 });
-apiLogSchema.index({ statusCode: 1, createdAt: -1 });
-apiLogSchema.index({ route: 1, createdAt: -1 });
 
-export default mongoose.model("ApiLog", apiLogSchema);
+export default mongoose.models.ApiLog || mongoose.model("ApiLog", apiLogSchema);

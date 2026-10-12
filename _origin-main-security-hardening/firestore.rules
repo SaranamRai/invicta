@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function rolePath() {
+      return /databases/$(database)/documents/roleAccounts/$(request.auth.uid);
+    }
+
+    function hasRole(role) {
+      return signedIn() &&
+        exists(rolePath()) &&
+        get(rolePath()).data.role == role;
+    }
+
+    function canBootstrapDemoRole(uid) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        !exists(rolePath()) &&
+        request.resource.data.email == request.auth.token.email &&
+        (
+          (request.auth.token.email == "admin@gmail.com" && request.resource.data.role == "admin") ||
+          (request.auth.token.email == "volunteer@gmail.com" && request.resource.data.role == "volunteer") ||
+          (request.auth.token.email == "coordinator@gmail.com" && request.resource.data.role == "coordinator")
+        );
+    }
+
+    function isAdmin() {
+      return hasRole("admin");
+    }
+
+    function isVolunteer() {
+      return hasRole("volunteer");
+    }
+
+    function isCoordinator() {
+      return hasRole("coordinator");
+    }
+
+    function isAdminOrVolunteer() {
+      return isAdmin() || isVolunteer();
+    }
+
+    function isAdminOrCoordinator() {
+      return isAdmin() || isCoordinator();
+    }
+
+    function coordinatorDepartment() {
+      return get(rolePath()).data.department;
+    }
+
+    function coordinatorSport() {
+      return get(rolePath()).data.assignedSport;
+    }
+
+    function coordinatorCanManageTeam(data) {
+      return isCoordinator() &&
+        (!get(rolePath()).data.keys().hasAny(["department"]) || data.department == coordinatorDepartment()) &&
+        (!get(rolePath()).data.keys().hasAny(["assignedSport"]) || data.sport == coordinatorSport());
+    }
+
+    function publicRead() {
+      return true;
+    }
+
+    match /roleAccounts/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin() || canBootstrapDemoRole(uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /sports/{docId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /departments/{docId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /venues/{docId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if publicRead();
+      allow create: if isAdminOrCoordinator() &&
+        (isAdmin() || coordinatorCanManageTeam(request.resource.data));
+      allow update: if isAdmin() ||
+        (coordinatorCanManageTeam(resource.data) && coordinatorCanManageTeam(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /players/{playerId} {
+      allow read: if publicRead();
+      allow create, update: if isAdminOrCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if publicRead();
+      allow create, delete: if isAdmin();
+      allow update: if isAdminOrVolunteer();
+    }
+
+    match /fixtures/{fixtureId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /liveScores/{scoreId} {
+      allow read: if publicRead();
+      allow create, update: if isAdminOrVolunteer();
+      allow delete: if isAdmin();
+    }
+
+    match /liveFeeds/{feedId} {
+      allow read: if publicRead();
+      allow create, update: if isAdminOrVolunteer();
+      allow delete: if isAdmin();
+    }
+
+    match /activityLogs/{logId} {
+      allow read: if publicRead();
+      allow create: if isAdminOrVolunteer();
+      allow update, delete: if isAdmin();
+    }
+
+    match /results/{resultId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /pointsTable/{rowId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if publicRead();
+      allow write: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if publicRead();
+      allow create: if isAdminOrVolunteer() || isCoordinator();
+      allow update, delete: if isAdmin();
+    }
+
+    match /rules/{ruleId} {
+      allow read: if publicRead();
+      allow create, update: if isAdminOrCoordinator();
+      allow delete: if isAdmin();
+    }
+
+    match /gallery/{imageId} {
+      allow read: if publicRead();
+      allow create: if isAdminOrVolunteer();
+      allow update, delete: if isAdmin();
+    }
+
+    match /issues/{issueId} {
+      allow read: if isAdminOrVolunteer() || isCoordinator();
+      allow create: if isAdminOrVolunteer() || isCoordinator();
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin();
+      allow write: if signedIn() && request.auth.uid == userId;
+    }
+  }
+}

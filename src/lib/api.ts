@@ -1295,6 +1295,95 @@ export function getAdminSports() {
   return apiFetch<MongoSport[]>("/admin/sports");
 }
 
+export interface AdminHealthPayload {
+  status: string;
+  backend: string;
+  mongodb: string;
+  smtp: string;
+  uptime: string;
+  uptimeSeconds: number;
+  environment: string;
+  startedAt: string;
+  timestamp: string;
+}
+
+export interface AdminStatsPayload {
+  totalRequestsToday: number;
+  failedRequestsToday: number;
+  averageResponseTimeMs: number;
+  slowestResponseTimeMs: number;
+  slowestRoutes: Array<{
+    method: string;
+    path: string;
+    statusCode: number;
+    durationMs: number;
+    createdAt: string;
+  }>;
+  roleCounts: Record<string, number>;
+  liveMatches: number;
+}
+
+export interface AdminLogPayload {
+  _id: string;
+  method?: string;
+  path?: string;
+  route?: string;
+  statusCode?: number;
+  durationMs?: number;
+  message?: string;
+  userRole?: string;
+  userEmail?: string;
+  createdAt?: string;
+}
+
+export function getTechnicalAdminHealth() {
+  return apiFetch<AdminHealthPayload>("/admin/health");
+}
+
+export function getTechnicalAdminStats() {
+  return apiFetch<AdminStatsPayload>("/admin/stats");
+}
+
+export function getTechnicalAdminDatabaseStatus() {
+  return apiFetch<{
+    connected: boolean;
+    name: string;
+    host: string;
+    collections: string[];
+  }>("/admin/database-status");
+}
+
+export function getTechnicalAdminApiLogs() {
+  return apiFetch<AdminLogPayload[]>("/admin/api-logs?limit=25");
+}
+
+export function getTechnicalAdminErrorLogs() {
+  return apiFetch<AdminLogPayload[]>("/admin/error-logs?limit=25");
+}
+
+export function getTechnicalAdminEmailStatus() {
+  return apiFetch<{
+    configured: boolean;
+    host: string;
+    port: number;
+    user: string;
+    secure: boolean;
+    from: string;
+  }>("/admin/email-status");
+}
+
+export function testTechnicalAdminSmtp() {
+  return apiFetch<{ sent: boolean; configured: boolean; message: string }>("/admin/test-smtp", {
+    method: "POST",
+  });
+}
+
+export function testTechnicalAdminMongodb() {
+  return apiFetch<{ ok: boolean; readyState: number; database: string; timestamp: string }>("/admin/test-mongodb", {
+    method: "POST",
+  });
+}
+
 export function createAdminSport(payload: {
   sportName: string;
   categories?: ("Male" | "Female" | "Mixed")[];
@@ -1663,181 +1752,4 @@ export async function downloadApprovedRegistrationsExcel(params?: Record<string,
   window.URL.revokeObjectURL(downloadUrl);
 
   return filename;
-}
-
-export interface TechnicalAdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: AuthSession["role"];
-  status: "active" | "inactive";
-  assignedSport?: string;
-  department?: string;
-  createdAt?: string;
-}
-
-export interface TechnicalAdminHealth {
-  environment: string;
-  frontendUrl: string;
-  backendUrl: string;
-  uptimeSeconds: number;
-  database: { connected: boolean; readyState: number; host: string; name: string };
-  smtp: TechnicalEmailStatus;
-  liveScoreService: { healthy: boolean; message: string };
-  deployment: Record<string, string>;
-  appVersion: string;
-  checkedAt: string;
-}
-
-export interface TechnicalEmailStatus {
-  configured: boolean;
-  healthy: boolean;
-  provider: string;
-  from: string;
-  sent: number;
-  failed: number;
-  lastEmailSentAt?: string | null;
-  lastEmailError?: string;
-  lastCheckedAt?: string | null;
-  coordinatorCredentialEmails?: number;
-  volunteerCredentialEmails?: number;
-  message?: string;
-}
-
-export interface TechnicalRouteUsage {
-  route: string;
-  count: number;
-  avgResponseTimeMs: number;
-}
-
-export interface TechnicalAdminStats {
-  api: {
-    requestsToday: number;
-    failedToday: number;
-    notFoundToday: number;
-    serverErrorsToday: number;
-    averageResponseTimeMs: number;
-    lastError?: TechnicalErrorLog | null;
-    mostUsedRoutes: TechnicalRouteUsage[];
-  };
-  registrations: Record<string, number>;
-  fixtures: Record<string, number>;
-  users: TechnicalAdminUser[];
-  checkedAt: string;
-}
-
-export interface TechnicalCollectionStatus {
-  key: string;
-  collection: string;
-  count: number;
-}
-
-export interface TechnicalDatabaseStatus {
-  database: { connected: boolean; readyState: number; host: string; name: string };
-  collections: TechnicalCollectionStatus[];
-  checkedAt: string;
-}
-
-export interface TechnicalApiLog {
-  _id: string;
-  method: string;
-  route: string;
-  statusCode: number;
-  responseTimeMs: number;
-  userRole?: string;
-  userEmail?: string;
-  createdAt: string;
-}
-
-export interface TechnicalErrorLog extends TechnicalApiLog {
-  errorType?: string;
-  message?: string;
-}
-
-export interface TechnicalAuditLog {
-  _id: string;
-  action: string;
-  performedBy?: string;
-  role?: string;
-  status?: string;
-  route?: string;
-  details?: string;
-  createdAt: string;
-}
-
-export interface TechnicalLiveMatch {
-  id: string;
-  matchTitle: string;
-  sport?: string;
-  category?: string;
-  status: string;
-  teamAName?: string;
-  teamBName?: string;
-  scoreA: number;
-  scoreB: number;
-  lastScoreUpdate?: string | null;
-  warnings: string[];
-}
-
-export function getTechnicalAdminHealth() {
-  return apiFetch<TechnicalAdminHealth>("/admin/health");
-}
-
-export function getTechnicalAdminStats() {
-  return apiFetch<TechnicalAdminStats>("/admin/stats");
-}
-
-export function getTechnicalAdminDatabaseStatus() {
-  return apiFetch<TechnicalDatabaseStatus>("/admin/database-status");
-}
-
-export function getTechnicalAdminApiLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalApiLog[] }>(withQuery("/admin/api-logs", params));
-}
-
-export function getTechnicalAdminErrorLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalErrorLog[] }>(withQuery("/admin/error-logs", params));
-}
-
-export function getTechnicalAdminAuditLogs(params?: Record<string, string | undefined>) {
-  return apiFetch<{ logs: TechnicalAuditLog[] }>(withQuery("/admin/audit-logs", params));
-}
-
-export function getTechnicalAdminLiveMonitoring() {
-  return apiFetch<{ matches: TechnicalLiveMatch[]; checkedAt: string }>("/admin/live-monitoring");
-}
-
-export function getTechnicalAdminEmailStatus() {
-  return apiFetch<TechnicalEmailStatus>("/admin/email-status");
-}
-
-export function testTechnicalAdminSmtp() {
-  return apiFetch<{ sent: boolean; skipped: boolean; message: string }>("/admin/test-smtp", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-export function testTechnicalAdminMongoDb() {
-  return apiFetch<{ ok: boolean; responseTimeMs: number }>("/admin/test-mongodb", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-export function updateTechnicalAdminUserStatus(role: string, id: string, status: "active" | "inactive") {
-  return apiFetch<{ user: TechnicalAdminUser }>(`/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-}
-
-export function resetTechnicalAdminUserPassword(role: string, id: string) {
-  return apiFetch<{ message: string; temporaryPassword: string; user: TechnicalAdminUser }>(
-    `/admin/system-users/${encodeURIComponent(role)}/${encodeURIComponent(id)}/reset-password`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
 }

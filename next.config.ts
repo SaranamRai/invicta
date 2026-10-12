@@ -4,8 +4,15 @@ import { fileURLToPath } from "node:url";
 
 const apiProxyTarget = process.env.API_PROXY_TARGET || "http://127.0.0.1:5000";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
+const appType = process.env.NEXT_PUBLIC_APP_TYPE;
+const distDir = appType === "public"
+  ? ".next-public"
+  : appType === "portal"
+    ? ".next-portal"
+    : ".next";
 
 const nextConfig: NextConfig = {
+  distDir,
   turbopack: {
     root: projectRoot,
   },

@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "teams": {
+      ".read": true,
+      "$teamId": {
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'name', 'department', 'sport', 'members', 'captainName', 'email', 'phone', 'contactNumber', 'registeredAt', 'source']) && newData.child('id').val() == $teamId && newData.child('phone').isString() && newData.child('phone').val().matches(/^\\d{10}$/) && newData.child('contactNumber').isString() && newData.child('contactNumber').val().matches(/^\\d{10}$/)"
+      }
+    }
+  }
+}
