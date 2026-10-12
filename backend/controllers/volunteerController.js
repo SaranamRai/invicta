@@ -296,6 +296,14 @@ export async function createLiveFeed(req, res) {
   return res.status(201).json(feed);
 }
 
+export async function volunteerActivity(req, res) {
+  const feeds = await LiveFeed.find({ addedBy: req.user.id })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+  return res.json(feeds);
+}
+
 export async function uploadGallery(req, res) {
   const image = await Gallery.create({ ...req.body, uploadedBy: req.user.id, uploadedByRole: req.user.role });
   return res.status(201).json(image);

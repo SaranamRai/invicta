@@ -481,6 +481,9 @@ function MemberCard({ item }: { item: { member: unknown; teamName: string; depar
           <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {getSportDisplayName(item.sport, item.sportName)} / {item.department} / {item.teamName}
           </p>
+          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">
+            {item.category} category
+          </p>
           <p className="mt-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <Calendar size={11} />
             {formatDate(item.registeredAt)}

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { getAssignedMatches, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
-import { getPublicLiveFeeds } from "@/lib/api";
+import { getVolunteerActivity } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatMatchClock, getMatchClockText, getMatchElapsedSeconds } from "@/lib/match-clock";
 import { getRoleAccount } from "@/lib/role-auth";
@@ -41,7 +41,7 @@ export default function VolunteerDashboard() {
       if (loading) return;
       loading = true;
       try {
-        const [matchesData, feeds] = await Promise.all([getAssignedMatches(), getPublicLiveFeeds()]);
+        const [matchesData, feeds] = await Promise.all([getAssignedMatches(), getVolunteerActivity()]);
         if (!isMounted) return;
 
         setMatches(matchesData.sort((a, b) => b.lastUpdated - a.lastUpdated));
@@ -55,7 +55,7 @@ export default function VolunteerDashboard() {
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
-        setRecentLogs(logs.slice(0, 5));
+        setRecentLogs(logs);
         setUpdatesToday(logs.filter((log) => log.timestamp >= startOfToday.getTime()).length);
       } finally {
         loading = false;
@@ -80,6 +80,16 @@ export default function VolunteerDashboard() {
   const filteredMatches = matches.filter(match => Boolean(assignedSport) || selectedSport === "All" || match.sport === selectedSport);
   const activeMatches = matches.filter(match => match.status === "Live");
   const nextMatch = matches.find(match => match.status === "Upcoming");
+  const matchById = new Map(matches.map((match) => [match.id, match]));
+  const finishedMatchIds = new Set(
+    recentLogs
+      .filter((log) => /full time|finished|match ended|auto stopped.*full time|updated match status to finished/i.test(log.action))
+      .map((log) => log.matchId)
+  );
+  const updatedMatches = Array.from(new Set(recentLogs.map((log) => log.matchId)))
+    .map((matchId) => matchById.get(matchId))
+    .filter((match): match is MatchData => Boolean(match));
+  const finishedMatches = updatedMatches.filter((match) => finishedMatchIds.has(match.id));
 
   const startMatch = async (match: MatchData) => {
     setStartingId(match.id);
@@ -212,6 +222,9 @@ export default function VolunteerDashboard() {
                         {getSportDisplayName(match.sport, match.sportName)} / {match.type}
                       </span>
                       <h3 className="mt-2 text-lg font-black uppercase tracking-wide text-foreground">{match.teamA} vs {match.teamB}</h3>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-accent">
+                        {match.sportName || match.sport} / {match.category || "Male"}
+                      </p>
                     </div>
                     <span className={cn(
                       "rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest",
@@ -301,10 +314,10 @@ export default function VolunteerDashboard() {
           </div>
         </div>
 
-        {/* Recent Activity */}
+        {/* Volunteer activity */}
         <div className="space-y-6">
           <h2 className="text-xl font-black uppercase tracking-wider text-foreground border-b border-border pb-4">
-            Recent Activity
+            Your Match Activity
           </h2>
           
           <div className="space-y-4">
@@ -314,6 +327,9 @@ export default function VolunteerDashboard() {
                   <Activity size={14} />
                 </div>
                 <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-accent">
+                    {matchById.get(log.matchId)?.teamA || "Match"} {matchById.get(log.matchId) ? `vs ${matchById.get(log.matchId)?.teamB}` : ""}
+                  </p>
                   <p className="text-sm text-foreground">{log.action}</p>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mt-1">
                     {formatDistanceToNow(log.timestamp, { addSuffix: true })} • {log.volunteerEmail}
@@ -324,6 +340,29 @@ export default function VolunteerDashboard() {
               <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
                 <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No recent activity</p>
               </div>
+            )}
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Matches You Finished</h3>
+              <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[10px] font-black text-accent">{finishedMatches.length}</span>
+            </div>
+            {finishedMatches.length > 0 ? (
+              <div className="space-y-2">
+                {finishedMatches.map((match) => (
+                  <Link key={match.id} href={`/volunteer/matches/${match.id}`} className="block rounded-xl border border-border bg-secondary/40 p-3 transition-colors hover:border-accent">
+                    <p className="text-xs font-black uppercase text-foreground">{match.teamA} vs {match.teamB}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {match.category || "Male"} / Final score {match.scoreA}-{match.scoreB}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-border p-4 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                No finished matches recorded yet
+              </p>
             )}
           </div>
         </div>

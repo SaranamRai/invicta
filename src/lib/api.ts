@@ -954,6 +954,10 @@ export function getVolunteerTeams() {
   return apiFetch<TeamSyncPayload[]>("/volunteer/teams");
 }
 
+export function getVolunteerActivity() {
+  return apiFetch<MongoLiveFeed[]>("/volunteer/activity");
+}
+
 export function getPublicSports() {
   return publicApiFetch<MongoSport>("/public/sports");
 }

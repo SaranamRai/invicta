@@ -6,6 +6,7 @@ import {
   submitResult,
   updateLiveScore,
   uploadGallery,
+  volunteerActivity,
   volunteerTeams,
 } from "../controllers/volunteerController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -17,6 +18,7 @@ router.use(authMiddleware, allowRoles("volunteer"));
 
 router.get("/assigned-matches", assignedMatches);
 router.get("/teams", volunteerTeams);
+router.get("/activity", volunteerActivity);
 router.put("/live-scores/:fixtureId", updateLiveScore);
 router.post("/live-feeds", createLiveFeed);
 router.post("/gallery", uploadGallery);
