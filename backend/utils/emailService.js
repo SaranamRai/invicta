@@ -163,6 +163,47 @@ export async function sendTeamApprovedEmail({ teamName, captainName, email, spor
   return { sent: true, skipped: false };
 }
 
+export async function sendTeamRejectedEmail({ teamName, captainName, email, sportName, tournamentName, rejectionReason }) {
+  const subject = `INVICTA Team Registration Update - ${teamName}`;
+  const text = [
+    `Hello ${captainName || teamName},`,
+    "",
+    `Your team "${teamName}" was not approved for ${sportName || "the selected sport"}${tournamentName ? ` in ${tournamentName}` : ""}.`,
+    rejectionReason ? `Reason: ${rejectionReason}` : "",
+    "",
+    "Please contact the sports management team if you need more information.",
+    "",
+    "Regards,",
+    "Sports Management Team",
+  ].filter(Boolean).join("\n");
+  const html =
+    `<h2>Team Registration Update</h2>` +
+    `<p>Hello ${captainName || teamName},</p>` +
+    `<p>Your team <strong>${teamName}</strong> was not approved for <strong>${sportName || "the selected sport"}</strong>${tournamentName ? ` in <strong>${tournamentName}</strong>` : ""}.</p>` +
+    (rejectionReason ? `<p><strong>Reason:</strong> ${rejectionReason}</p>` : "") +
+    `<p>Please contact the sports management team if you need more information.</p>` +
+    `<hr>` +
+    `<p style="color:#666;font-size:12px">Regards,<br>Sports Management Team</p>`;
+
+  const transport = getTransporter();
+  if (!transport) {
+    console.warn("[EMAIL] SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and EMAIL_FROM in backend environment variables.");
+    console.log(`[EMAIL] Would send rejection to ${email}:`, { teamName, captainName, sportName, tournamentName, rejectionReason });
+    return { sent: false, skipped: true };
+  }
+
+  await transport.sendMail({
+    from: process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.SMTP_USER || "noreply@invicta-sports.com",
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  console.log(`[EMAIL] Sent to ${email}, subject: "${subject}"`);
+  return { sent: true, skipped: false };
+}
+
 export function getEmailErrorMessage(error) {
   if (error?.code === "EAUTH" || error?.responseCode === 535) {
     return "Gmail rejected the SMTP login. Use a Google App Password for SMTP_PASS and make sure SMTP_USER is the same Gmail account.";
