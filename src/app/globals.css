@@ -399,6 +399,29 @@ a {
   max-width: 100%;
 }
 
+.responsive-match-list {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .responsive-match-list {
+    max-height: min(70vh, 860px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.25rem;
+  }
+}
+
+@media (max-width: 1023px) {
+  .responsive-match-list {
+    overflow: visible;
+  }
+}
+
+.responsive-match-list > * {
+  min-width: 0;
+}
+
 .dashboard-surface [class*="grid-cols-"] > * {
   min-width: 0;
 }

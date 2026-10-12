@@ -198,7 +198,7 @@ export default function VolunteerDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="responsive-match-list grid grid-cols-1 gap-4 lg:grid-cols-2">
             {filteredMatches.length > 0 ? filteredMatches.map(match => {
               const isRunning = match.status === "Live" && match.clockRunning;
               const isFinished = match.status === "Finished" || match.period === "Full Time";

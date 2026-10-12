@@ -422,7 +422,7 @@ export function FixtureViewer({
       )}
 
       {/* Fixtures by Date */}
-      <div className="space-y-8">
+      <div className="responsive-match-list space-y-5 sm:space-y-6">
         {Object.entries(groupedByDate).length === 0 ? (
           <Card className="bg-slate-900/60 border-dashed border-white/10 text-white animate-fadeIn">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -451,11 +451,11 @@ export function FixtureViewer({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {dateFixtures.map((fixture) => (
                   <Card key={fixture.id} className="bg-slate-900/60 border-white/5 text-white hover:border-accent transition-colors">
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
                         {/* Match Info */}
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">

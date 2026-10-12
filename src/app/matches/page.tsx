@@ -356,7 +356,7 @@ export default function MatchesPage() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-7">
 
         {/* ── Match List ── */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="responsive-match-list lg:col-span-2 space-y-5 sm:space-y-6">
           <AnimatePresence mode="popLayout">
             {filteredMatches.length > 0 ? filteredMatches.map((match, i) => (
               <motion.div
@@ -416,7 +416,7 @@ export default function MatchesPage() {
                             🏆
                           </div>
                           <div className="min-w-0">
-                            <span className="sport-heading block truncate text-2xl font-black uppercase tracking-wide text-white lg:text-3xl">{match.teamA}</span>
+                            <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamA}</span>
                           </div>
                         </div>
 
@@ -441,7 +441,7 @@ export default function MatchesPage() {
                         {/* Team B */}
                         <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-end gap-4 text-right">
                           <div className="min-w-0">
-                            <span className="sport-heading block truncate text-2xl font-black uppercase tracking-wide text-white lg:text-3xl">{match.teamB}</span>
+                            <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamB}</span>
                           </div>
                           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
                             🥈
