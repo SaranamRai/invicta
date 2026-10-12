@@ -14,8 +14,8 @@ export default function ContactPage() {
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
         <InfoCard icon={HelpCircle} title="Event Help Desk" text="For schedule, venue, and match-day questions." />
-        <InfoCard icon={Mail} title="Contact Email" text="contact@invicta-sports.com" href="mailto:contact@invicta-sports.com" />
-        <InfoCard icon={Phone} title="Contact Phone" text="+91 XXXXXXXXXX" href="tel:+91XXXXXXXXXX" />
+        <InfoCard icon={Mail} title="Contact Email" text="msuinvicta2026@gmail.com" href="mailto:msuinvicta2026@gmail.com" />
+        <InfoCard icon={Phone} title="Contact Phone" text="+91 9883924453" href="tel:+919883924453" />
         <InfoCard icon={MapPin} title="Venue Support" text="Report urgent ground or equipment issues to a volunteer or coordinator." />
       </div>
     </div>
