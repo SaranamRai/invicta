@@ -9,53 +9,24 @@ interface JwtPayload {
 }
 
 const AUTH_COOKIE_NAME = "sportsAuthToken";
-const appType = process.env.NEXT_PUBLIC_APP_TYPE;
 const roleHomePath: Record<PortalRole, string> = {
-  admin: "/admin-dashboard",
-  supercoordinator: "/admin",
-  volunteer: "/volunteer-dashboard",
-  coordinator: "/coordinator-dashboard",
+  admin: "/portal/7fK2mQ",
+  supercoordinator: "/portal/9xP4sL",
+  volunteer: "/portal/3vN8rT",
+  coordinator: "/portal/5qH6bW",
 };
 
 const protectedRoutes: Array<{ prefix: string; roles: PortalRole[] }> = [
-  { prefix: "/admin", roles: ["supercoordinator"] },
+  { prefix: "/portal/7fK2mQ", roles: ["admin"] },
+  { prefix: "/portal/9xP4sL", roles: ["supercoordinator"] },
+  { prefix: "/portal/3vN8rT", roles: ["volunteer"] },
+  { prefix: "/portal/5qH6bW", roles: ["coordinator"] },
   { prefix: "/admin-dashboard", roles: ["admin"] },
+  { prefix: "/admin", roles: ["supercoordinator"] },
   { prefix: "/volunteer", roles: ["volunteer"] },
   { prefix: "/volunteer-dashboard", roles: ["volunteer"] },
   { prefix: "/coordinator-dashboard", roles: ["coordinator"] },
-  { prefix: "/register", roles: ["admin", "supercoordinator", "coordinator"] },
-];
-
-const portalOnlyRoutes = [
-  "/login",
-  "/admin",
-  "/admin-dashboard",
-  "/super-coordinator",
-  "/coordinator",
-  "/coordinator-dashboard",
-  "/volunteer",
-  "/volunteer-dashboard",
-  "/profile",
-];
-
-const publicOnlyRoutes = [
-  "/about",
-  "/sports",
-  "/fixtures",
-  "/live",
-  "/live-score",
-  "/results",
-  "/standings",
-  "/announcements",
-  "/rules",
-  "/gallery",
-  "/public-register",
-  "/departments",
-  "/contact",
-  "/teams",
-  "/matches",
-  "/points-table",
-  "/public-dashboard",
+  { prefix: "/register", roles: ["supercoordinator", "coordinator"] },
 ];
 
 function decodeBase64UrlJson<T>(value: string): T | null {
@@ -95,48 +66,25 @@ function redirectToLogin(request: NextRequest) {
   return response;
 }
 
-function isUnder(pathname: string, prefix: string) {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-function notFoundResponse() {
-  return new Response("This route is not available in this frontend deployment.", {
-    status: 404,
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
-}
-
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const session = verifySessionToken(token);
+  const opaqueRoute = Object.entries(roleHomePath).find(([, path]) => path === pathname);
+  const session = verifySessionToken(request.cookies.get(AUTH_COOKIE_NAME)?.value);
 
-  if (appType === "public") {
-    if (pathname === "/register") {
-      return NextResponse.rewrite(new URL("/public-register", request.url));
+  if (opaqueRoute) {
+    const requiredRole = opaqueRoute[0] as PortalRole;
+    if (!session?.role) return redirectToLogin(request);
+    if (session.role !== requiredRole) {
+      return NextResponse.redirect(new URL(roleHomePath[session.role], request.url));
     }
-
-    if (portalOnlyRoutes.some((route) => isUnder(pathname, route))) {
-      return notFoundResponse();
-    }
-  }
-
-  if (appType === "portal") {
-    if (pathname === "/") {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    if (publicOnlyRoutes.some((route) => isUnder(pathname, route))) {
-      return notFoundResponse();
-    }
-  }
-
-  if (pathname === "/super-coordinator") {
-    return NextResponse.redirect(new URL("/admin", request.url));
-  }
-
-  if (pathname === "/coordinator") {
-    return NextResponse.redirect(new URL("/coordinator-dashboard", request.url));
+    const internalPath = requiredRole === "admin"
+      ? "/admin-dashboard"
+      : requiredRole === "supercoordinator"
+        ? "/admin"
+        : requiredRole === "volunteer"
+          ? "/volunteer-dashboard"
+          : "/coordinator-dashboard";
+    return NextResponse.rewrite(new URL(internalPath, request.url));
   }
 
   if (pathname === "/login" && session?.role) {
@@ -148,10 +96,6 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!process.env.JWT_SECRET) {
-    return NextResponse.next();
-  }
-
   if (!session?.role) {
     return redirectToLogin(request);
   }
@@ -160,41 +104,18 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return new Response("Access denied. You are not allowed to access this page.", {
-    status: 403,
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
+  return NextResponse.redirect(new URL(roleHomePath[session.role], request.url));
 }
 
 export const config = {
   matcher: [
-    "/",
     "/login",
+    "/portal/:path*",
     "/admin/:path*",
     "/admin-dashboard/:path*",
-    "/super-coordinator/:path*",
-    "/coordinator/:path*",
     "/volunteer/:path*",
     "/volunteer-dashboard/:path*",
     "/coordinator-dashboard/:path*",
     "/register",
-    "/about/:path*",
-    "/sports/:path*",
-    "/fixtures/:path*",
-    "/live/:path*",
-    "/live-score/:path*",
-    "/results/:path*",
-    "/standings/:path*",
-    "/announcements/:path*",
-    "/rules/:path*",
-    "/gallery/:path*",
-    "/public-register/:path*",
-    "/departments/:path*",
-    "/contact/:path*",
-    "/teams/:path*",
-    "/matches/:path*",
-    "/points-table/:path*",
-    "/public-dashboard/:path*",
-    "/profile/:path*",
   ],
 };

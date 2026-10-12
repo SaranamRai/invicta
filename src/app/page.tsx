@@ -8,8 +8,22 @@ import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "About Us", href: "/about" },
+  { label: "About", href: "/about" },
   { label: "Contact", href: "/#contact" },
+];
+
+const primaryActions = [
+  { label: "View Matches", href: "/matches", summary: "Upcoming and live fixtures" },
+  { label: "View Standings", href: "/standings", summary: "See league tables and rankings" },
+  { label: "Explore Sports", href: "/sports", summary: "Browse games, teams and categories" },
+  { label: "Register Team", href: "/public-register", summary: "Join the tournament" },
+];
+
+const overviewCards = [
+  { label: "Tournament status", value: "Open for participation", hint: "Check the latest updates and registration details" },
+  { label: "Upcoming fixtures", value: "Live schedule", hint: "Track match dates, venues and match status" },
+  { label: "Standings", value: "Updated results", hint: "Monitor team performance across sports" },
+  { label: "Support", value: "Staff access", hint: "Login for volunteers and coordinators" },
 ];
 
 const sports = [
@@ -26,10 +40,10 @@ export default function LandingPage() {
   return (
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
       <header className="fixed inset-x-0 top-0 z-40 px-2 pt-2 sm:px-5 sm:pt-5">
-        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-2 py-2 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:flex-nowrap">
-          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 flex-1 items-center justify-start gap-1 sm:flex-none sm:gap-3">
-            <MedhaviLogo className="h-9 w-[min(7rem,28vw)] sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
-            <InvictaLogo className="h-8 w-[min(7rem,28vw)] sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
+        <div className="landing-navbar mx-auto flex max-w-[1400px] flex-col items-stretch justify-between gap-2 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-2 py-2 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:flex-nowrap">
+          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center justify-center gap-3 sm:justify-start">
+            <MedhaviLogo className="h-10 w-28 sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
+            <InvictaLogo className="h-9 w-28 sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
           </Link>
 
           <nav className="order-3 flex w-full items-center justify-center gap-1 overflow-x-auto rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto lg:overflow-visible">
@@ -89,6 +103,36 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="px-5 pb-4 pt-2 sm:px-8">
+          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {overviewCards.map((card) => (
+              <div key={card.label} className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm shadow-black/5">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{card.label}</p>
+                <h3 className="mt-3 text-2xl font-black text-foreground">{card.value}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{card.hint}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="px-5 pb-8 sm:px-8">
+          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {primaryActions.map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group rounded-2xl border border-border bg-card p-5 transition-all hover:border-accent hover:bg-accent/5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-foreground">{action.label}</p>
+                  <ArrowRight className="h-4 w-4 text-accent transition-transform group-hover:translate-x-1" />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{action.summary}</p>
+              </Link>
+            ))}
           </div>
         </section>
 

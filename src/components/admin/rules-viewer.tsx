@@ -228,7 +228,7 @@ function RuleSection({
             </CardContent>
           </Card>
         )) : (
-          <div className="col-span-full rounded-2xl border-2 border-dashed border-white/10 bg-slate-900/40 p-6 text-center">
+          <div className="col-span-full rounded-3xl border-2 border-dashed border-white/10 bg-slate-900/40 p-12 text-center">
             <BookOpen size={44} className="mx-auto text-slate-600" />
             <p className="mt-4 text-sm font-semibold text-slate-500">{emptyLabel}</p>
           </div>

@@ -349,14 +349,14 @@ function CoordinatorDashboardContent() {
   };
 
   return (
-    <div className="dashboard-surface ops-dashboard-surface min-h-screen overflow-x-hidden bg-background text-foreground">
+    <div className="dashboard-surface min-h-screen overflow-x-hidden bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-3 py-2.5 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            <MedhaviLogo className="h-9 w-36 shrink-0 sm:h-11 sm:w-44" />
-            <InvictaLogo className="h-10 w-36 shrink-0 sm:h-12 sm:w-44" />
+            <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
+            <InvictaLogo className="h-12 w-44 shrink-0 sm:h-14 sm:w-52" />
             <div className="min-w-0">
-              <h1 className="sport-heading text-base font-black sm:text-xl">Coordinator Dashboard</h1>
+              <h1 className="sport-heading text-lg font-black sm:text-2xl">Coordinator Dashboard</h1>
               <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
                 Manage your assigned department or sport teams, review fixtures, and prepare team details for admin approval.
               </p>
@@ -377,22 +377,22 @@ function CoordinatorDashboardContent() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 px-3 py-4 sm:px-5 sm:py-5">
-        <section className="rounded-xl border border-border bg-card p-4">
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6">
+        <section className="rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-accent">
                 <ShieldCheck size={18} />
                 <span className="text-xs font-black uppercase tracking-widest">Assigned Role</span>
               </div>
-              <h2 className="sport-heading text-xl font-black">{account?.name || "Coordinator"}</h2>
+              <h2 className="sport-heading text-2xl font-black">{account?.name || "Coordinator"}</h2>
               <p className="mt-1 text-sm font-semibold text-muted-foreground">
                 Department: {account?.department || "All assigned departments"} / Sport: {assignedSport ? assignedSportName : "All assigned sports"}
               </p>
             </div>
             <Link
               href="/register"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-[11px] font-black uppercase tracking-widest text-accent-foreground"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-xs font-black uppercase tracking-widest text-accent-foreground"
             >
               <ClipboardList size={16} />
               Add Department Team
@@ -410,7 +410,7 @@ function CoordinatorDashboardContent() {
           <StatCard icon={UsersRound} label="Total Members" value={totalPlayers} />
         </section>
 
-        <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <Card className="p-0">
             <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -427,9 +427,9 @@ function CoordinatorDashboardContent() {
             </div>
 
             {leagueTable.length > 0 ? (
-              <div className="dashboard-scroll-box coordinator-table-scroll overflow-auto rounded-b-xl">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead className="sticky top-0 z-10 bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Rank</th>
                       <th className="px-4 py-3">Department</th>
@@ -456,7 +456,7 @@ function CoordinatorDashboardContent() {
                 </table>
               </div>
             ) : (
-              <div className="p-5 text-center text-sm font-semibold text-muted-foreground">
+              <div className="p-8 text-center text-sm font-semibold text-muted-foreground">
                 No league table entries are available for your sport yet.
               </div>
             )}
@@ -472,7 +472,7 @@ function CoordinatorDashboardContent() {
               <p className="mt-1 text-sm font-medium text-muted-foreground">Public notices related to your sport.</p>
             </div>
 
-            <div className="dashboard-scroll-box coordinator-announcements-scroll divide-y divide-border overflow-y-auto overscroll-contain">
+            <div className="divide-y divide-border">
               {announcements.length > 0 ? announcements.slice(0, 5).map((announcement) => (
                 <div key={announcement._id} className="p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -491,7 +491,7 @@ function CoordinatorDashboardContent() {
                   )}
                 </div>
               )) : (
-                <div className="p-5 text-center text-sm font-semibold text-muted-foreground">
+                <div className="p-8 text-center text-sm font-semibold text-muted-foreground">
                   No announcements are available for your sport yet.
                 </div>
               )}
@@ -499,7 +499,7 @@ function CoordinatorDashboardContent() {
           </Card>
         </section>
 
-        <section className="min-w-0 rounded-2xl border border-border bg-card p-3 sm:p-5">
+        <section className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="sport-heading text-xl font-black">Tournament Match Duties</h2>
@@ -604,13 +604,13 @@ function CoordinatorDashboardContent() {
           </form>
 
           {!selectedTournament ? (
-            <div className="rounded-xl border border-dashed border-border p-5 text-center text-sm font-semibold text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
               Please select a tournament to view matches.
             </div>
           ) : filteredFixtures.length > 0 ? (
-            <div className="dashboard-scroll-box coordinator-table-scroll overflow-auto rounded-2xl border border-border">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="overflow-x-auto rounded-2xl border border-border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Fixture</th>
                     <th className="px-4 py-3">Category</th>
@@ -664,24 +664,24 @@ function CoordinatorDashboardContent() {
               </table>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border p-5 text-center text-sm font-semibold text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm font-semibold text-muted-foreground">
               No fixtures are available for this tournament/category yet.
             </div>
           )}
         </section>
 
-        <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <Card className="p-0">
             <div className="border-b border-border p-5">
               <h2 className="sport-heading text-xl font-black">Tournament Teams</h2>
               <p className="mt-1 text-sm font-medium text-muted-foreground">Teams for your assigned sport, filtered by tournament and category.</p>
             </div>
             {!selectedTournament ? (
-              <div className="p-6 text-center">
+              <div className="p-10 text-center">
                 <p className="text-sm font-semibold text-muted-foreground">Please select a tournament above to view teams.</p>
               </div>
             ) : filteredTeams.length > 0 ? (
-              <div className="dashboard-scroll-box coordinator-teams-scroll min-w-0 space-y-5 overflow-y-auto overscroll-contain p-5">
+              <div className="p-5 space-y-5">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-2">
                     <GenderMark gender="Male" className="h-5 w-5" />
@@ -737,7 +737,7 @@ function CoordinatorDashboardContent() {
                 </div>
               </div>
             ) : (
-              <div className="p-6 text-center">
+              <div className="p-10 text-center">
                 <p className="text-sm font-semibold text-muted-foreground">No teams found for this tournament/category.</p>
               </div>
             )}
@@ -1027,8 +1027,8 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
 
   if (registrations.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border p-4 text-center">
-        <CheckCircle size={22} className="mx-auto text-muted-foreground/40" />
+      <div className="rounded-xl border border-dashed border-border p-6 text-center">
+        <CheckCircle size={32} className="mx-auto text-muted-foreground/40" />
         <p className="mt-3 text-sm font-semibold text-muted-foreground">No approved registrations found for your assigned sport.</p>
       </div>
     );
@@ -1109,7 +1109,7 @@ function ApprovedTeamsView({ assignedSport }: { assignedSport: string }) {
         </select>
       )}
       {!selectedTournament && (
-        <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm font-semibold text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm font-semibold text-muted-foreground">
           Please select a tournament to view approved teams.
         </div>
       )}

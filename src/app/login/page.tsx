@@ -13,7 +13,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"" | "admin" | "supercoordinator" | "coordinator" | "volunteer">("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +33,7 @@ export default function LoginPage() {
         return;
       }
 
-      const session = await loginRoleAccount(portalEmail, cleanPassword, role || undefined);
+      const session = await loginRoleAccount(portalEmail, cleanPassword);
       storePortalSession(session);
       router.push(roleHomePath[session.role]);
     } catch (err) {
@@ -46,7 +45,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-4 py-6 sm:py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-6 sm:py-8">
       <div className="absolute right-4 top-4 z-20">
         <ThemeToggle />
       </div>
@@ -65,11 +64,7 @@ export default function LoginPage() {
               />
             </div>
             <span className="h-12 w-px shrink-0 bg-slate-300" aria-hidden="true" />
-            <img
-              src="/invicta-logo-transparent.png"
-              alt="Invicta"
-              className="h-10 w-40 shrink-0 object-contain sm:h-14 sm:w-52"
-            />
+            <span className="min-w-0 text-2xl font-black uppercase text-slate-900 sport-heading sm:text-4xl">Invicta</span>
           </div>
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">Choose a role and open the right dashboard</p>
         </div>
@@ -112,17 +107,6 @@ export default function LoginPage() {
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-12 text-sm font-bold tracking-tight text-slate-900 transition-all placeholder:text-slate-400 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/10"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="ml-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Account Role</label>
-              <select value={role} onChange={(event) => setRole(event.target.value as typeof role)} className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-900 outline-none focus:border-accent focus:ring-4 focus:ring-accent/10">
-                <option value="">Auto detect role</option>
-                <option value="admin">Admin</option>
-                <option value="supercoordinator">Super Coordinator</option>
-                <option value="coordinator">Coordinator</option>
-                <option value="volunteer">Volunteer</option>
-              </select>
             </div>
 
             <div className="space-y-2">

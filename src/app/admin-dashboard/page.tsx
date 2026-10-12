@@ -3,259 +3,184 @@
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
   Database,
+  Download,
   LogOut,
   Mail,
   RefreshCw,
   Server,
-  ShieldCheck,
-  UsersRound,
+  Shield,
+  XCircle,
 } from "lucide-react";
-import type React from "react";
-import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  AdminHealthPayload,
-  AdminLogPayload,
-  AdminStatsPayload,
-  RoleAccountPayload,
-  getAdminRoleAccounts,
-  getTechnicalAdminApiLogs,
-  getTechnicalAdminDatabaseStatus,
-  getTechnicalAdminEmailStatus,
-  getTechnicalAdminErrorLogs,
-  getTechnicalAdminHealth,
-  getTechnicalAdminStats,
-  testTechnicalAdminMongodb,
-  testTechnicalAdminSmtp,
-} from "@/lib/api";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { MedhaviLogo } from "@/components/medhavi-logo";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Card } from "@/components/ui/card";
+import { AppToast } from "@/components/ui/app-toast";
+import {
+  getTechnicalAdminApiLogs,
+  getTechnicalAdminAuditLogs,
+  getTechnicalAdminDatabaseStatus,
+  getTechnicalAdminEmailStatus,
+  getTechnicalAdminErrorLogs,
+  getTechnicalAdminHealth,
+  getTechnicalAdminLiveMonitoring,
+  getTechnicalAdminStats,
+  resetTechnicalAdminUserPassword,
+  TechnicalAdminHealth,
+  TechnicalAdminStats,
+  TechnicalApiLog,
+  TechnicalAuditLog,
+  TechnicalCollectionStatus,
+  TechnicalDatabaseStatus,
+  TechnicalEmailStatus,
+  TechnicalErrorLog,
+  TechnicalLiveMatch,
+  testTechnicalAdminMongoDb,
+  testTechnicalAdminSmtp,
+  updateTechnicalAdminUserStatus,
+} from "@/lib/api";
 import { logoutPortalSession } from "@/lib/role-auth";
-import { cn } from "@/lib/utils";
 
-type DatabaseStatus = Awaited<ReturnType<typeof getTechnicalAdminDatabaseStatus>>;
-type EmailStatus = Awaited<ReturnType<typeof getTechnicalAdminEmailStatus>>;
-type AdminTab = "overview" | "users" | "api" | "errors" | "database";
+type ToastState = { message: string; variant: "success" | "error" | "info" };
+type AdminTab = "overview" | "database" | "users" | "monitoring" | "logs";
 
 const tabs: Array<{ id: AdminTab; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "users", label: "System Users" },
-  { id: "api", label: "API Monitor" },
-  { id: "errors", label: "Errors" },
   { id: "database", label: "Database" },
+  { id: "users", label: "Users" },
+  { id: "monitoring", label: "Live Monitoring" },
+  { id: "logs", label: "Logs" },
 ];
 
-function statusTone(value?: string | boolean) {
-  const ok = value === true || value === "ok" || value === "online" || value === "connected" || value === "configured";
-  return ok ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-amber-200 bg-amber-50 text-amber-700";
+function formatDate(value?: string | null) {
+  if (!value) return "Not recorded";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleString();
 }
 
-function StatTile({
-  icon,
-  label,
-  value,
-  helper,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  helper?: string;
-}) {
+function formatUptime(seconds = 0) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return days ? `${days}d ${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">{icon}</div>
-      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
-      <div className="mt-1 text-2xl font-black text-foreground">{value}</div>
-      {helper && <p className="mt-2 text-xs font-semibold text-muted-foreground">{helper}</p>}
-    </Card>
+    <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${ok ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
+      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+      {label}
+    </span>
   );
 }
 
-function LogTable({ title, rows }: { title: string; rows: AdminLogPayload[] }) {
-  return (
-    <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-foreground">{title}</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-xs">
-          <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            <tr>
-              <th className="py-2">Time</th>
-              <th className="py-2">Route</th>
-              <th className="py-2">Status</th>
-              <th className="py-2">Duration</th>
-              <th className="py-2">User</th>
-              <th className="py-2">Message</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.length ? rows.map((row) => (
-              <tr key={row._id}>
-                <td className="py-3 text-muted-foreground">{row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}</td>
-                <td className="py-3 font-semibold">{row.path || row.route || "-"}</td>
-                <td className="py-3">{row.statusCode || "-"}</td>
-                <td className="py-3">{typeof row.durationMs === "number" ? `${row.durationMs}ms` : "-"}</td>
-                <td className="py-3 text-muted-foreground">{row.userRole || "-"} {row.userEmail ? `(${row.userEmail})` : ""}</td>
-                <td className="max-w-[280px] truncate py-3 text-muted-foreground">{row.message || "-"}</td>
-              </tr>
-            )) : (
-              <tr>
-                <td className="py-8 text-center text-muted-foreground" colSpan={6}>No records yet</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-2xl border border-border bg-card p-4 shadow-sm ${className}`}>{children}</div>;
 }
 
-function UsersTable({ users }: { users: RoleAccountPayload[] }) {
+function MetricCard({ label, value, sub, icon: Icon }: { label: string; value: string | number; sub?: string; icon: typeof Activity }) {
   return (
-    <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <Panel>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-black uppercase tracking-widest text-foreground">System Users</h2>
-          <p className="mt-1 text-xs font-semibold text-muted-foreground">Admin, super coordinator, sport coordinator, and volunteer accounts.</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+          <p className="mt-2 text-2xl font-black text-foreground">{value}</p>
         </div>
-        <span className="rounded-full bg-accent/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
-          {users.length} accounts
+        <span className="rounded-xl bg-accent/10 p-2 text-accent">
+          <Icon className="h-5 w-5" />
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-xs">
-          <thead className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            <tr>
-              <th className="py-2">Name</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Role</th>
-              <th className="py-2">Department</th>
-              <th className="py-2">Assigned Sport</th>
-              <th className="py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {users.length ? users.map((user) => (
-              <tr key={`${user.role}-${user.id}-${user.email}`}>
-                <td className="py-3 font-black text-foreground">{user.fullName || "Unnamed"}</td>
-                <td className="py-3 font-semibold text-muted-foreground">{user.email}</td>
-                <td className="py-3">
-                  <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
-                    {user.role}
-                  </span>
-                </td>
-                <td className="py-3 text-muted-foreground">{user.deptName || "-"}</td>
-                <td className="py-3 text-muted-foreground">{user.assignedSportName || user.assignedSport || "-"}</td>
-                <td className="py-3">
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-500">
-                    {user.status || "active"}
-                  </span>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td className="py-8 text-center text-muted-foreground" colSpan={6}>No role accounts found</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+      {sub ? <p className="mt-2 text-xs font-semibold text-muted-foreground">{sub}</p> : null}
+    </Panel>
   );
 }
 
-function AdminDashboardContent() {
+function DataTable({ children }: { children: React.ReactNode }) {
+  return <div className="overflow-x-auto rounded-2xl border border-border bg-card">{children}</div>;
+}
+
+function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const [health, setHealth] = useState<AdminHealthPayload | null>(null);
-  const [stats, setStats] = useState<AdminStatsPayload | null>(null);
-  const [database, setDatabase] = useState<DatabaseStatus | null>(null);
-  const [email, setEmail] = useState<EmailStatus | null>(null);
-  const [apiLogs, setApiLogs] = useState<AdminLogPayload[]>([]);
-  const [errorLogs, setErrorLogs] = useState<AdminLogPayload[]>([]);
-  const [users, setUsers] = useState<RoleAccountPayload[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [message, setMessage] = useState("");
+  const [health, setHealth] = useState<TechnicalAdminHealth | null>(null);
+  const [stats, setStats] = useState<TechnicalAdminStats | null>(null);
+  const [database, setDatabase] = useState<TechnicalDatabaseStatus | null>(null);
+  const [email, setEmail] = useState<TechnicalEmailStatus | null>(null);
+  const [apiLogs, setApiLogs] = useState<TechnicalApiLog[]>([]);
+  const [errorLogs, setErrorLogs] = useState<TechnicalErrorLog[]>([]);
+  const [auditLogs, setAuditLogs] = useState<TechnicalAuditLog[]>([]);
+  const [matches, setMatches] = useState<TechnicalLiveMatch[]>([]);
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
 
-  const collectionCount = useMemo(() => database?.collections?.length || 0, [database]);
-  const userCount = users.length || Object.values(stats?.roleCounts || {}).reduce((total, count) => total + Number(count || 0), 0);
-
-  function applyDashboardData(
-    nextHealth: AdminHealthPayload,
-    nextStats: AdminStatsPayload,
-    nextDatabase: DatabaseStatus,
-    nextEmail: EmailStatus,
-    nextApiLogs: AdminLogPayload[],
-    nextErrorLogs: AdminLogPayload[],
-    nextUsers: RoleAccountPayload[]
-  ) {
-    setHealth(nextHealth);
-    setStats(nextStats);
-    setDatabase(nextDatabase);
-    setEmail(nextEmail);
-    setApiLogs(nextApiLogs);
-    setErrorLogs(nextErrorLogs);
-    setUsers(nextUsers);
-  }
-
-  async function fetchDashboardData() {
-    return Promise.all([
-      getTechnicalAdminHealth(),
-      getTechnicalAdminStats(),
-      getTechnicalAdminDatabaseStatus(),
-      getTechnicalAdminEmailStatus(),
-      getTechnicalAdminApiLogs(),
-      getTechnicalAdminErrorLogs(),
-      getAdminRoleAccounts(),
-    ]);
-  }
-
-  async function refresh() {
-    setIsLoading(true);
-    setMessage("");
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await fetchDashboardData();
-      applyDashboardData(...data);
+      const [healthData, statsData, databaseData, emailData, apiData, errorData, auditData, liveData] = await Promise.all([
+        getTechnicalAdminHealth(),
+        getTechnicalAdminStats(),
+        getTechnicalAdminDatabaseStatus(),
+        getTechnicalAdminEmailStatus(),
+        getTechnicalAdminApiLogs({ limit: "80" }),
+        getTechnicalAdminErrorLogs({ limit: "80" }),
+        getTechnicalAdminAuditLogs({ limit: "80" }),
+        getTechnicalAdminLiveMonitoring(),
+      ]);
+      setHealth(healthData);
+      setStats(statsData);
+      setDatabase(databaseData);
+      setEmail(emailData);
+      setApiLogs(apiData.logs);
+      setErrorLogs(errorData.logs);
+      setAuditLogs(auditData.logs);
+      setMatches(liveData.matches);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load admin dashboard data.");
+      setToast({ message: error instanceof Error ? error.message : "Could not load admin dashboard.", variant: "error" });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    let isMounted = true;
-
-    void (async () => {
-      try {
-        const data = await fetchDashboardData();
-        if (isMounted) applyDashboardData(...data);
-      } catch (error) {
-        if (isMounted) {
-          setMessage(error instanceof Error ? error.message : "Could not load admin dashboard data.");
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  async function runSmtpTest() {
-    const result = await testTechnicalAdminSmtp();
-    setMessage(result.message);
-  }
+  useEffect(() => {
+    void Promise.resolve().then(loadDashboard);
+  }, [loadDashboard]);
 
-  async function runMongoTest() {
-    const result = await testTechnicalAdminMongodb();
-    setMessage(result.ok ? `MongoDB connected to ${result.database}.` : "MongoDB connection failed.");
+  const filteredUsers = useMemo(() => {
+    const users = stats?.users || [];
+    return roleFilter === "all" ? users : users.filter((user) => user.role === roleFilter);
+  }, [roleFilter, stats?.users]);
+
+  const warningMatches = matches.filter((match) => match.warnings.length > 0);
+
+  async function runAction(label: string, action: () => Promise<{ message?: string } | unknown>) {
+    setActionBusy(label);
+    try {
+      const result = await action();
+      const message = typeof result === "object" && result && "message" in result ? String(result.message) : `${label} completed.`;
+      setToast({ message, variant: "success" });
+      await loadDashboard();
+    } catch (error) {
+      setToast({ message: error instanceof Error ? error.message : `${label} failed.`, variant: "error" });
+    } finally {
+      setActionBusy("");
+    }
   }
 
   async function handleLogout() {
@@ -265,15 +190,15 @@ function AdminDashboardContent() {
 
   return (
     <div className="dashboard-surface min-h-screen bg-background pb-12 text-foreground">
-      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-3 py-3 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
             <MedhaviLogo className="h-11 w-44 shrink-0 sm:h-14 sm:w-56" />
             <InvictaLogo className="h-12 w-44 shrink-0 sm:h-16 sm:w-56" />
             <div className="space-y-0.5 sm:space-y-1">
-              <h1 className="sport-heading text-lg font-black sm:text-3xl">INVICTA TECHNICAL ADMIN</h1>
+              <h1 className="sport-heading text-lg font-black sm:text-3xl">INVICTA ADMIN DASHBOARD</h1>
               <p className="max-w-2xl text-xs font-semibold leading-relaxed text-muted-foreground sm:text-sm">
-                Monitor backend health, users, API performance, database status, SMTP, logs, and live match activity.
+                Technical monitoring for deployment health, API activity, database status, user access, email delivery, and live score warnings.
               </p>
             </div>
           </div>
@@ -282,19 +207,18 @@ function AdminDashboardContent() {
             <ThemeToggle />
             <button
               type="button"
-              onClick={refresh}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-[10px] font-black uppercase tracking-widest text-foreground transition-all hover:border-accent disabled:opacity-60 sm:px-5 sm:py-3"
+              onClick={() => void loadDashboard()}
+              className="flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3 text-[10px] font-black uppercase tracking-widest text-foreground transition-all hover:border-accent hover:text-accent"
             >
-              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 transition-all hover:bg-red-500 hover:text-white sm:px-5 sm:py-3"
+              className="flex h-10 items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 text-[10px] font-black uppercase tracking-widest text-red-500 transition-all hover:bg-red-500 hover:text-white"
             >
-              <LogOut size={16} />
+              <LogOut className="h-4 w-4" />
               Sign Out
             </button>
           </div>
@@ -307,105 +231,193 @@ function AdminDashboardContent() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all sm:px-6 sm:py-4 sm:text-sm sm:tracking-[0.1em]",
-                  activeTab === tab.id
-                    ? "border-accent text-accent"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
+                className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-[10px] font-black uppercase tracking-[0.08em] transition-all sm:px-6 sm:py-4 sm:text-sm ${
+                  activeTab === tab.id ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        {message && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">{message}</div>
-        )}
-
-        {activeTab === "overview" && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatTile icon={<Server size={20} />} label="Backend" value={<span className={`rounded-md border px-2 py-1 text-base ${statusTone(health?.backend)}`}>{health?.backend || "loading"}</span>} helper={health?.environment || "environment"} />
-              <StatTile icon={<Database size={20} />} label="MongoDB" value={<span className={`rounded-md border px-2 py-1 text-base ${statusTone(health?.mongodb)}`}>{health?.mongodb || "loading"}</span>} helper={`${collectionCount} collections`} />
-              <StatTile icon={<UsersRound size={20} />} label="Users" value={userCount} helper="role accounts" />
-              <StatTile icon={<Activity size={20} />} label="Uptime" value={health?.uptime || "-"} helper="server runtime" />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatTile icon={<Activity size={20} />} label="Requests Today" value={stats?.totalRequestsToday ?? 0} />
-              <StatTile icon={<AlertTriangle size={20} />} label="Failed Requests" value={stats?.failedRequestsToday ?? 0} />
-              <StatTile icon={<Server size={20} />} label="Avg Response" value={`${stats?.averageResponseTimeMs ?? 0}ms`} />
-              <StatTile icon={<ShieldCheck size={20} />} label="Live Matches" value={stats?.liveMatches ?? 0} />
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        {activeTab === "overview" ? (
+          <div className="space-y-6">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <MetricCard label="Environment" value={health?.environment || "-"} sub={`Version ${health?.appVersion || "-"}`} icon={Server} />
+              <MetricCard label="Uptime" value={formatUptime(health?.uptimeSeconds || 0)} sub={formatDate(health?.checkedAt)} icon={Activity} />
+              <MetricCard label="Requests Today" value={stats?.api.requestsToday || 0} sub={`${stats?.api.failedToday || 0} failed`} icon={Shield} />
+              <MetricCard label="Avg Response" value={`${stats?.api.averageResponseTimeMs || 0}ms`} sub={`${stats?.api.serverErrorsToday || 0} server errors`} icon={Activity} />
+              <MetricCard label="Emails Sent" value={email?.sent || 0} sub={`${email?.failed || 0} failed`} icon={Mail} />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="text-sm font-black uppercase tracking-widest">Role Summary</h2>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm font-bold">
-                  {Object.entries(stats?.roleCounts || {}).map(([role, count]) => (
-                    <button
-                      type="button"
-                      key={role}
-                      onClick={() => setActiveTab("users")}
-                      className="rounded-xl bg-secondary p-3 text-left transition-all hover:bg-accent/15"
-                    >
-                      <span className="block text-[10px] uppercase tracking-widest text-muted-foreground">{role}</span>
-                      <span className="text-2xl font-black text-foreground">{count}</span>
-                    </button>
-                  ))}
+              <Panel>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">MongoDB</p>
+                    <p className="mt-2 text-lg font-black">{health?.database.name || "Database"}</p>
+                  </div>
+                  <StatusBadge ok={Boolean(health?.database.connected)} label={health?.database.connected ? "Connected" : "Offline"} />
                 </div>
-              </Card>
-              <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="text-sm font-black uppercase tracking-widest">Email Status</h2>
-                <p className="mt-4 text-sm font-semibold text-muted-foreground">{email?.host || "SMTP host not configured"}</p>
-                <p className="mt-2 text-sm font-bold">{email?.user || "No sender account"}</p>
-                <button type="button" onClick={runSmtpTest} className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-[10px] font-black uppercase tracking-widest hover:border-accent">
-                  <Mail size={15} />
-                  Test SMTP
-                </button>
-              </Card>
-              <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <h2 className="text-sm font-black uppercase tracking-widest">Database Status</h2>
-                <p className="mt-4 text-sm font-semibold text-muted-foreground">{database?.name || "-"} on {database?.host || "-"}</p>
-                <p className="mt-2 text-2xl font-black">{collectionCount} collections</p>
-                <button type="button" onClick={runMongoTest} className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-[10px] font-black uppercase tracking-widest hover:border-accent">
-                  <Database size={15} />
-                  Test MongoDB
-                </button>
-              </Card>
+                <p className="mt-3 text-sm font-semibold text-muted-foreground">{health?.database.host || "Host not reported"}</p>
+              </Panel>
+              <Panel>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">SMTP</p>
+                    <p className="mt-2 text-lg font-black">{email?.provider || "Mail Provider"}</p>
+                  </div>
+                  <StatusBadge ok={Boolean(email?.healthy)} label={email?.healthy ? "Verified" : "Needs Check"} />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-muted-foreground">{email?.message || "No SMTP status"}</p>
+              </Panel>
+              <Panel>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Live Scores</p>
+                    <p className="mt-2 text-lg font-black">{matches.length} monitored matches</p>
+                  </div>
+                  <StatusBadge ok={!warningMatches.length} label={warningMatches.length ? "Warnings" : "Healthy"} />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-muted-foreground">{warningMatches.length ? `${warningMatches.length} match warnings need review.` : "No live scoring warnings."}</p>
+              </Panel>
             </div>
-          </>
-        )}
 
-        {activeTab === "users" && <UsersTable users={users} />}
-        {activeTab === "api" && <LogTable title="Recent API Logs" rows={apiLogs} />}
-        {activeTab === "errors" && <LogTable title="Recent Error Logs" rows={errorLogs} />}
-        {activeTab === "database" && (
-          <Card className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-sm font-black uppercase tracking-widest">MongoDB Collections</h2>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">{database?.name || "Database"} on {database?.host || "unknown host"}</p>
-              </div>
-              <button type="button" onClick={runMongoTest} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-[10px] font-black uppercase tracking-widest hover:border-accent">
-                <Database size={15} />
-                Test MongoDB
-              </button>
-            </div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {(database?.collections || []).map((collection) => (
-                <div key={collection} className="rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm font-black text-foreground">
-                  {collection}
+            <Panel>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-black">Developer Tools</h2>
+                  <p className="text-sm font-semibold text-muted-foreground">Run safe checks or export a health snapshot.</p>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction("MongoDB test", testTechnicalAdminMongoDb)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-wider hover:border-accent hover:text-accent">
+                    <Database className="h-4 w-4" /> Test MongoDB
+                  </button>
+                  <button type="button" disabled={Boolean(actionBusy)} onClick={() => void runAction("SMTP test", testTechnicalAdminSmtp)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-wider hover:border-accent hover:text-accent">
+                    <Mail className="h-4 w-4" /> Test SMTP
+                  </button>
+                  <button type="button" onClick={() => downloadJson("invicta-health-report.json", { health, stats, database, email, matches })} className="inline-flex items-center gap-2 rounded-xl bg-accent px-3 py-2 text-xs font-black uppercase tracking-wider text-accent-foreground hover:bg-accent/90">
+                    <Download className="h-4 w-4" /> Export
+                  </button>
+                </div>
+              </div>
+            </Panel>
+          </div>
+        ) : null}
+
+        {activeTab === "database" ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(database?.collections || []).map((item: TechnicalCollectionStatus) => (
+                <MetricCard key={item.key} label={item.collection} value={item.count} sub={item.key} icon={Database} />
               ))}
             </div>
-          </Card>
-        )}
-      </div>
+          </div>
+        ) : null}
+
+        {activeTab === "users" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black">System Users</h2>
+                <p className="text-sm font-semibold text-muted-foreground">Activate, deactivate, or reset role account passwords.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {["all", "admin", "supercoordinator", "coordinator", "volunteer"].map((role) => (
+                  <button key={role} type="button" onClick={() => setRoleFilter(role)} className={`rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider ${roleFilter === role ? "bg-accent text-accent-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"}`}>
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <DataTable>
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Assigned</th><th className="px-4 py-3">Actions</th></tr>
+                </thead>
+                <tbody>{filteredUsers.map((user) => (
+                  <tr key={`${user.role}-${user.id}`} className="border-t border-border">
+                    <td className="px-4 py-3"><p className="font-black">{user.name}</p><p className="text-xs font-semibold text-muted-foreground">{user.email}</p></td>
+                    <td className="px-4 py-3 font-semibold">{user.role}</td>
+                    <td className="px-4 py-3"><StatusBadge ok={user.status === "active"} label={user.status} /></td>
+                    <td className="px-4 py-3 text-muted-foreground">{user.assignedSport || user.department || "-"}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => void runAction("Status update", () => updateTechnicalAdminUserStatus(user.role, user.id, user.status === "active" ? "inactive" : "active"))} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold hover:border-accent hover:text-accent">
+                          {user.status === "active" ? "Deactivate" : "Activate"}
+                        </button>
+                        <button type="button" onClick={() => void runAction("Password reset", () => resetTechnicalAdminUserPassword(user.role, user.id))} className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold hover:border-accent hover:text-accent">
+                          Reset Password
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </DataTable>
+          </div>
+        ) : null}
+
+        {activeTab === "monitoring" ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {matches.map((match) => (
+              <Panel key={match.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black">{match.matchTitle}</p>
+                    <p className="text-xs font-semibold text-muted-foreground">{match.sport} {match.category ? `- ${match.category}` : ""}</p>
+                  </div>
+                  <StatusBadge ok={!match.warnings.length} label={match.status} />
+                </div>
+                <p className="mt-3 text-sm font-black">{match.teamAName || "Team A"} {match.scoreA} - {match.scoreB} {match.teamBName || "Team B"}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Last update: {formatDate(match.lastScoreUpdate)}</p>
+                {match.warnings.length ? <p className="mt-3 flex items-center gap-2 text-sm font-bold text-amber-600"><AlertTriangle className="h-4 w-4" /> {match.warnings.join(", ")}</p> : null}
+              </Panel>
+            ))}
+            {!matches.length ? <Panel><p className="text-sm font-semibold text-muted-foreground">No live or recently completed matches found.</p></Panel> : null}
+          </div>
+        ) : null}
+
+        {activeTab === "logs" ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black">Logs</h2>
+                <p className="text-sm font-semibold text-muted-foreground">Recent API, error, and audit activity.</p>
+              </div>
+              <button type="button" onClick={() => downloadJson("invicta-error-audit-logs.json", { errorLogs, auditLogs, apiLogs })} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-black uppercase tracking-wider hover:border-accent hover:text-accent">
+                <Download className="h-4 w-4" /> Download Logs
+              </button>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-3">
+              <DataTable>
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted uppercase tracking-wider text-muted-foreground"><tr><th className="px-3 py-2">API</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Time</th></tr></thead>
+                  <tbody>{apiLogs.slice(0, 24).map((log) => <tr key={log._id} className="border-t border-border"><td className="px-3 py-2 font-semibold">{log.method} {log.route}</td><td className="px-3 py-2">{log.statusCode}</td><td className="px-3 py-2">{log.responseTimeMs}ms</td></tr>)}</tbody>
+                </table>
+              </DataTable>
+              <DataTable>
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted uppercase tracking-wider text-muted-foreground"><tr><th className="px-3 py-2">Error</th><th className="px-3 py-2">Route</th><th className="px-3 py-2">When</th></tr></thead>
+                  <tbody>{errorLogs.slice(0, 24).map((log) => <tr key={log._id} className="border-t border-border"><td className="px-3 py-2 font-semibold">{log.message || log.errorType}</td><td className="px-3 py-2">{log.route}</td><td className="px-3 py-2">{formatDate(log.createdAt)}</td></tr>)}</tbody>
+                </table>
+              </DataTable>
+              <DataTable>
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted uppercase tracking-wider text-muted-foreground"><tr><th className="px-3 py-2">Action</th><th className="px-3 py-2">By</th><th className="px-3 py-2">When</th></tr></thead>
+                  <tbody>{auditLogs.slice(0, 24).map((log) => <tr key={log._id} className="border-t border-border"><td className="px-3 py-2 font-semibold">{log.action}</td><td className="px-3 py-2">{log.performedBy || "-"}</td><td className="px-3 py-2">{formatDate(log.createdAt)}</td></tr>)}</tbody>
+                </table>
+              </DataTable>
+            </div>
+          </div>
+        ) : null}
+      </main>
+
+      {loading ? <div className="fixed bottom-5 left-5 rounded-xl border border-border bg-card px-4 py-3 text-sm font-black text-foreground shadow-xl">Loading dashboard...</div> : null}
+      {toast ? <AppToast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} /> : null}
     </div>
   );
 }
@@ -413,7 +425,7 @@ function AdminDashboardContent() {
 export default function AdminDashboardPage() {
   return (
     <ProtectedRoute allowedRole="admin">
-      <AdminDashboardContent />
+      <AdminDashboard />
     </ProtectedRoute>
   );
 }

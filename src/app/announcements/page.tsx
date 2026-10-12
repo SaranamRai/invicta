@@ -32,7 +32,7 @@ export default function AnnouncementsPage() {
     async function loadAnnouncements() {
       const publicAnnouncements = await getPublicAnnouncements();
       if (!isMounted) return;
-      setAnnouncements(publicAnnouncements.map(mapMongoAnnouncement).sort((a, b) => b.timestamp - a.timestamp));
+      setAnnouncements(publicAnnouncements.map(mapMongoAnnouncement));
     }
 
     void loadAnnouncements();
@@ -57,9 +57,6 @@ export default function AnnouncementsPage() {
         {announcements.length > 0 ? announcements.map((announcement) => (
           <Card key={announcement.id} className="p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-accent">{announcement.type}</p>
-            <time className="mt-1 block text-xs font-semibold text-muted-foreground" dateTime={announcement.timestamp ? new Date(announcement.timestamp).toISOString() : undefined}>
-              {announcement.timestamp ? new Date(announcement.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Date and time unavailable"}
-            </time>
             <h2 className="mt-2 text-xl font-black text-foreground">{announcement.title}</h2>
             <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">{announcement.message}</p>
             {announcement.attachmentHtml && (
@@ -74,7 +71,7 @@ export default function AnnouncementsPage() {
             )}
           </Card>
         )) : (
-          <div className="rounded-2xl border-2 border-dashed border-border bg-card/40 p-6 text-center">
+          <div className="rounded-3xl border-2 border-dashed border-border bg-card/40 p-12 text-center">
             <Megaphone size={44} className="mx-auto text-muted-foreground" />
             <p className="mt-4 text-sm font-semibold text-muted-foreground">No announcements posted yet.</p>
           </div>

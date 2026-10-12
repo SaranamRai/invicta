@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 
 
 import { AuthGuard } from "@/components/auth-guard";
-import { MatchTrackerProvider } from "@/components/layout/match-tracker";
 
 export default function RootLayout({
   children,
@@ -30,13 +29,12 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${outfit.variable} ${inter.variable}`}>
       <body className="bg-background text-foreground antialiased selection:bg-accent selection:text-accent-foreground font-sans overflow-x-hidden">
-        <MatchTrackerProvider>
-          <AuthGuard>{children}</AuthGuard>
-        </MatchTrackerProvider>
+        <AuthGuard>{children}</AuthGuard>
       </body>
     </html>
   );
 }
+
 
 
 

@@ -5,7 +5,6 @@ import {
   Calendar,
   GraduationCap,
   Mail,
-  Phone,
   Search,
   ShieldCheck,
   UserRoundCheck,
@@ -17,13 +16,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { createAdminCoordinator, createAdminVolunteer, getAdminRoleAccounts, getPublicSports, updateAdminRoleAccount, deleteAdminRoleAccount, updateAdminTeam, MongoSport } from "@/lib/api";
 import { Team } from "@/lib/fixture-generator";
-import { createAdminDualRoleAccount } from "@/lib/api";
 
 interface AppUser {
   id: string;
   fullName: string;
   email: string;
-  phone?: string;
   deptName: string;
   role: "admin" | "volunteer" | "coordinator" | string;
   assignedSport?: string;
@@ -113,7 +110,7 @@ export function UsersViewer({
   const [roleAccounts, setRoleAccounts] = useState<AppUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [accountRole, setAccountRole] = useState<"coordinator" | "volunteer" | "both">("coordinator");
+  const [accountRole, setAccountRole] = useState<"coordinator" | "volunteer">("coordinator");
   const [accountSport, setAccountSport] = useState("");
   const [accountSportId, setAccountSportId] = useState("");
   const [accountSportName, setAccountSportName] = useState("");
@@ -216,9 +213,7 @@ export function UsersViewer({
     try {
       const result = accountRole === "coordinator"
         ? await createAdminCoordinator(payload)
-        : accountRole === "volunteer"
-          ? await createAdminVolunteer(payload)
-          : await createAdminDualRoleAccount(payload);
+        : await createAdminVolunteer(payload);
 
       setAccountName("");
       setAccountEmail("");
@@ -235,7 +230,7 @@ export function UsersViewer({
 
       const response = result as { message?: string; emailSent?: boolean };
       const msg = response.message || "";
-      const roleLabel = accountRole === "coordinator" ? "Coordinator" : accountRole === "volunteer" ? "Volunteer" : "Coordinator and Volunteer";
+      const roleLabel = accountRole === "coordinator" ? "Coordinator" : "Volunteer";
       if (response.emailSent) {
         setAccountSuccess(`${roleLabel} account created successfully. Duty assignment email sent to ${payload.email}.`);
       } else if (msg.replace(/\.$/, "") === "Account created successfully") {
@@ -530,12 +525,11 @@ export function UsersViewer({
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <select
                   value={accountRole}
-                  onChange={(event) => setAccountRole(event.target.value as "coordinator" | "volunteer" | "both")}
+                  onChange={(event) => setAccountRole(event.target.value as "coordinator" | "volunteer")}
                   className="h-12 w-full appearance-none rounded-xl border border-white/10 bg-slate-950 px-3 text-xs font-black uppercase tracking-widest text-white outline-none focus:border-accent"
                 >
                   <option value="coordinator">Coordinator</option>
                   <option value="volunteer">Volunteer</option>
-                  <option value="both">Coordinator + Volunteer</option>
                 </select>
                 <select
                   value={accountSport}
@@ -606,7 +600,7 @@ export function UsersViewer({
                   className="inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[10px] font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.01] disabled:opacity-50 sm:px-5"
                 >
                   <UserPlus size={15} className="shrink-0" />
-                  <span className="truncate">{isCreatingAccount ? "Creating..." : `Create ${accountRole === "coordinator" ? "Coordinator" : accountRole === "volunteer" ? "Volunteer" : "Both Roles"}`}</span>
+                  <span className="truncate">{isCreatingAccount ? "Creating..." : `Create ${accountRole === "coordinator" ? "Coordinator" : "Volunteer"}`}</span>
                 </button>
               </div>
             </form>
@@ -762,7 +756,6 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
                 </div>
                 <div className="mt-4 space-y-2 text-xs font-semibold text-slate-400">
                   <p className="break-all font-mono text-slate-300">{volunteer.email}</p>
-                  <p className="flex items-center gap-1.5"><Phone size={12} />{volunteer.phone || "Phone not recorded"}</p>
                   <p className="uppercase">{volunteer.assignedSportName || (volunteer.assignedSport ? getSportName(volunteer.assignedSport, volunteer.assignedSportName) : volunteer.deptName)}</p>
                   <p>{formatCreatedAt(volunteer.createdAt)}</p>
                 </div>
@@ -779,12 +772,11 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-[1040px] w-full text-left">
+            <table className="min-w-[900px] w-full text-left">
               <thead className="bg-slate-950/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-white/5">
                 <tr>
                   <th className="px-6 py-4">Name</th>
                   <th className="px-6 py-4">Email Address</th>
-                  <th className="px-6 py-4">Phone Number</th>
                   <th className="px-6 py-4">Department / Group</th>
                   <th className="px-6 py-4">Joined Date</th>
                   <th className="px-6 py-4 text-right">Role</th>
@@ -802,9 +794,6 @@ function VolunteersTable({ volunteers, loading, onEdit }: { volunteers: AppUser[
                         <Mail size={13} className="text-slate-500" />
                         <span>{volunteer.email}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-5 text-slate-300 font-medium">
-                      <div className="flex items-center gap-1.5 text-xs font-mono"><Phone size={13} className="text-slate-500" /><span>{volunteer.phone || "Not recorded"}</span></div>
                     </td>
                     <td className="px-6 py-5 text-slate-300 font-bold">
                       <div className="flex items-center gap-1.5 text-xs">

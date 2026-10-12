@@ -5,33 +5,13 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { PublicDashboardShell } from "@/components/layout/public-dashboard-shell";
-import { InvictaAssistant } from "@/components/invicta-assistant";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [, loading] = useAuthState(auth);
   const pathname = usePathname();
 
   const isLandingPage = pathname === "/";
-  const isPublicPage = [
-    "/about",
-    "/sports",
-    "/fixtures",
-    "/live",
-    "/live-score",
-    "/results",
-    "/standings",
-    "/announcements",
-    "/rules",
-    "/gallery",
-    "/public-register",
-    "/departments",
-    "/contact",
-    "/teams",
-    "/matches",
-    "/points-table",
-    "/public-dashboard",
-  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  const isAboutPage = pathname === "/about";
   const isAuthPage = pathname === "/login";
   const isTeamRegistrationPage = pathname === "/register";
   // Volunteer routes have their own layout and auth guard
@@ -40,16 +20,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAdminPage = pathname.startsWith("/admin") || pathname.startsWith("/admin-dashboard");
   const isCoordinatorPage = pathname.startsWith("/coordinator-dashboard");
 
-  if (isLandingPage) {
-    return <>{children}<InvictaAssistant /></>;
-  }
-
-  if (isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
+  if (isLandingPage || isAboutPage || isVolunteerPage || isAdminPage || isCoordinatorPage || isTeamRegistrationPage) {
     return <>{children}</>;
-  }
-
-  if (isPublicPage) {
-    return <><PublicDashboardShell>{children}</PublicDashboardShell><InvictaAssistant /></>;
   }
 
   if (loading && isAuthPage) {

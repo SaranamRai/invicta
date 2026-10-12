@@ -14,7 +14,7 @@ function CategorySection({ label, icon: Icon, children }: { label: string; icon:
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${gender === "Female" ? "bg-pink-500/15" : gender === "Male" ? "bg-blue-500/15" : "bg-accent/15 text-accent"}`}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
           {gender ? <GenderMark gender={gender} className="h-5 w-5" /> : <Icon size={16} />}
         </div>
         <h3 className="text-sm font-black uppercase tracking-[0.2em] text-accent">{label}</h3>
@@ -433,7 +433,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              <GenderMark gender="Male" className="h-5 w-5" />
+              <Shield size={18} />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Teams</p>
@@ -444,7 +444,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
-              <GenderMark gender="Female" className="h-5 w-5" />
+              <ShieldOff size={18} />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Teams</p>
@@ -455,7 +455,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              <GenderMark gender="Male" className="h-5 w-5" />
+              <Users size={18} />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Members</p>
@@ -466,7 +466,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
-              <GenderMark gender="Female" className="h-5 w-5" />
+              <Users size={18} />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Members</p>

@@ -100,7 +100,7 @@ export default function ResultsPage() {
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-border bg-card/40 p-6 text-center">
+    <div className="rounded-3xl border-2 border-dashed border-border bg-card/40 p-12 text-center">
       <Trophy size={44} className="mx-auto text-muted-foreground" />
       <p className="mt-4 text-sm font-semibold text-muted-foreground">{label}</p>
     </div>

@@ -83,7 +83,7 @@ export default function RulesPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {!selectedTournamentId ? (
-          <div className="col-span-full rounded-2xl border-2 border-dashed border-border bg-card/40 p-6 text-center">
+          <div className="col-span-full rounded-3xl border-2 border-dashed border-border bg-card/40 p-12 text-center">
             <BookOpen size={44} className="mx-auto text-muted-foreground" />
             <p className="mt-4 text-sm font-semibold text-muted-foreground">Please select a tournament.</p>
           </div>
@@ -108,7 +108,7 @@ export default function RulesPage() {
             )}
           </Card>
         )) : (
-          <div className="col-span-full rounded-2xl border-2 border-dashed border-border bg-card/40 p-6 text-center">
+          <div className="col-span-full rounded-3xl border-2 border-dashed border-border bg-card/40 p-12 text-center">
             <BookOpen size={44} className="mx-auto text-muted-foreground" />
             <p className="mt-4 text-sm font-semibold text-muted-foreground">Rules will appear here after the organizing team publishes them.</p>
           </div>
