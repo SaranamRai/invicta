@@ -504,9 +504,16 @@ export default function MatchesPage() {
                       <div className="flex min-w-0 flex-wrap items-center justify-center gap-5">
                         {/* Team A */}
                         <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-start gap-4 text-left">
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
-                            🏆
-                          </div>
+                          {match.status === "Finished" && match.scoreA !== match.scoreB && (
+                            <span className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black",
+                              match.scoreA > match.scoreB
+                                ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/30"
+                                : "bg-red-500/15 text-red-400 ring-1 ring-red-400/30"
+                            )}>
+                              {match.scoreA > match.scoreB ? "W" : "L"}
+                            </span>
+                          )}
                           <div className="min-w-0">
                             <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamA}</span>
                           </div>
@@ -535,9 +542,16 @@ export default function MatchesPage() {
                           <div className="min-w-0">
                             <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamB}</span>
                           </div>
-                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl shadow-inner transition-transform group-hover/team:scale-110">
-                            🥈
-                          </div>
+                          {match.status === "Finished" && match.scoreA !== match.scoreB && (
+                            <span className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black",
+                              match.scoreB > match.scoreA
+                                ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/30"
+                                : "bg-red-500/15 text-red-400 ring-1 ring-red-400/30"
+                            )}>
+                              {match.scoreB > match.scoreA ? "W" : "L"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
