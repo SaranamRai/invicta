@@ -403,6 +403,29 @@ a {
   min-width: 0;
 }
 
+.dashboard-surface h1 {
+  font-size: clamp(1.35rem, 2.5vw, 2.15rem);
+  line-height: 1.1;
+}
+
+.dashboard-surface h2 {
+  font-size: clamp(1.05rem, 2vw, 1.45rem);
+  line-height: 1.15;
+}
+
+.dashboard-surface [class*="gap-8"],
+.dashboard-surface [class*="gap-10"],
+.dashboard-surface [class*="gap-12"] {
+  gap: 1.25rem !important;
+}
+
+.dashboard-surface [class*="p-6"],
+.dashboard-surface [class*="p-8"],
+.dashboard-surface [class*="p-10"],
+.dashboard-surface [class*="p-12"] {
+  padding: 1.25rem !important;
+}
+
 .dashboard-surface button {
   min-height: 38px;
   line-height: 1.2;
@@ -486,7 +509,7 @@ a {
   .dashboard-surface [class*="gap-8"],
   .dashboard-surface [class*="gap-10"],
   .dashboard-surface [class*="gap-12"] {
-    gap: 1.25rem !important;
+    gap: 1rem !important;
   }
 }
 

@@ -157,11 +157,11 @@ export default function MatchesPage() {
   ];
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <header className="flex flex-col gap-8 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-8">
+      <header className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:pb-6">
         <div>
-          <h1 className="text-5xl font-black tracking-tighter sport-heading text-primary">Matches & Live Scores</h1>
+          <h1 className="text-3xl font-black tracking-tighter sport-heading text-primary sm:text-4xl">Matches & Live Scores</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-muted-foreground">
             See every published fixture, follow live scores during a match, and read updates posted by volunteers. Selected date: {formatFullDate(selectedDate)}.
           </p>
@@ -280,7 +280,7 @@ export default function MatchesPage() {
         </div>
       </header>
 
-      <section className="rounded-3xl border border-border bg-card/70 p-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
+      <section className="rounded-2xl border border-border bg-card/70 p-3 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-5 sm:p-4">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
           <h2 className="mt-1 text-xl font-black sport-heading text-foreground">Select Tournament</h2>
@@ -353,7 +353,7 @@ export default function MatchesPage() {
       </div>
 
       {/* Two-column layout: Matches (left) + Live Feed (right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-7">
 
         {/* ── Match List ── */}
         <div className="lg:col-span-2 space-y-8">
@@ -374,7 +374,7 @@ export default function MatchesPage() {
                   <div className="grid grid-cols-1 xl:grid-cols-[180px_minmax(0,1fr)_132px]">
                     {/* Status & Info */}
                     <div className={cn(
-                      "flex flex-col justify-center border-b p-5 sm:p-6 xl:border-b-0 xl:border-r",
+                      "flex flex-col justify-center border-b p-4 sm:p-5 xl:border-b-0 xl:border-r",
                       match.status === "Live" ? "bg-white/5 border-white/10" : "bg-secondary/30 border-border"
                     )}>
                       <div className="space-y-4">
@@ -408,7 +408,7 @@ export default function MatchesPage() {
                     </div>
 
                     {/* Teams & Score */}
-                    <div className="min-w-0 p-5 sm:p-6 xl:p-7">
+                    <div className="min-w-0 p-4 sm:p-5 xl:p-6">
                       <div className="flex min-w-0 flex-wrap items-center justify-center gap-5">
                         {/* Team A */}
                         <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-start gap-4 text-left">
@@ -426,11 +426,11 @@ export default function MatchesPage() {
                             "flex items-center gap-4 rounded-2xl border-2 px-6 py-4 shadow-2xl transition-all",
                             match.status === "Live" || match.status === "Paused" ? "bg-black/60 border-accent/40" : "bg-secondary border-border"
                           )}>
-                            <span className={cn("scoreboard-number text-4xl font-black leading-none sm:text-5xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
+                            <span className={cn("scoreboard-number text-3xl font-black leading-none sm:text-4xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
                               {match.status === "Upcoming" ? "00" : (match.scoreA ?? 0).toString().padStart(2, "0")}
                             </span>
                             <span className="text-3xl font-black italic text-accent opacity-50">:</span>
-                            <span className={cn("scoreboard-number text-4xl font-black leading-none sm:text-5xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
+                            <span className={cn("scoreboard-number text-3xl font-black leading-none sm:text-4xl", match.status === "Upcoming" ? "opacity-20" : "text-white")}>
                               {match.status === "Upcoming" ? "00" : (match.scoreB ?? 0).toString().padStart(2, "0")}
                             </span>
                           </div>
