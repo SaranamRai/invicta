@@ -12,20 +12,6 @@ const navLinks = [
   { label: "Contact", href: "/#contact" },
 ];
 
-const primaryActions = [
-  { label: "View Matches", href: "/matches", summary: "Upcoming and live fixtures" },
-  { label: "View Standings", href: "/standings", summary: "See league tables and rankings" },
-  { label: "Explore Sports", href: "/sports", summary: "Browse games, teams and categories" },
-  { label: "Register Team", href: "/public-register", summary: "Join the tournament" },
-];
-
-const overviewCards = [
-  { label: "Tournament status", value: "Open for participation", hint: "Check the latest updates and registration details" },
-  { label: "Upcoming fixtures", value: "Live schedule", hint: "Track match dates, venues and match status" },
-  { label: "Standings", value: "Updated results", hint: "Monitor team performance across sports" },
-  { label: "Support", value: "Staff access", hint: "Login for volunteers and coordinators" },
-];
-
 const sports = [
   "Cricket",
   "Badminton",
@@ -103,36 +89,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        <section className="px-5 pb-4 pt-2 sm:px-8">
-          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {overviewCards.map((card) => (
-              <div key={card.label} className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm shadow-black/5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{card.label}</p>
-                <h3 className="mt-3 text-2xl font-black text-foreground">{card.value}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{card.hint}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="px-5 pb-8 sm:px-8">
-          <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {primaryActions.map((action) => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="group rounded-2xl border border-border bg-card p-5 transition-all hover:border-accent hover:bg-accent/5 hover:shadow-md"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-foreground">{action.label}</p>
-                  <ArrowRight className="h-4 w-4 text-accent transition-transform group-hover:translate-x-1" />
-                </div>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{action.summary}</p>
-              </Link>
-            ))}
           </div>
         </section>
 
