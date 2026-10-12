@@ -204,7 +204,7 @@ export default function VolunteerDashboard() {
               const isFinished = match.status === "Finished" || match.period === "Full Time";
 
               return (
-                <Card key={match.id} className="p-6 relative overflow-hidden">
+                <Card key={match.id} className="relative overflow-hidden sm:p-5">
                   {isRunning && <div className="absolute left-0 top-0 h-full w-1 bg-accent" />}
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -224,7 +224,7 @@ export default function VolunteerDashboard() {
                     </span>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-[1.2fr_1fr_1.2fr] items-center gap-4 rounded-2xl bg-secondary/60 p-4">
+                  <div className="mt-4 grid grid-cols-[1.2fr_1fr_1.2fr] items-center gap-3 rounded-xl bg-secondary/60 p-3 sm:p-4">
                     <div className="flex flex-col items-center">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{match.teamA}</p>
                       <div className="flex items-center gap-1.5">
@@ -293,7 +293,7 @@ export default function VolunteerDashboard() {
                 </Card>
               );
             }) : (
-              <div className="col-span-full text-center p-10 border border-dashed border-border rounded-2xl">
+              <div className="col-span-full rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
                 <AlertCircle size={32} className="mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No matches for this sport</p>
               </div>
@@ -321,7 +321,7 @@ export default function VolunteerDashboard() {
                 </div>
               </Card>
             )) : (
-              <div className="text-center p-10 border border-dashed border-border rounded-2xl">
+              <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
                 <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">No recent activity</p>
               </div>
             )}

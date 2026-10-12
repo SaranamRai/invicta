@@ -378,7 +378,7 @@ function CoordinatorDashboardContent() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-3 py-5 sm:px-6 sm:py-6">
-        <section className="rounded-2xl border border-border bg-card p-6">
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-accent">

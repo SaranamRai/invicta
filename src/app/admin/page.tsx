@@ -244,7 +244,7 @@ function ApprovalsPanel() {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
       ) : filteredRegistrations.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+        <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
           <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
           <p className="mt-4 text-sm font-bold text-muted-foreground">No pending registrations match these filters</p>
         </div>
@@ -602,12 +602,12 @@ function ApprovedTeamsPanel({ onTeamDeleted }: { onTeamDeleted?: (registration: 
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
         </div>
       ) : !selectedTournament ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+        <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
           <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
           <p className="mt-4 text-sm font-bold text-muted-foreground">Please select a tournament.</p>
         </div>
       ) : visibleRegistrations.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+        <div className="rounded-xl border border-dashed border-border p-6 text-center sm:p-8">
           <CheckCircle size={40} className="mx-auto text-muted-foreground/40" />
           <p className="mt-4 text-sm font-bold text-muted-foreground">No approved teams found for these filters</p>
         </div>

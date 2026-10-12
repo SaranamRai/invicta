@@ -403,6 +403,16 @@ a {
   min-width: 0;
 }
 
+.dashboard-surface button {
+  min-height: 38px;
+  line-height: 1.2;
+}
+
+.dashboard-surface button:not([class*="h-"]) {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
 @media (max-width: 640px) {
   .dashboard-surface button,
   .dashboard-surface a {
@@ -438,7 +448,7 @@ a {
 
   .dashboard-surface button,
   .dashboard-surface a[role="button"] {
-    min-height: 42px;
+    min-height: 38px;
   }
 
   .dashboard-surface table {

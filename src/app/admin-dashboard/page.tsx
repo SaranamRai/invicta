@@ -90,7 +90,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-border bg-card p-4 shadow-sm ${className}`}>{children}</div>;
+  return <div className={`rounded-xl border border-border bg-card p-3.5 shadow-sm sm:p-4 ${className}`}>{children}</div>;
 }
 
 function MetricCard({ label, value, sub, icon: Icon }: { label: string; value: string | number; sub?: string; icon: typeof Activity }) {
