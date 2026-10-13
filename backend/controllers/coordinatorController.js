@@ -6,6 +6,7 @@ import Announcement from "../models/Announcement.js";
 import Rule from "../models/Rule.js";
 import Sport from "../models/Sport.js";
 import Volunteer from "../models/Volunteer.js";
+import AuditLog from "../models/AuditLog.js";
 import { createRoleAccount } from "./authController.js";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
@@ -283,6 +284,14 @@ export async function assignFixtureVolunteer(req, res) {
 
   fixture.assignedVolunteer = volunteer._id;
   await fixture.save();
+  await AuditLog.create({
+    action: "fixture-volunteer-assigned",
+    actorRole: req.user?.role || "coordinator",
+    actorEmail: req.user?.email || "",
+    targetType: "fixture",
+    targetId: fixture._id.toString(),
+    message: `${req.user?.email || "Coordinator"} assigned ${fixture.teamAName || "Team A"} vs ${fixture.teamBName || "Team B"} to ${volunteer.email || volunteer.name || volunteer._id} (${fixture.sportName || fixture.sport}, ${fixture.category || "Male"}, ${fixture.date || "date not set"}).`,
+  });
 
   return res.json({
     id: fixture._id.toString(),

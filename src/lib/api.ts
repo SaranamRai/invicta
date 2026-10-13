@@ -1752,6 +1752,11 @@ export interface TechnicalErrorLog extends TechnicalApiLog {
 export interface TechnicalAuditLog {
   _id: string;
   action: string;
+  actorRole?: string;
+  actorEmail?: string;
+  targetType?: string;
+  targetId?: string;
+  message?: string;
   performedBy?: string;
   role?: string;
   status?: string;

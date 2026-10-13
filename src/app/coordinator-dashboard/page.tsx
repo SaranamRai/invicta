@@ -427,7 +427,7 @@ function CoordinatorDashboardContent() {
             </div>
 
             {leagueTable.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="dashboard-info-scroll overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     <tr>
@@ -472,7 +472,7 @@ function CoordinatorDashboardContent() {
               <p className="mt-1 text-sm font-medium text-muted-foreground">Public notices related to your sport.</p>
             </div>
 
-            <div className="divide-y divide-border">
+            <div className="dashboard-info-scroll max-h-80 divide-y divide-border overflow-y-auto">
               {announcements.length > 0 ? announcements.slice(0, 5).map((announcement) => (
                 <div key={announcement._id} className="p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -512,7 +512,7 @@ function CoordinatorDashboardContent() {
             </span>
           </div>
 
-          <div className="mb-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr_1fr]">
+          <div className="dashboard-nested-panel mb-5 grid gap-3 rounded-xl border border-border bg-secondary/20 p-3 lg:grid-cols-[1.2fr_0.8fr_1fr]">
             <label className="space-y-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-accent">Tournament</span>
               <select

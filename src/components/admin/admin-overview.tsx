@@ -12,7 +12,7 @@ import { Team, Fixture } from "@/lib/fixture-generator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { sports } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import { getAdminRoleAccounts, getApiClientMetrics, RoleAccountPayload } from "@/lib/api";
+import { getAdminRoleAccounts, getApiClientMetrics, getTechnicalAdminAuditLogs, RoleAccountPayload, TechnicalAuditLog } from "@/lib/api";
 
 interface AdminOverviewProps {
   teams: Team[];
@@ -59,6 +59,7 @@ export function AdminOverview({
   const [calendarYear, setCalendarYear] = useState(today.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [auditActivity, setAuditActivity] = useState<TechnicalAuditLog[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
   const [roleAccounts, setRoleAccounts] = useState<RoleAccountPayload[]>([]);
   const [apiLatencyMs, setApiLatencyMs] = useState<number | null>(null);
@@ -166,6 +167,20 @@ export function AdminOverview({
     void loadSystemHealth();
     const interval = window.setInterval(loadSystemHealth, 1000);
 
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAuditActivity() {
+      const result = await getTechnicalAdminAuditLogs({ limit: "80" }).catch(() => ({ logs: [] }));
+      if (isMounted) setAuditActivity(result.logs);
+    }
+    void loadAuditActivity();
+    const interval = window.setInterval(loadAuditActivity, 5000);
     return () => {
       isMounted = false;
       window.clearInterval(interval);
@@ -581,6 +596,21 @@ export function AdminOverview({
                   ))}
                 </div>
               )}
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/10 p-3">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">Assignment and score activity</h4>
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+                {auditActivity.filter((entry) => entry.action === "fixture-volunteer-assigned" || entry.action === "volunteer-score-updated").length > 0 ? auditActivity
+                  .filter((entry) => entry.action === "fixture-volunteer-assigned" || entry.action === "volunteer-score-updated")
+                  .map((entry) => (
+                  <div key={entry._id} className="rounded-lg border border-white/10 bg-white/5 p-2.5">
+                    <p className="text-xs font-semibold text-slate-200">{entry.message || entry.details || entry.action}</p>
+                    <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                      {entry.actorRole || "user"} · {entry.actorEmail || entry.performedBy || "unknown"} · {new Date(entry.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                )) : <p className="text-xs text-slate-500">No assignment or score activity recorded yet.</p>}
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -7,6 +7,7 @@ import Gallery from "../models/Gallery.js";
 import Issue from "../models/Issue.js";
 import Result from "../models/Result.js";
 import Volunteer from "../models/Volunteer.js";
+import AuditLog from "../models/AuditLog.js";
 
 function normalizeSport(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
@@ -285,6 +286,14 @@ export async function updateLiveScore(req, res) {
 
   Object.keys(fixturePatch).forEach((key) => fixturePatch[key] === undefined && delete fixturePatch[key]);
   await Fixture.findByIdAndUpdate(req.params.fixtureId, fixturePatch);
+  await AuditLog.create({
+    action: "volunteer-score-updated",
+    actorRole: req.user?.role || "volunteer",
+    actorEmail: req.user?.email || "",
+    targetType: "fixture",
+    targetId: fixture._id.toString(),
+    message: `${req.user?.email || "Volunteer"} updated ${fixture.teamAName || "Team A"} vs ${fixture.teamBName || "Team B"} in ${fixture.sportName || fixture.sport} (${fixture.category || "Male"}) on ${fixture.date || "date not set"}: ${fixturePatch.scoreA}-${fixturePatch.scoreB}, status ${nextStatus}.`,
+  });
 
   return res.json(score);
 }

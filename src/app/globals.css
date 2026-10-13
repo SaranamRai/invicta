@@ -403,6 +403,16 @@ a {
   min-width: 0;
 }
 
+.dashboard-info-scroll {
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--accent)) transparent;
+}
+
+.dashboard-nested-panel {
+  min-width: 0;
+}
+
 @media (min-width: 1024px) {
   .responsive-match-list {
     max-height: min(70vh, 860px);

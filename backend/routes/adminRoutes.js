@@ -55,7 +55,7 @@ router.get("/stats", adminOnly, adminStats);
 router.get("/database-status", adminOnly, databaseStatus);
 router.get("/api-logs", adminOnly, apiLogs);
 router.get("/error-logs", adminOnly, errorLogs);
-router.get("/audit-logs", adminOnly, auditLogs);
+router.get("/audit-logs", adminOrSuper, auditLogs);
 router.get("/live-monitoring", adminOnly, liveMonitoring);
 router.get("/email-status", adminOnly, emailStatus);
 router.post("/test-smtp", adminOnly, testSmtp);
