@@ -169,14 +169,14 @@ export default function StandingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-card">
-                {visibleStandings.length > 0 ? visibleStandings.map((team, i) => (
-                  <tr key={`${team.sport}-${team.team}`} className={cn("group transition-all hover:bg-secondary/30", i < 3 && "bg-accent/5")}>
+                {visibleStandings.length > 0 ? visibleStandings.map((team) => (
+                  <tr key={`${team.sport}-${team.team}`} className={cn("group transition-all hover:bg-secondary/30", team.position <= 3 && "bg-accent/5")}>
                     <td className="px-8 py-6">
                       <span className={cn(
                         "flex h-10 w-10 items-center justify-center rounded-xl font-black sport-heading text-xl shadow-inner",
-                        i === 0 ? "bg-accent text-accent-foreground border-2 border-accent/20" :
-                        i === 1 ? "bg-slate-200 text-slate-800" :
-                        i === 2 ? "bg-amber-700/20 text-amber-900 dark:text-amber-200" :
+                        team.position === 1 ? "bg-accent text-accent-foreground border-2 border-accent/20" :
+                        team.position === 2 ? "bg-slate-200 text-slate-800" :
+                        team.position === 3 ? "bg-amber-700/20 text-amber-900 dark:text-amber-200" :
                         "bg-secondary text-muted-foreground"
                       )}>
                         {team.position}

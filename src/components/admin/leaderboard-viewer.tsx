@@ -111,10 +111,18 @@ function computeLeaderboard(
   const sorted = rows.sort((a, b) => {
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.won !== a.won) return b.won - a.won;
-    return a.name.localeCompare(b.name);
+    return 0;
   });
 
-  return sorted.map((row, idx) => ({ ...row, rank: idx + 1 }));
+  let previousRank = 0;
+  let previousRow: LeaderboardRow | null = null;
+  return sorted.map((row, idx) => {
+    if (!previousRow || row.pts !== previousRow.pts || row.won !== previousRow.won) {
+      previousRank = idx + 1;
+      previousRow = row;
+    }
+    return { ...row, rank: previousRank };
+  });
 }
 
 export function LeaderboardViewer({ teams, fixtures, onRecalculate }: LeaderboardViewerProps) {

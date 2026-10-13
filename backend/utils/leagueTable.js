@@ -38,6 +38,27 @@ export async function buildLeagueTable(filters = {}) {
     const key = `${row.tournamentId}:${row.sportId}:${row.category}`;
     groups.set(key, [...(groups.get(key) || []), row]);
   }
-  const compare = (a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor || a.team.localeCompare(b.team);
-  return [...groups.values()].flatMap((group) => group.sort(compare).map((row, index) => ({ ...row, position: index + 1, goalDifference: row.goalsFor - row.goalsAgainst })));
+  // Keep the existing official criteria in priority order. Do not use a
+  // presentation-only value such as team name to break an official tie.
+  const compareOfficialCriteria = (a, b) => (
+    b.points - a.points ||
+    (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) ||
+    b.goalsFor - a.goalsFor
+  );
+
+  return [...groups.values()].flatMap((group) => {
+    const sortedGroup = group
+      .map((row) => ({ ...row, goalDifference: row.goalsFor - row.goalsAgainst }))
+      .sort(compareOfficialCriteria);
+
+    let previousRank = 0;
+    let previousRow = null;
+    return sortedGroup.map((row, index) => {
+      if (!previousRow || compareOfficialCriteria(previousRow, row) !== 0) {
+        previousRank = index + 1;
+        previousRow = row;
+      }
+      return { ...row, position: previousRank };
+    });
+  });
 }
