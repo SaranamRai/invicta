@@ -22,6 +22,7 @@ import {
   deleteAdminFixture,
   deleteAdminFixtures,
   getAdminFixtures,
+  getAdminRoleAccounts,
   getAdminTeams,
   updateAdminFixture,
   getAdminSports,
@@ -33,6 +34,7 @@ import {
   deleteTeamRegistration,
   MongoSport,
   AdminFixturePayload,
+  RoleAccountPayload,
   TeamRegistrationPayload,
   TournamentPayload,
   downloadApprovedRegistrationsExcel,
@@ -718,16 +720,27 @@ export default function AdminDashboard() {
       if (refreshing) return;
       refreshing = true;
       try {
-        const [nextTeams, nextFixtures, nextTournaments] = await Promise.all([
+        const [nextTeams, nextFixtures, nextTournaments, nextRoleAccounts] = await Promise.all([
           getAdminTeams(),
           getAdminFixtures(),
           getAdminTournaments(),
+          getAdminRoleAccounts(),
         ]);
 
         if (!isMounted) return;
 
         setTeams(nextTeams as Team[]);
-        setFixtures(nextFixtures as Fixture[]);
+        const volunteerById = new Map(
+          nextRoleAccounts
+            .filter((account) => account.role === "volunteer")
+            .map((account) => [account.id, account.fullName || account.email])
+        );
+        setFixtures((nextFixtures as AdminFixturePayload[]).map((fixture) => ({
+          ...fixture,
+          assignedVolunteerName: fixture.assignedVolunteerName
+            || (fixture.assignedVolunteer ? volunteerById.get(fixture.assignedVolunteer) : "")
+            || "",
+        })) as Fixture[]);
         setTournaments(nextTournaments);
       } catch (error) {
         console.error("Failed to load Mongo admin data:", error);
