@@ -45,6 +45,7 @@ export interface Fixture {
   scoreA?: number;
   scoreB?: number;
   assignedVolunteer?: string;
+  assignedVolunteerName?: string;
 }
 
 /**

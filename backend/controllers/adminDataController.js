@@ -104,6 +104,9 @@ function mapTeam(team) {
 }
 
 function mapFixture(fixture) {
+  const assignedVolunteer = fixture.assignedVolunteer && typeof fixture.assignedVolunteer === "object"
+    ? fixture.assignedVolunteer
+    : null;
   const endTime = fixture.endTime instanceof Date
     ? `${String(fixture.endTime.getHours()).padStart(2, "0")}:${String(fixture.endTime.getMinutes()).padStart(2, "0")}`
     : typeof fixture.endTime === "string" && fixture.endTime.includes("T")
@@ -136,7 +139,8 @@ function mapFixture(fixture) {
     scoreA: fixture.scoreA || 0,
     scoreB: fixture.scoreB || 0,
     endedAt: fixture.endedAt,
-    assignedVolunteer: fixture.assignedVolunteer?.toString?.() || "",
+    assignedVolunteer: assignedVolunteer?._id?.toString?.() || fixture.assignedVolunteer?.toString?.() || "",
+    assignedVolunteerName: assignedVolunteer?.name || assignedVolunteer?.email || "",
   };
 }
 
@@ -1109,7 +1113,10 @@ export async function deleteTeam(req, res) {
 export async function listFixtures(req, res) {
   const assignedSport = getAssignedSport(req);
   const query = req.user?.role === "volunteer" && assignedSport ? { sport: assignedSport } : {};
-  const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
+  const fixtures = await Fixture.find(query)
+    .populate("assignedVolunteer", "name email")
+    .sort({ date: 1, time: 1 })
+    .lean();
   return res.json(fixtures.map(mapFixture));
 }
 

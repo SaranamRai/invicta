@@ -437,6 +437,7 @@ export interface AdminFixturePayload {
   matchGapMinutes?: number;
   round?: string;
   assignedVolunteer?: string;
+  assignedVolunteerName?: string;
   fixtureSource?: "MANUAL" | "AUTOMATIC" | "IMPORTED" | string;
 }
 

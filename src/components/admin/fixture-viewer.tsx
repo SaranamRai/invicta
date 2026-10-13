@@ -543,7 +543,9 @@ export function FixtureViewer({
                           <div className="flex items-center gap-2 text-slate-400">
                             <UsersRound size={14} />
                             <span className="text-xs">
-                              {fixture.assignedVolunteer ? `Volunteer assigned (${fixture.assignedVolunteer})` : "No volunteer assigned"}
+                              {fixture.assignedVolunteer
+                                ? `Volunteer assigned (${fixture.assignedVolunteerName || fixture.assignedVolunteer})`
+                                : "No volunteer assigned"}
                             </span>
                           </div>
                           {fixture.endedAt && (
