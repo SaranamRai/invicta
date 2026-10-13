@@ -103,10 +103,12 @@ function mapTeam(team) {
   };
 }
 
-function mapFixture(fixture) {
+function mapFixture(fixture, volunteerById = new Map()) {
   const assignedVolunteer = fixture.assignedVolunteer && typeof fixture.assignedVolunteer === "object"
     ? fixture.assignedVolunteer
     : null;
+  const assignedVolunteerId = assignedVolunteer?._id?.toString?.() || fixture.assignedVolunteer?.toString?.() || "";
+  const volunteer = assignedVolunteer || volunteerById.get(assignedVolunteerId);
   const endTime = fixture.endTime instanceof Date
     ? `${String(fixture.endTime.getHours()).padStart(2, "0")}:${String(fixture.endTime.getMinutes()).padStart(2, "0")}`
     : typeof fixture.endTime === "string" && fixture.endTime.includes("T")
@@ -139,8 +141,8 @@ function mapFixture(fixture) {
     scoreA: fixture.scoreA || 0,
     scoreB: fixture.scoreB || 0,
     endedAt: fixture.endedAt,
-    assignedVolunteer: assignedVolunteer?._id?.toString?.() || fixture.assignedVolunteer?.toString?.() || "",
-    assignedVolunteerName: assignedVolunteer?.name || assignedVolunteer?.email || "",
+    assignedVolunteer: assignedVolunteerId,
+    assignedVolunteerName: volunteer?.name || volunteer?.email || "",
   };
 }
 
@@ -1113,11 +1115,15 @@ export async function deleteTeam(req, res) {
 export async function listFixtures(req, res) {
   const assignedSport = getAssignedSport(req);
   const query = req.user?.role === "volunteer" && assignedSport ? { sport: assignedSport } : {};
-  const fixtures = await Fixture.find(query)
-    .populate("assignedVolunteer", "name email")
-    .sort({ date: 1, time: 1 })
-    .lean();
-  return res.json(fixtures.map(mapFixture));
+  const fixtures = await Fixture.find(query).sort({ date: 1, time: 1 }).lean();
+  const volunteerIds = fixtures
+    .map((fixture) => fixture.assignedVolunteer?.toString?.())
+    .filter(Boolean);
+  const volunteers = volunteerIds.length
+    ? await Volunteer.find({ _id: { $in: volunteerIds } }).select("_id name email").lean()
+    : [];
+  const volunteerById = new Map(volunteers.map((volunteer) => [volunteer._id.toString(), volunteer]));
+  return res.json(fixtures.map((fixture) => mapFixture(fixture, volunteerById)));
 }
 
 export async function replaceFixtures(req, res) {
