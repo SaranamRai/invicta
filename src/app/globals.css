@@ -413,6 +413,14 @@ a {
   min-width: 0;
 }
 
+.coordinator-scroll-panel {
+  min-width: 0;
+  max-height: min(65vh, 620px);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--accent)) transparent;
+}
+
 @media (min-width: 1024px) {
   .responsive-match-list {
     max-height: min(70vh, 860px);
@@ -425,6 +433,10 @@ a {
 @media (max-width: 1023px) {
   .responsive-match-list {
     overflow: visible;
+  }
+
+  .coordinator-scroll-panel {
+    max-height: min(60vh, 520px);
   }
 }
 

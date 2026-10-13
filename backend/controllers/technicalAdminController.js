@@ -95,7 +95,8 @@ export async function errorLogs(req, res) {
 
 export async function auditLogs(req, res) {
   const limit = Math.min(Number(req.query.limit || 50), 200);
-  res.json(await AuditLog.find({}).sort({ createdAt: -1 }).limit(limit).lean());
+  const logs = await AuditLog.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+  return res.json({ logs });
 }
 
 export async function liveMonitoring(_req, res) {

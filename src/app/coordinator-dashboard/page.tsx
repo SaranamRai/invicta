@@ -427,9 +427,9 @@ function CoordinatorDashboardContent() {
             </div>
 
             {leagueTable.length > 0 ? (
-              <div className="dashboard-info-scroll overflow-x-auto">
+              <div className="coordinator-scroll-panel dashboard-info-scroll overflow-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <thead className="sticky top-0 z-10 bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Rank</th>
                       <th className="px-4 py-3">Department</th>
@@ -608,9 +608,9 @@ function CoordinatorDashboardContent() {
               Please select a tournament to view matches.
             </div>
           ) : filteredFixtures.length > 0 ? (
-            <div className="overflow-x-auto rounded-2xl border border-border">
+            <div className="coordinator-scroll-panel dashboard-info-scroll overflow-auto rounded-2xl border border-border">
               <table className="w-full text-left text-sm">
-                <thead className="bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-secondary text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Fixture</th>
                     <th className="px-4 py-3">Category</th>
@@ -681,7 +681,7 @@ function CoordinatorDashboardContent() {
                 <p className="text-sm font-semibold text-muted-foreground">Please select a tournament above to view teams.</p>
               </div>
             ) : filteredTeams.length > 0 ? (
-              <div className="p-5 space-y-5">
+              <div className="coordinator-scroll-panel dashboard-info-scroll space-y-5 overflow-y-auto p-5">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-blue-400 border-b border-white/10 pb-2">
                     <GenderMark gender="Male" className="h-5 w-5" />
@@ -926,9 +926,9 @@ function CoordinatorDashboardContent() {
               <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Volunteers Under This Sport</h3>
             </div>
             {volunteers.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="coordinator-scroll-panel dashboard-info-scroll overflow-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-background text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <thead className="sticky top-0 z-10 bg-background text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Email</th>

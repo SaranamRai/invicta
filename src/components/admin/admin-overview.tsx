@@ -177,7 +177,7 @@ export function AdminOverview({
     let isMounted = true;
     async function loadAuditActivity() {
       const result = await getTechnicalAdminAuditLogs({ limit: "80" }).catch(() => ({ logs: [] }));
-      if (isMounted) setAuditActivity(result.logs);
+      if (isMounted) setAuditActivity(Array.isArray(result.logs) ? result.logs : []);
     }
     void loadAuditActivity();
     const interval = window.setInterval(loadAuditActivity, 5000);
