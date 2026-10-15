@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { loginRoleAccount } from "@/lib/api";
 import { roleHomePath, storePortalSession } from "@/lib/role-auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InvictaLogo } from "@/components/invicta-logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -64,7 +65,7 @@ export default function LoginPage() {
               />
             </div>
             <span className="h-12 w-px shrink-0 bg-slate-300" aria-hidden="true" />
-            <span className="min-w-0 text-2xl font-black uppercase text-slate-900 sport-heading sm:text-4xl">Invicta</span>
+            <InvictaLogo className="h-12 w-32 shrink-0 sm:h-16 sm:w-44" />
           </div>
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 sm:text-xs">Choose a role and open the right dashboard</p>
         </div>

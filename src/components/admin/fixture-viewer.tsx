@@ -70,6 +70,24 @@ export function FixtureViewer({
   const completedCount = filteredFixtures.filter((fixture) => fixture.status === "completed").length;
   const upcomingCount = filteredFixtures.filter((fixture) => fixture.status === "scheduled").length;
   const assignedVolunteerCount = filteredFixtures.filter((fixture) => Boolean(fixture.assignedVolunteer)).length;
+  const conflictFixtures = filteredFixtures.filter((fixture, index, all) => all.some((other, otherIndex) =>
+    otherIndex !== index &&
+    other.date === fixture.date &&
+    other.time === fixture.time &&
+    other.venue &&
+    other.venue === fixture.venue
+  ));
+  const toMinutes = (value: string) => {
+    const [hours, minutes] = value.split(":").map(Number);
+    return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : -1;
+  };
+  const restConflicts = filteredFixtures.filter((fixture, index, all) => all.some((other, otherIndex) => {
+    if (otherIndex === index || other.date !== fixture.date) return false;
+    const sameTeam = [fixture.teamA, fixture.teamB].some((team) => team && (team === other.teamA || team === other.teamB));
+    const first = toMinutes(fixture.time);
+    const second = toMinutes(other.time);
+    return sameTeam && first >= 0 && second >= 0 && Math.abs(first - second) < 30;
+  }));
 
   const groupedByDate = filteredFixtures.reduce(
     (acc, fixture) => {
@@ -423,6 +441,13 @@ export function FixtureViewer({
 
       {/* Fixtures by Date */}
       <div className="responsive-match-list space-y-5 sm:space-y-6">
+        {(conflictFixtures.length > 0 || restConflicts.length > 0) && (
+          <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-200">
+            Schedule conflict detected:
+            {conflictFixtures.length > 0 && ` ${conflictFixtures.length} fixture${conflictFixtures.length === 1 ? "" : "s"} share a venue and start time.`}
+            {restConflicts.length > 0 && ` ${restConflicts.length} team assignment${restConflicts.length === 1 ? "" : "s"} allow less than 30 minutes of rest.`}
+          </div>
+        )}
         {Object.entries(groupedByDate).length === 0 ? (
           <Card className="bg-slate-900/60 border-dashed border-white/10 text-white animate-fadeIn">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -577,6 +602,13 @@ export function FixtureViewer({
                               <Edit3 size={13} /> Reschedule
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => window.print()}
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-bold px-3 py-2 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 transition-all uppercase tracking-wider"
+                          >
+                            <ListChecks size={13} /> Printable Sheet
+                          </button>
                           {onDeleteFixture && (
                             <button
                               onClick={() => {

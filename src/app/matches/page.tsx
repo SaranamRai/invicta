@@ -133,6 +133,46 @@ export default function MatchesPage() {
     ? matchesData.find((match) => match.id === selectedMatchId) || null
     : null;
 
+  const selectMatch = (matchId: string | null) => {
+    setSelectedMatchId(matchId);
+    if (matchId) {
+      window.localStorage.setItem("invicta-selected-match", matchId);
+      window.dispatchEvent(new CustomEvent("invicta-match-selected", { detail: matchId }));
+    } else {
+      window.localStorage.removeItem("invicta-selected-match");
+      window.dispatchEvent(new CustomEvent("invicta-match-cleared"));
+    }
+  };
+
+  React.useEffect(() => {
+    const storedMatchId = window.localStorage.getItem("invicta-selected-match");
+    if (storedMatchId) window.setTimeout(() => setSelectedMatchId(storedMatchId), 0);
+  }, []);
+
+  React.useEffect(() => {
+    if (!selectedMatchId) {
+      window.localStorage.removeItem("invicta-selected-match");
+      return;
+    }
+
+    if (selectedMatch?.status === "Finished") {
+      window.setTimeout(() => setSelectedMatchId(null), 0);
+      window.localStorage.removeItem("invicta-selected-match");
+      return;
+    }
+
+    window.localStorage.setItem("invicta-selected-match", selectedMatchId);
+  }, [selectedMatchId, selectedMatch?.status]);
+
+  React.useEffect(() => {
+    if (!selectedMatchId) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") selectMatch(null);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [selectedMatchId]);
+
   const selectedMatchFeeds = selectedMatchId
     ? liveFeeds.filter((feed) => feed.matchId === selectedMatchId)
     : [];
@@ -306,10 +346,10 @@ export default function MatchesPage() {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-border bg-card/70 p-3 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-3.5">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Tournament</p>
-          <h2 className="mt-1 text-lg font-black sport-heading text-foreground">Select Tournament</h2>
+      <section className="rounded-xl border border-border bg-card/70 px-3 py-2.5 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex items-center gap-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-accent">Tournament</p>
+          <h2 className="text-sm font-black uppercase tracking-tight sport-heading text-foreground">Select</h2>
         </div>
         <select
           value={selectedTournamentId}
@@ -318,7 +358,7 @@ export default function MatchesPage() {
             setSelectedSport("All Sports");
             setSelectedMatchId(null);
           }}
-          className="mt-3 h-10 w-full rounded-2xl border border-border bg-background px-3 text-sm font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-sm"
+          className="mt-2 h-9 w-full rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground outline-none transition-colors focus:border-accent sm:mt-0 sm:max-w-xs"
         >
           {tournaments.length === 0 ? (
             <option value="">No tournaments available</option>
@@ -448,9 +488,10 @@ export default function MatchesPage() {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-7">
 
         {/* ── Match List ── */}
-        <div className="responsive-match-list lg:col-span-2 space-y-5 sm:space-y-6">
-          <AnimatePresence mode="popLayout">
-            {filteredMatches.length > 0 ? filteredMatches.map((match, i) => (
+        <div className="lg:col-span-2">
+          <div className="responsive-match-list max-h-[62dvh] min-h-[22rem] touch-pan-y overscroll-contain space-y-5 overflow-x-hidden overflow-y-auto rounded-2xl border-2 border-border bg-card/45 p-3 shadow-inner [-webkit-overflow-scrolling:touch] sm:max-h-[calc(100dvh-16rem)] sm:space-y-6 sm:p-4 lg:max-h-[calc(100dvh-17rem)]">
+            <AnimatePresence mode="popLayout">
+              {filteredMatches.length > 0 ? filteredMatches.map((match, i) => (
               <motion.div
                 key={match.id}
                 layout
@@ -501,9 +542,9 @@ export default function MatchesPage() {
 
                     {/* Teams & Score */}
                     <div className="min-w-0 p-4 sm:p-5 xl:p-6">
-                      <div className="flex min-w-0 flex-wrap items-center justify-center gap-5">
+                      <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:gap-5">
                         {/* Team A */}
-                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-start gap-4 text-left">
+                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.5rem)] items-center justify-start gap-2 text-left sm:gap-4">
                           {match.status === "Finished" && match.scoreA !== match.scoreB && (
                             <span className={cn(
                               "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black",
@@ -515,7 +556,7 @@ export default function MatchesPage() {
                             </span>
                           )}
                           <div className="min-w-0">
-                            <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamA}</span>
+                            <span className="sport-heading block max-w-full truncate whitespace-nowrap text-sm font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamA}</span>
                           </div>
                         </div>
 
@@ -538,9 +579,9 @@ export default function MatchesPage() {
                         </div>
 
                         {/* Team B */}
-                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.75rem)] items-center justify-end gap-4 text-right">
+                        <div className="group/team order-1 flex min-w-0 flex-1 basis-[calc(50%-0.5rem)] items-center justify-end gap-2 text-right sm:gap-4">
                           <div className="min-w-0">
-                            <span className="sport-heading block break-words text-xl font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamB}</span>
+                            <span className="sport-heading block max-w-full truncate whitespace-nowrap text-sm font-black uppercase tracking-wide text-white sm:text-2xl lg:text-3xl">{match.teamB}</span>
                           </div>
                           {match.status === "Finished" && match.scoreA !== match.scoreB && (
                             <span className={cn(
@@ -560,44 +601,16 @@ export default function MatchesPage() {
                     <div className="flex items-center justify-center border-t border-white/10 bg-white/5 p-5 xl:border-l xl:border-t-0">
                       <button
                         type="button"
-                        onClick={() => setSelectedMatchId((current) => current === match.id ? null : match.id)}
+                        onClick={() => selectMatch(match.id)}
                         className="w-full rounded-xl bg-accent px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-95"
                       >
-                        {selectedMatchId === match.id ? "Hide Match" : "View Match"}
+                        View Match
                       </button>
                     </div>
                   </div>
                 </Card>
-                {selectedMatchId === match.id && (
-                  <Card className="mt-4 border-2 p-5">
-                    <div className="grid gap-4 md:grid-cols-4">
-                      <DetailItem label="Date" value={match.date || "TBD"} />
-                      <DetailItem label="Time" value={match.time || "TBD"} />
-                      <DetailItem label="Venue" value={match.venue || "Venue TBD"} />
-                      <DetailItem label="Status" value={match.status} />
-                    </div>
-                    <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">
-                      <p className="sport-heading text-lg font-black uppercase text-foreground">
-                        {match.teamA} {match.scoreA ?? 0} - {match.scoreB ?? 0} {match.teamB}
-                      </p>
-                      <p className="mt-1 text-xs font-black uppercase tracking-widest text-accent">
-                        {match.sport} / {getMatchPeriod(match)}
-                      </p>
-                    </div>
-                    {match.announcements && match.announcements.length > 0 && (
-                      <div className="mt-5 space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Match Updates</p>
-                        {match.announcements.map((announcement, index) => (
-                          <p key={`${match.id}-announcement-${index}`} className="rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground">
-                            {announcement}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                )}
               </motion.div>
-            )) : (
+              )) : (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -611,13 +624,14 @@ export default function MatchesPage() {
                   Once the organizing team adds fixtures, they will appear here with date, time, venue, teams, and scores.
                 </p>
               </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* ── Global Live Feed (sticky right column) ── */}
         <div className="lg:col-span-1">
-          <div className="sticky top-8 space-y-5">
+          <div className="space-y-5 lg:sticky lg:top-8">
             <div className="flex items-center gap-3 pb-4 border-b border-border">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
@@ -633,7 +647,7 @@ export default function MatchesPage() {
               </div>
             )}
 
-            <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+            <div className="max-h-[48dvh] touch-pan-y space-y-4 overflow-x-hidden overflow-y-auto rounded-2xl border-2 border-border bg-card/45 p-3 pr-2 [-webkit-overflow-scrolling:touch] sm:max-h-[65vh] lg:max-h-[80vh]">
               <AnimatePresence initial={false}>
                 {!selectedMatchId ? (
                   <div className="text-center py-16 border border-dashed border-border rounded-2xl">
@@ -684,6 +698,73 @@ export default function MatchesPage() {
             </div>
           </div>
         </div>
+
+        {selectedMatch && selectedMatch.status !== "Finished" && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="match-preview-title"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) selectMatch(null);
+            }}
+          >
+            <Card className="max-h-[90vh] w-full max-w-3xl overflow-y-auto border-2 p-5 shadow-2xl sm:p-7">
+              <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">Match Centre</p>
+                  <h2 id="match-preview-title" className="mt-1 sport-heading text-2xl font-black text-foreground">
+                    {selectedMatch.teamA} vs {selectedMatch.teamB}
+                  </h2>
+                  <p className="mt-1 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                    {selectedMatch.sport} / {getMatchPeriod(selectedMatch)}
+                  </p>
+                </div>
+                <button type="button" onClick={() => selectMatch(null)} className="shrink-0 rounded-xl border border-border px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors hover:border-accent hover:text-foreground">
+                  Cancel
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <DetailItem label="Date" value={selectedMatch.date || "TBD"} />
+                <DetailItem label="Time" value={selectedMatch.time || "TBD"} />
+                <DetailItem label="Venue" value={selectedMatch.venue || "Venue TBD"} />
+                <DetailItem label="Weather" value="☀️ 29°C" />
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-5 text-center">
+                <p className="scoreboard-number text-4xl font-black text-foreground">
+                  {selectedMatch.scoreA ?? 0} <span className="mx-2 text-accent">:</span> {selectedMatch.scoreB ?? 0}
+                </p>
+                <p className="mt-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                  {selectedMatch.status === "Live" ? "Live now" : selectedMatch.status}
+                </p>
+              </div>
+
+              {selectedMatch.announcements && selectedMatch.announcements.length > 0 && (
+                <div className="mt-5 space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Match Updates</p>
+                  {selectedMatch.announcements.map((announcement, index) => (
+                    <p key={`${selectedMatch.id}-announcement-${index}`} className="rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground">{announcement}</p>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-5">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Chronological Match Events</p>
+                <div className="space-y-2 border-l-2 border-accent/30 pl-4">
+                  {(selectedMatch.scoreEvents || []).slice().sort((a, b) => a.timestamp - b.timestamp).map((event) => (
+                    <div key={event.id} className="relative text-xs font-semibold text-foreground">
+                      <span className="absolute -left-[1.35rem] top-1 h-2 w-2 rounded-full bg-accent" />
+                      <span className="font-black text-accent">{event.matchTime}</span> · Score +{event.points} - {event.teamName}
+                    </div>
+                  ))}
+                  {(!selectedMatch.scoreEvents || selectedMatch.scoreEvents.length === 0) && <p className="text-xs font-medium text-muted-foreground">No scored events recorded yet.</p>}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
       </div>
     </div>

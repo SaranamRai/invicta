@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -18,8 +18,15 @@ export const metadata: Metadata = {
   description: "Register teams, follow fixtures and live scores, and view inter-department sports standings for MSU Invicta.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  userScalable: true,
+};
+
 
 import { AuthGuard } from "@/components/auth-guard";
+import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 
 export default function RootLayout({
   children,
@@ -29,13 +36,13 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${outfit.variable} ${inter.variable}`}>
       <body className="bg-background text-foreground antialiased selection:bg-accent selection:text-accent-foreground font-sans overflow-x-hidden">
-        <AuthGuard>{children}</AuthGuard>
+        <AuthGuard>
+          {children}
+          <LiveScoreFloatingButton />
+        </AuthGuard>
       </body>
     </html>
   );
 }
-
-
-
 
 

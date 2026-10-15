@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Calendar,
   ClipboardList,
+  Flame,
   Home,
   LogIn,
   Radio,
@@ -38,6 +39,8 @@ export default function PublicDashboard() {
   const [teamsData, setTeamsData] = useState<Team[]>([]);
   const [now, setNow] = useState(0);
   const [tournaments, setTournaments] = useState<TournamentPayload[]>([]);
+  const [standingsView, setStandingsView] = useState<"table" | "bracket">("table");
+  const [cheers, setCheers] = useState<Record<string, number>>({});
 
   const { registrationOpen, openTournament, nextTournament } = useMemo(() => {
     const normalized = tournaments
@@ -174,6 +177,13 @@ export default function PublicDashboard() {
     { label: "Check League Tables", href: "/standings", icon: Trophy },
   ];
 
+  const tickerItems = matchesData
+    .filter((match) => match.status === "Live" || match.status === "Upcoming")
+    .slice(0, 8)
+    .map((match) => match.status === "Live"
+      ? `LIVE ${match.sportName || match.sport}: ${match.teamA} ${match.scoreA}-${match.scoreB} ${match.teamB}`
+      : `UP NEXT ${match.teamA} vs ${match.teamB}${match.time ? ` · ${match.time}` : ""}`);
+
   const easyPaths = [
     { label: "Visitors", href: "/matches", icon: Radio },
     { label: "Teams", href: registrationOpen ? "/public-register" : "/", icon: ClipboardList },
@@ -187,7 +197,16 @@ export default function PublicDashboard() {
   };
 
   return (
-    <div className="dashboard-surface min-h-screen space-y-6 bg-background text-foreground sm:space-y-8">
+    <div className="dashboard-surface min-h-[100dvh] overflow-y-visible space-y-6 bg-background text-foreground sm:space-y-8">
+      <div className="overflow-hidden rounded-xl border border-accent/20 bg-accent/10 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-foreground">
+        <div className="flex min-w-max animate-[ticker_28s_linear_infinite] gap-10 px-4">
+          {(tickerItems.length ? tickerItems : ["INVICTA LIVE · Follow fixtures, scores, and tournament updates"]).map((item, index) => (
+            <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
+              <Radio size={12} className="text-accent" /> {item}
+            </span>
+          ))}
+        </div>
+      </div>
       <section className="public-dashboard-hero relative overflow-hidden rounded-xl bg-[#020617] text-white shadow-xl ring-1 ring-white/10 sm:rounded-2xl">
         <div className="absolute inset-0 bg-no-repeat opacity-100" style={heroBackdropStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,#020617_0%,rgba(2,6,23,0.66)_42%,rgba(2,6,23,0.36)_100%)]" />
@@ -290,8 +309,8 @@ export default function PublicDashboard() {
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
-        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-8">
+      <div className="grid items-stretch gap-5 lg:grid-cols-3 lg:gap-6">
+        <div className="flex min-w-0 flex-col space-y-5 lg:col-span-2 lg:space-y-8">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-primary" />
@@ -300,8 +319,37 @@ export default function PublicDashboard() {
             <Link href="/standings" className="text-xs font-black uppercase tracking-widest text-primary hover:text-accent">Full Table</Link>
           </div>
 
-          <Card className="border-2 p-4 sm:p-5">
-            {standingsBySport.length > 0 ? (
+          <div className="flex w-fit rounded-xl border border-border bg-secondary/50 p-1">
+            {[
+              ["table", "Points Table"],
+              ["bracket", "Tournament Bracket"],
+            ].map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setStandingsView(value as "table" | "bracket")} className={cn("rounded-lg px-3 py-2 text-[9px] font-black uppercase tracking-widest transition-colors", standingsView === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <Card className="flex h-full flex-col border-2 p-4 sm:p-5 lg:min-h-[36rem]">
+            {standingsView === "bracket" ? (
+              <div className="flex flex-1 flex-col justify-center gap-6">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-accent">Knockout Progression</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {[
+                    ["Semi-finals", standingsBySport[0]?.rows.slice(0, 4).map((row) => row.team) || ["Qualifier A", "Qualifier B", "Qualifier C", "Qualifier D"]],
+                    ["Final", ["Winner SF1", "Winner SF2"]],
+                    ["Champion", ["Tournament Champion"]],
+                  ].map(([round, teams]) => (
+                    <div key={String(round)} className="space-y-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{round}</p>
+                      {(teams as string[]).map((team, index) => (
+                        <div key={`${team}-${index}`} className="rounded-xl border border-border bg-secondary/40 px-3 py-4 text-sm font-black text-foreground">{team}</div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : standingsBySport.length > 0 ? (
               <div className="grid gap-4">
                 {standingsBySport.map((sport) => (
                   <div key={sport.id} className="overflow-hidden rounded-xl border border-border bg-background/40">
@@ -343,7 +391,7 @@ export default function PublicDashboard() {
           </Card>
         </div>
 
-        <div className="min-w-0 space-y-5 lg:space-y-6">
+        <div className="flex min-w-0 flex-col space-y-5 lg:space-y-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-1.5 rounded-full bg-accent" />
@@ -354,7 +402,7 @@ export default function PublicDashboard() {
             </Link>
           </div>
 
-          <div className="max-h-[36rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner">
+          <div className="h-full max-h-[36rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card/40 p-2 pr-2 shadow-inner lg:min-h-[36rem]">
             {matchesData.length > 0 ? matchesData.map((match, i) => (
               <motion.div
                 key={match.id}
@@ -408,6 +456,20 @@ export default function PublicDashboard() {
                       </span>
                     )}
                   </div>
+                  {match.status === "Live" && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                        <span>Fan support</span>
+                        <span>{cheers[match.id] || 0} cheers</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(95, 50 + ((cheers[match.id] || 0) % 45))}%` }} />
+                      </div>
+                      <button type="button" onClick={() => setCheers((current) => ({ ...current, [match.id]: (current[match.id] || 0) + 1 }))} className="inline-flex items-center gap-1.5 rounded-lg bg-accent/15 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-accent transition-colors hover:bg-accent/25">
+                        <Flame size={13} /> Cheer
+                      </button>
+                    </div>
+                  )}
                 </Card>
               </motion.div>
             )) : (

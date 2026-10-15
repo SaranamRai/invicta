@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, Mail, Phone } from "lucide-react";
-import { LiveScoreFloatingButton } from "@/components/layout/live-score-floating-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { InvictaLogo } from "@/components/invicta-logo";
 import { MedhaviLogo } from "@/components/medhavi-logo";
@@ -8,7 +7,7 @@ import { SportMark } from "@/components/sport-mark";
 
 const navLinks = [
   { label: "Home", href: "/#home" },
-  { label: "About", href: "/about" },
+  { label: "About Us", href: "/about" },
   { label: "Contact", href: "/#contact" },
 ];
 
@@ -27,10 +26,15 @@ export default function LandingPage() {
     <div className="landing-page min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
       <header className="fixed inset-x-0 top-0 z-40 px-2 pt-2 sm:px-5 sm:pt-5">
         <div className="landing-navbar mx-auto flex max-w-[1400px] flex-col items-stretch justify-between gap-2 rounded-[22px] border border-[#e4dccd] bg-[#f4f1ee]/80 px-2 py-2 shadow-[0_12px_26px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-5 lg:px-5 lg:flex-nowrap">
-          <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center justify-center gap-3 sm:justify-start">
-            <MedhaviLogo className="h-10 w-28 sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
-            <InvictaLogo className="h-9 w-28 sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
-          </Link>
+          <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-4">
+            <Link href="/" aria-label="MSU Invicta home" className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <MedhaviLogo className="h-9 w-24 sm:h-12 sm:w-36 lg:h-16 lg:w-52" />
+              <InvictaLogo className="h-8 w-24 sm:h-10 sm:w-32 lg:h-12 lg:w-48" />
+            </Link>
+            <div className="shrink-0 lg:hidden">
+              <ThemeToggle />
+            </div>
+          </div>
 
           <nav className="order-3 flex w-full items-center justify-center gap-1 overflow-x-auto rounded-full border border-[#d8d2ca] bg-white/15 p-1 sm:gap-2 lg:order-none lg:w-auto lg:overflow-visible">
             {navLinks.map((link, index) => (
@@ -44,13 +48,20 @@ export default function LandingPage() {
             ))}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center justify-center gap-2 sm:gap-3 lg:justify-end">
+          <div className="ml-auto hidden shrink-0 items-center justify-center gap-2 sm:gap-3 lg:flex lg:justify-end">
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       <main>
+        <div className="mx-auto max-w-[1400px] overflow-hidden rounded-xl border border-[#e4dccd] bg-[#f4f1ee]/75 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#1b1b1b] shadow-sm">
+          <div className="flex min-w-max animate-[ticker_30s_linear_infinite] gap-10 px-4">
+            <span>LIVE MATCHES · Follow scores and fixtures</span>
+            <span>UP NEXT · Check the public dashboard for tournament updates</span>
+            <span>INVICTA · Building Champions</span>
+          </div>
+        </div>
         <section id="home" className="relative isolate overflow-hidden pt-28 pb-10 sm:pt-32 lg:pt-36">
           <div className="landing-hero-shell relative mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-[#ede2d0] bg-[#f6f1ea] px-3 pb-8 pt-6 shadow-[0_18px_38px_rgba(15,23,42,0.06)] sm:px-6 sm:pb-10 lg:px-10 lg:pt-8 xl:px-12">
             <div className="landing-hero-light absolute inset-0" />
@@ -157,7 +168,6 @@ export default function LandingPage() {
           <span>Medhavi Skills University</span>
         </div>
       </footer>
-      <LiveScoreFloatingButton />
     </div>
   );
 }

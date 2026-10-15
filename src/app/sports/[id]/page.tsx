@@ -433,7 +433,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              <Shield size={18} />
+              <GenderMark gender="Male" className="h-8 w-8" />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Teams</p>
@@ -444,7 +444,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
-              <ShieldOff size={18} />
+              <GenderMark gender="Female" className="h-8 w-8" />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Teams</p>
@@ -455,7 +455,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-              <Users size={18} />
+              <GenderMark gender="Male" className="h-8 w-8" />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Male Members</p>
@@ -466,7 +466,7 @@ export default function SportDetailPage({ params: paramsPromise }: { params: Pro
         <Card className="p-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-pink-500/20 flex items-center justify-center text-pink-400 shrink-0">
-              <Users size={18} />
+              <GenderMark gender="Female" className="h-8 w-8" />
             </div>
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Female Members</p>

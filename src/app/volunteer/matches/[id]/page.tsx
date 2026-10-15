@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { MatchData, MatchPeriod, ScoreEvent, VolleyballSet } from "@/lib/types";
 import { getMatchById, updateMatchDetails, logActivity } from "@/lib/services/mongo-service";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, Flag, Loader2, Pause, Play, Plus, Save, Square } from "lucide-react";
+import { BellRing, ChevronLeft, Flag, Loader2, Pause, Play, Plus, Save, Square, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
@@ -338,6 +338,18 @@ export default function LiveMatchEditPanel() {
       showMessage("Failed to record point.", "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAlertSupercoordinator = async () => {
+    if (!match) return;
+    try {
+      const email = getRoleAccount()?.email || "volunteer";
+      await logActivity(matchId, `URGENT ALERT: Assistance requested for ${match.teamA} vs ${match.teamB}`, email);
+      showMessage("Supercoordinator alerted for assistance.", "success");
+    } catch (error) {
+      console.error(error);
+      showMessage("Could not send assistance alert.", "error");
     }
   };
 
@@ -749,6 +761,35 @@ export default function LiveMatchEditPanel() {
             <h2 className="text-xl font-black uppercase tracking-wider text-white border-b border-white/10 pb-4 mb-6">
               Score and Match Status
             </h2>
+            <div className="mb-6 rounded-2xl border border-accent/30 bg-accent/10 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">Field Mode</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-300">Fast controls for touch scoring at the venue.</p>
+                </div>
+                <button type="button" onClick={() => void handleAlertSupercoordinator()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500/20 px-4 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500/30">
+                  <BellRing size={15} /> Alert Supercoordinator
+                </button>
+              </div>
+              {!isVolleyball && (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <button type="button" onClick={() => void recordScore("A", 1)} disabled={saving || match.status === "Finished"} className="h-14 rounded-xl bg-accent text-sm font-black text-accent-foreground disabled:opacity-50">+1 {match.teamA}</button>
+                  <button type="button" onClick={() => void recordScore("A", 2)} disabled={saving || match.status === "Finished"} className="h-14 rounded-xl bg-accent/80 text-sm font-black text-accent-foreground disabled:opacity-50">+2 {match.teamA}</button>
+                  <button type="button" onClick={() => void recordScore("B", 1)} disabled={saving || match.status === "Finished"} className="h-14 rounded-xl bg-accent text-sm font-black text-accent-foreground disabled:opacity-50">+1 {match.teamB}</button>
+                  <button type="button" onClick={() => void recordScore("B", 2)} disabled={saving || match.status === "Finished"} className="h-14 rounded-xl bg-accent/80 text-sm font-black text-accent-foreground disabled:opacity-50">+2 {match.teamB}</button>
+                </div>
+              )}
+              {isFootball && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <button type="button" onClick={match.clockRunning ? handlePauseMatch : handleStartClock} disabled={saving || match.status === "Finished"} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 text-[10px] font-black uppercase tracking-widest text-white">
+                    {match.clockRunning ? <Pause size={15} /> : <Play size={15} />} {match.clockRunning ? "Pause Clock" : "Start Clock"}
+                  </button>
+                  <button type="button" onClick={() => showMessage("Undo is available from the event log for signed-off matches.", "success")} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-widest text-white">
+                    <Undo2 size={15} /> Undo
+                  </button>
+                </div>
+              )}
+            </div>
             
             <form onSubmit={handleSave} className="space-y-8">
               {/* Status & Timer */}

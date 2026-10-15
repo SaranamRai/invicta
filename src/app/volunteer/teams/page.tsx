@@ -224,7 +224,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
-              <Shield size={18} />
+              <GenderMark gender="Male" className="h-8 w-8" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Male Teams</p>
@@ -235,7 +235,7 @@ export default function VolunteerTeamsPage() {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-pink-400">
-              <ShieldOff size={18} />
+              <GenderMark gender="Female" className="h-8 w-8" />
             </div>
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Female Teams</p>

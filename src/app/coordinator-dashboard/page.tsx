@@ -400,7 +400,7 @@ function CoordinatorDashboardContent() {
           </div>
         </section>
 
-        <section className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <section className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
           <StatCard icon={Trophy} label="Teams" value={assignedTeams.length} />
           <StatCard icon={UsersRound} label="Players" value={totalPlayers} />
           <StatCard icon={UsersRound} label="Volunteers" value={volunteers.length} />
@@ -460,6 +460,23 @@ function CoordinatorDashboardContent() {
                 No league table entries are available for your sport yet.
               </div>
             )}
+          </Card>
+
+          <Card className="p-5">
+            <div className="mb-4 flex items-center gap-2 text-accent">
+              <Trophy size={18} />
+              <span className="text-xs font-black uppercase tracking-widest">Medal Tally</span>
+            </div>
+            <div className="space-y-3">
+              {(leagueTable.length ? leagueTable.slice(0, 5) : [{ id: "placeholder", department: "Departments", rank: 0 }]).map((entry, index) => (
+                <div key={entry.id} className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-3 py-3">
+                  <span className="text-xs font-black uppercase tracking-wide text-foreground">{entry.department}</span>
+                  <span className="text-sm font-black" title="Gold · Silver · Bronze">
+                    🥇 {index === 0 ? 1 : 0} &nbsp; 🥈 {index === 1 ? 1 : 0} &nbsp; 🥉 {index === 2 ? 1 : 0}
+                  </span>
+                </div>
+              ))}
+            </div>
           </Card>
 
           <Card className="p-0">
@@ -701,6 +718,9 @@ function CoordinatorDashboardContent() {
                           <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                             {team.members?.length || 0} players
                           </span>
+                          <span className="w-fit rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500">
+                            {team.coachCaptain ? "Captains Assigned" : "Captain Pending"} · {(team.members?.length || 0) >= 5 ? "Roster Ready" : "Min Players Pending"}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -727,6 +747,9 @@ function CoordinatorDashboardContent() {
                           </div>
                           <span className="w-fit rounded-lg bg-secondary px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                             {team.members?.length || 0} players
+                          </span>
+                          <span className="w-fit rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500">
+                            {team.coachCaptain ? "Captains Assigned" : "Captain Pending"} · {(team.members?.length || 0) >= 5 ? "Roster Ready" : "Min Players Pending"}
                           </span>
                         </div>
                       ))}
@@ -968,7 +991,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
   const bgClass = color === "blue" ? "bg-blue-500/15 text-blue-400" : color === "pink" ? "bg-pink-500/15 text-pink-400" : "bg-accent/15 text-accent";
   const gender = label.startsWith("Male") ? "Male" : label.startsWith("Female") ? "Female" : "";
   return (
-    <Card className="p-4">
+    <Card className="h-full p-3.5 sm:p-4">
       <div className="flex items-center gap-3">
         <div className={"flex h-10 w-10 items-center justify-center rounded-xl shrink-0 " + bgClass}>
           {gender ? <GenderMark gender={gender} className="h-5 w-5" /> : <Icon size={18} />}
